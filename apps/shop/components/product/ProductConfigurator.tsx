@@ -3,12 +3,9 @@
 import { useState } from "react";
 import type { Size } from "@artsyde/db";
 import { ColorPicker } from "@/components/tshirt/ColorPicker";
-import type { DesignPlacement } from "@/components/tshirt/design";
+import { PRODUCT_PLACEMENT } from "@/components/tshirt/design";
 import { TshirtViewer } from "@/components/tshirt/TshirtViewer";
 import { formatXof } from "@/lib/format";
-
-/** Position du design des modèles du catalogue : centré sur la poitrine. */
-const PRODUCT_PLACEMENT: DesignPlacement = { side: "front", x: 0, y: 23, width: 13, rotation: 0 };
 
 type ProductConfiguratorProps = {
   product: {
