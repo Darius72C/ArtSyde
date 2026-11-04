@@ -9,14 +9,24 @@ import {
   MAX_DESIGN_LAYERS,
   type DesignLayer,
   type DesignPlacement,
+  type DesignSide,
 } from "./design";
 import { DesignControls } from "./DesignControls";
 import { DesignLayers } from "./DesignLayers";
 import { DesignUpload, type UploadedDesign } from "./DesignUpload";
+import { PhotoPreview } from "./PhotoPreview";
 import { TshirtViewer } from "./TshirtViewer";
 
+type ViewMode = "apercu" | "3d";
+
+const VIEW_MODES: { id: ViewMode; label: string }[] = [
+  { id: "apercu", label: "Aperçu photo" },
+  { id: "3d", label: "3D" },
+];
+
 /**
- * Configurateur : couleur du t-shirt + images du client placées sur le modèle 3D.
+ * Configurateur : couleur du t-shirt + images du client, vues en aperçu photo
+ * (devant / dos) ou sur le modèle 3D.
  * Pour l'instant, les images restent dans le navigateur. L'envoi vers le stockage
  * et l'enregistrement dans la commande viendront avec le panier.
  */
@@ -25,7 +35,18 @@ export function TshirtStudio() {
   const [layers, setLayers] = useState<DesignLayer[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  const [view, setView] = useState<ViewMode>("apercu");
+  const [viewSide, setViewSide] = useState<DesignSide>("front");
+
   const selected = layers.find((l) => l.id === selectedId) ?? null;
+  const selectedSide = selected?.placement.side;
+
+  // La vue suit la face de l'image sélectionnée (devant ou dos).
+  useEffect(() => {
+    if (selectedSide) setViewSide(selectedSide);
+  }, [selectedSide]);
+
+  const placed = layers.map(({ id, url, placement }) => ({ id, url, placement }));
 
   // Libère la mémoire de toutes les images quand le client quitte la page.
   const layersRef = useRef(layers);
@@ -74,12 +95,48 @@ export function TshirtStudio() {
 
   return (
     <section className="flex w-full flex-col items-center gap-6">
-      <TshirtViewer
-        color={color}
-        designs={layers.map(({ id, url, placement }) => ({ id, url, placement }))}
-        focusSide={selected?.placement.side}
-        className="h-[60vh] min-h-80 w-full max-w-2xl"
-      />
+      <div className="flex w-full max-w-2xl flex-col gap-2">
+        <div
+          role="tablist"
+          aria-label="Type d'aperçu"
+          className="flex self-center rounded-md border border-ash-gray p-1"
+        >
+          {VIEW_MODES.map((m) => {
+            const active = view === m.id;
+            return (
+              <button
+                key={m.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setView(m.id)}
+                className={`rounded px-3 py-1 text-sm transition ${
+                  active ? "bg-curse-violet text-ghost-white" : "text-ghost-white/70 hover:text-ghost-white"
+                }`}
+              >
+                {m.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {view === "apercu" ? (
+          <PhotoPreview
+            color={color}
+            side={viewSide}
+            onSideChange={setViewSide}
+            designs={placed}
+            className="h-[60vh] min-h-80 w-full"
+          />
+        ) : (
+          <TshirtViewer
+            color={color}
+            designs={placed}
+            focusSide={viewSide}
+            className="h-[60vh] min-h-80 w-full"
+          />
+        )}
+      </div>
 
       {layers.length > 0 && (
         <DesignLayers

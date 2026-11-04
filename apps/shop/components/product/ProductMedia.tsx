@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { PRODUCT_PLACEMENT } from "@/components/tshirt/design";
+import { PRODUCT_PLACEMENT, type DesignSide } from "@/components/tshirt/design";
+import { PhotoPreview } from "@/components/tshirt/PhotoPreview";
 import { TshirtViewer } from "@/components/tshirt/TshirtViewer";
 
-export type MediaMode = "photos" | "3d";
+export type MediaMode = "photos" | "apercu" | "3d";
 
 type ProductMediaProps = {
   name: string;
@@ -19,12 +20,14 @@ type ProductMediaProps = {
 
 const MODES: { id: MediaMode; label: string }[] = [
   { id: "photos", label: "Photos" },
+  { id: "apercu", label: "Aperçu" },
   { id: "3d", label: "3D" },
 ];
 
 /**
- * Visuel de la fiche produit : les photos (mockups) ou le t-shirt 3D interactif.
- * Sans mockup, seule la vue 3D est proposée.
+ * Visuel de la fiche produit, en trois modes : les photos (mockups), l'aperçu
+ * photo-réaliste dans la couleur choisie (devant / dos), ou le t-shirt 3D.
+ * Sans mockup, le mode Photos n'est pas proposé.
  */
 export function ProductMedia({
   name,
@@ -36,8 +39,11 @@ export function ProductMedia({
   onModeChange,
 }: ProductMediaProps) {
   const [active, setActive] = useState(0);
+  const [side, setSide] = useState<DesignSide>("front");
   const hasPhotos = mockups.length > 0;
-  const current = hasPhotos && mode === "photos" ? "photos" : "3d";
+  const current: MediaMode = mode === "photos" && !hasPhotos ? "apercu" : mode;
+  const modes = hasPhotos ? MODES : MODES.filter((m) => m.id !== "photos");
+  const design = [{ id: productId, url: designUrl, placement: PRODUCT_PLACEMENT }];
   const photo = mockups[Math.min(active, mockups.length - 1)];
 
   return (
@@ -52,21 +58,25 @@ export function ProductMedia({
             sizes="(min-width: 1024px) 50vw, 100vw"
             className="object-cover"
           />
-        ) : (
-          <TshirtViewer
+        ) : current === "apercu" ? (
+          <PhotoPreview
             color={color}
-            designs={[{ id: productId, url: designUrl, placement: PRODUCT_PLACEMENT }]}
-            className="h-full w-full"
+            side={side}
+            onSideChange={setSide}
+            designs={design}
+            className="h-full w-full p-4"
           />
+        ) : (
+          <TshirtViewer color={color} designs={design} className="h-full w-full" />
         )}
 
-        {hasPhotos && (
+        {(
           <div
             role="tablist"
             aria-label="Type d'aperçu"
             className="absolute left-3 top-3 flex rounded-md border border-ash-gray bg-curse-black/80 p-1 backdrop-blur"
           >
-            {MODES.map((m) => {
+            {modes.map((m) => {
               const selected = current === m.id;
               return (
                 <button

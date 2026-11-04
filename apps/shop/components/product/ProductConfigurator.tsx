@@ -22,13 +22,13 @@ type ProductConfiguratorProps = {
 /** Fiche produit interactive : photos ou t-shirt 3D, couleur, taille et prix. */
 export function ProductConfigurator({ product }: ProductConfiguratorProps) {
   const [color, setColor] = useState(product.colors[0] ?? "#000000");
-  // Les photos d'abord quand il y en a ; sinon la 3D.
-  const [mode, setMode] = useState<MediaMode>(product.mockups.length > 0 ? "photos" : "3d");
+  // Les photos d'abord quand il y en a ; sinon l'aperçu photo-réaliste.
+  const [mode, setMode] = useState<MediaMode>(product.mockups.length > 0 ? "photos" : "apercu");
 
   function changeColor(hex: string) {
     setColor(hex);
-    // Les photos ne montrent qu'une couleur : on passe en 3D pour voir le résultat.
-    setMode("3d");
+    // Les photos ne montrent qu'une couleur : on passe à l'aperçu pour voir le résultat.
+    setMode((m) => (m === "photos" ? "apercu" : m));
   }
   const [size, setSize] = useState<Size | null>(null);
   const [message, setMessage] = useState<string | null>(null);

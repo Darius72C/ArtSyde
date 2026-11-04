@@ -65,3 +65,17 @@ export const PRODUCT_PLACEMENT: DesignPlacement = {
   width: 13,
   rotation: 0,
 };
+
+/**
+ * Correspondance entre les unités de placement (celles du modèle 3D) et les
+ * photos Printful à plat (devant et dos), en fractions de la taille de l'image.
+ * Mesuré sur les photos : torse d'environ 1000 px sur 2000, bas du t-shirt à 88 %.
+ */
+export const PHOTO_MAP = {
+  centerX: 0.5,
+  hemY: 0.8835,
+  /** Pixels (en fraction de l'image) par unité horizontale, et pour la largeur. */
+  unitX: 0.024,
+  /** Pixels (en fraction de l'image) par unité verticale. */
+  unitY: 0.021,
+} as const;
