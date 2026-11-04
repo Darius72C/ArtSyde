@@ -5,6 +5,7 @@ import { Canvas } from "@react-three/fiber";
 import { ContactShadows, Html, OrbitControls, useProgress } from "@react-three/drei";
 import { brand } from "@artsyde/ui";
 import { TshirtModel } from "./TshirtModel";
+import type { DesignPlacement } from "./design";
 
 function Loader() {
   const { progress } = useProgress();
@@ -17,11 +18,12 @@ function Loader() {
 
 type TshirtViewerProps = {
   color: string;
+  design?: { url: string; placement: DesignPlacement } | null;
   className?: string;
 };
 
 /** Visionneuse 3D : le client peut tourner autour du t-shirt et zoomer. */
-export function TshirtViewer({ color, className }: TshirtViewerProps) {
+export function TshirtViewer({ color, design, className }: TshirtViewerProps) {
   return (
     <div className={className}>
       <Canvas
@@ -38,7 +40,7 @@ export function TshirtViewer({ color, className }: TshirtViewerProps) {
         <pointLight position={[0, -2, 2]} intensity={0.4} />
 
         <Suspense fallback={<Loader />}>
-          <TshirtModel color={color} />
+          <TshirtModel color={color} design={design} />
         </Suspense>
 
         <ContactShadows position={[0, -1, 0]} opacity={0.5} scale={4} blur={2.5} far={2} />
@@ -50,7 +52,8 @@ export function TshirtViewer({ color, className }: TshirtViewerProps) {
           // Empêche de passer sous le t-shirt ou de le voir pile du dessus.
           minPolarAngle={Math.PI / 4}
           maxPolarAngle={Math.PI / 1.7}
-          autoRotate
+          // La rotation automatique s'arrête quand le client place son design.
+          autoRotate={!design}
           autoRotateSpeed={1.2}
         />
       </Canvas>
