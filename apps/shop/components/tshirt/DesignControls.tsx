@@ -3,11 +3,9 @@
 import { DEFAULT_PLACEMENT, PRINT_AREA, type DesignPlacement, type DesignSide } from "./design";
 
 type DesignControlsProps = {
-  fileName: string;
   lowResolution: boolean;
   placement: DesignPlacement;
   onChange: (placement: DesignPlacement) => void;
-  onRemove: () => void;
 };
 
 type SliderProps = {
@@ -48,32 +46,12 @@ const SIDES: { id: DesignSide; label: string }[] = [
   { id: "back", label: "Dos" },
 ];
 
-/** Réglages du design : face, position, taille et rotation. */
-export function DesignControls({
-  fileName,
-  lowResolution,
-  placement,
-  onChange,
-  onRemove,
-}: DesignControlsProps) {
+/** Réglages de l'image sélectionnée : face, position, taille et rotation. */
+export function DesignControls({ lowResolution, placement, onChange }: DesignControlsProps) {
   const set = (patch: Partial<DesignPlacement>) => onChange({ ...placement, ...patch });
 
   return (
     <div className="flex w-full max-w-2xl flex-col gap-5 rounded-xl border border-ash-gray p-5 text-left">
-      <div className="flex items-center justify-between gap-3">
-        <p className="truncate text-sm">
-          <span className="text-ghost-white/60">Design : </span>
-          {fileName}
-        </p>
-        <button
-          type="button"
-          onClick={onRemove}
-          className="shrink-0 text-sm text-ghost-white/60 underline hover:text-curse-violet"
-        >
-          Retirer
-        </button>
-      </div>
-
       {lowResolution && (
         <p className="rounded-md bg-yellow-400/10 px-3 py-2 text-sm text-yellow-200">
           Ton image est petite : elle risque d&apos;être floue à l&apos;impression. Si tu en as une
@@ -141,7 +119,7 @@ export function DesignControls({
         onClick={() => onChange({ ...DEFAULT_PLACEMENT, side: placement.side })}
         className="self-start text-sm text-ghost-white/60 underline hover:text-curse-violet"
       >
-        Recentrer le design
+        Recentrer cette image
       </button>
     </div>
   );

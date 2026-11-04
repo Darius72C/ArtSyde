@@ -11,7 +11,11 @@ export type UploadedDesign = {
 };
 
 type DesignUploadProps = {
-  onUpload: (design: UploadedDesign) => void;
+  /** Nombre d'images que le client peut encore ajouter. */
+  remaining: number;
+  /** Version compacte, affichée quand le t-shirt a déjà des images. */
+  compact?: boolean;
+  onUpload: (designs: UploadedDesign[]) => void;
 };
 
 /** Lit la taille réelle de l'image pour vérifier sa qualité d'impression. */
@@ -24,75 +28,105 @@ function readImageSize(url: string) {
   });
 }
 
-/** Zone d'envoi du design : clic ou glisser-déposer. */
-export function DesignUpload({ onUpload }: DesignUploadProps) {
+/** Zone d'envoi des images : clic ou glisser-déposer, plusieurs fichiers à la fois. */
+export function DesignUpload({ remaining, compact = false, onUpload }: DesignUploadProps) {
   const input = useRef<HTMLInputElement>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<string[]>([]);
   const [dragging, setDragging] = useState(false);
 
-  async function handleFile(file: File | undefined) {
-    setError(null);
-    if (!file) return;
+  async function handleFiles(list: FileList | null | undefined) {
+    if (!list || list.length === 0) return;
+    const problems: string[] = [];
+    let files = Array.from(list);
 
-    if (!(DESIGN_FILE_RULES.types as readonly string[]).includes(file.type)) {
-      setError("Format non accepté. Envoie une image PNG, JPG ou WebP.");
-      return;
-    }
-    if (file.size > DESIGN_FILE_RULES.maxBytes) {
-      setError("Image trop lourde. La taille maximale est de 15 Mo.");
-      return;
+    if (files.length > remaining) {
+      problems.push(
+        `Tu peux encore ajouter ${remaining} image${remaining > 1 ? "s" : ""}. Les suivantes ont été ignorées.`,
+      );
+      files = files.slice(0, remaining);
     }
 
-    const url = URL.createObjectURL(file);
-    try {
-      const size = await readImageSize(url);
-      onUpload({ file, url, ...size });
-    } catch {
-      URL.revokeObjectURL(url);
-      setError("Impossible de lire cette image. Essaie avec un autre fichier.");
+    const accepted: UploadedDesign[] = [];
+    for (const file of files) {
+      if (!(DESIGN_FILE_RULES.types as readonly string[]).includes(file.type)) {
+        problems.push(`« ${file.name} » : format non accepté (PNG, JPG ou WebP).`);
+        continue;
+      }
+      if (file.size > DESIGN_FILE_RULES.maxBytes) {
+        problems.push(`« ${file.name} » : trop lourde (15 Mo maximum).`);
+        continue;
+      }
+      const url = URL.createObjectURL(file);
+      try {
+        accepted.push({ file, url, ...(await readImageSize(url)) });
+      } catch {
+        URL.revokeObjectURL(url);
+        problems.push(`« ${file.name} » : impossible de lire cette image.`);
+      }
     }
+
+    setErrors(problems);
+    if (accepted.length > 0) onUpload(accepted);
   }
+
+  const disabled = remaining <= 0;
 
   return (
     <div className="flex w-full max-w-2xl flex-col gap-2">
       <button
         type="button"
-        onClick={() => input.current?.click()}
+        onClick={() => !disabled && input.current?.click()}
+        aria-disabled={disabled}
         onDragOver={(e) => {
           e.preventDefault();
-          setDragging(true);
+          if (!disabled) setDragging(true);
         }}
         onDragLeave={() => setDragging(false)}
         onDrop={(e) => {
           e.preventDefault();
           setDragging(false);
-          void handleFile(e.dataTransfer.files[0]);
+          if (!disabled) void handleFiles(e.dataTransfer.files);
         }}
-        className={`flex flex-col items-center gap-1 rounded-xl border-2 border-dashed px-4 py-6 transition ${
-          dragging
-            ? "border-curse-violet bg-curse-violet/10"
-            : "border-ash-gray hover:border-curse-violet"
+        className={`flex flex-col items-center gap-1 rounded-xl border-2 border-dashed px-4 transition ${
+          compact ? "py-3" : "py-6"
+        } ${
+          disabled
+            ? "cursor-not-allowed border-ash-gray opacity-50"
+            : dragging
+              ? "border-curse-violet bg-curse-violet/10"
+              : "border-ash-gray hover:border-curse-violet"
         }`}
       >
-        <span className="font-medium">Ajoute ton propre design</span>
-        <span className="text-sm text-ghost-white/60">
-          Clique ou glisse ton image ici. PNG, JPG ou WebP, 15 Mo maximum.
+        <span className="font-medium">
+          {disabled
+            ? "Nombre maximum d'images atteint"
+            : compact
+              ? "+ Ajouter d'autres images"
+              : "Ajoute tes propres designs"}
         </span>
+        {!compact && (
+          <span className="text-sm text-ghost-white/60">
+            Clique ou glisse une ou plusieurs images ici. PNG, JPG ou WebP, 15 Mo maximum chacune.
+          </span>
+        )}
       </button>
       <input
         ref={input}
         type="file"
+        multiple
         accept={DESIGN_FILE_RULES.accept}
         className="sr-only"
         onChange={(e) => {
-          void handleFile(e.target.files?.[0]);
+          void handleFiles(e.target.files);
           e.target.value = "";
         }}
       />
-      {error && (
-        <p role="alert" className="text-sm text-red-400">
-          {error}
-        </p>
+      {errors.length > 0 && (
+        <ul role="alert" className="text-left text-sm text-red-400">
+          {errors.map((msg) => (
+            <li key={msg}>{msg}</li>
+          ))}
+        </ul>
       )}
     </div>
   );

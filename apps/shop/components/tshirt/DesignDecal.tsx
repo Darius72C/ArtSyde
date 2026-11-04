@@ -14,10 +14,12 @@ const PROJECTION_DEPTH = 12;
 type DesignDecalProps = {
   url: string;
   placement: DesignPlacement;
+  /** Ordre d'empilement : plus il est grand, plus l'image passe au-dessus. */
+  layer: number;
 };
 
 /** Image du client projetée sur le t-shirt. Doit être un enfant du <mesh> du t-shirt. */
-export function DesignDecal({ url, placement }: DesignDecalProps) {
+export function DesignDecal({ url, placement, layer }: DesignDecalProps) {
   const texture = useTexture(url);
 
   useEffect(() => {
@@ -40,13 +42,14 @@ export function DesignDecal({ url, placement }: DesignDecalProps) {
       position={[x, placement.y, isBack ? BACK_Z : FRONT_Z]}
       rotation={[0, isBack ? Math.PI : 0, rotationZ]}
       scale={[placement.width, placement.width * aspect, PROJECTION_DEPTH]}
+      renderOrder={layer + 1}
     >
       <meshStandardMaterial
         map={texture}
         transparent
         roughness={0.9}
         polygonOffset
-        polygonOffsetFactor={-10}
+        polygonOffsetFactor={-10 - layer}
         depthWrite={false}
       />
     </Decal>

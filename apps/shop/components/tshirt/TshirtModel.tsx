@@ -13,12 +13,17 @@ const MODEL_URL = "/models/tshirt.glb";
 // à environ 2 unités pour que la caméra et la lumière restent simples.
 const SCALE = 0.05;
 
+export type PlacedDesign = { id: string; url: string; placement: DesignPlacement };
+
 type TshirtModelProps = {
   color: string;
-  design?: { url: string; placement: DesignPlacement } | null;
+  /** Images du client, de la plus basse à la plus haute. */
+  designs?: PlacedDesign[];
+  /** Face à montrer au client (celle de l'image sélectionnée). */
+  focusSide?: DesignPlacement["side"];
 };
 
-export function TshirtModel({ color, design }: TshirtModelProps) {
+export function TshirtModel({ color, designs = [], focusSide = "front" }: TshirtModelProps) {
   const { nodes } = useGLTF(MODEL_URL);
   const mesh = nodes["T-Shirt_Material_0"] as Mesh;
   const group = useRef<Group>(null);
@@ -36,8 +41,8 @@ export function TshirtModel({ color, design }: TshirtModelProps) {
 
   useEffect(() => () => material.dispose(), [material]);
 
-  // Quand le client choisit le dos, le t-shirt pivote doucement pour le montrer.
-  const targetY = design?.placement.side === "back" ? Math.PI : 0;
+  // Quand le client travaille sur le dos, le t-shirt pivote doucement pour le montrer.
+  const targetY = focusSide === "back" ? Math.PI : 0;
   useFrame((_, delta) => {
     if (!group.current) return;
     const r = group.current.rotation;
@@ -54,11 +59,11 @@ export function TshirtModel({ color, design }: TshirtModelProps) {
         position={[0, -0.95, 0]}
         castShadow
       >
-        {design && (
-          <Suspense fallback={null}>
-            <DesignDecal url={design.url} placement={design.placement} />
+        {designs.map((d, i) => (
+          <Suspense key={d.id} fallback={null}>
+            <DesignDecal url={d.url} placement={d.placement} layer={i} />
           </Suspense>
-        )}
+        ))}
       </mesh>
     </group>
   );

@@ -42,19 +42,22 @@ enum Size {
 // ---------- Designs envoyés par les clients ----------
 
 model CustomDesign {
-  id        String   @id @default(cuid())
+  id          String    @id @default(cuid())
+  // Un article peut porter plusieurs images (calques).
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  // Ordre d'empilement : 0 = calque du dessous.
+  layer       Int
   // Fichier original, en haute qualité, pour la conception et l'impression.
-  fileUrl   String
-  fileName  String
-  mimeType  String
-  // Position du design sur le t-shirt 3D (face, x, y, échelle, rotation).
-  placement Json
-  // Capture de l'aperçu 3D, pour l'afficher vite dans le monitoring.
-  previewUrl String?
-  notes     String?
-  createdAt DateTime @default(now())
+  fileUrl     String
+  fileName    String
+  mimeType    String
+  // Position de l'image sur le t-shirt 3D (face, x, y, largeur, rotation).
+  placement   Json
+  notes       String?
+  createdAt   DateTime  @default(now())
 
-  orderItem OrderItem?
+  @@index([orderItemId])
 }
 
 // ---------- Commandes ----------
@@ -93,11 +96,12 @@ model OrderItem {
   orderId        String
   order          Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
-  // Un article est soit un modèle du catalogue, soit un design client.
+  // Un article est soit un modèle du catalogue, soit un t-shirt avec les images du client.
   productId      String?
-  product        Product?      @relation(fields: [productId], references: [id])
-  customDesignId String?       @unique
-  customDesign   CustomDesign? @relation(fields: [customDesignId], references: [id])
+  product        Product?       @relation(fields: [productId], references: [id])
+  customDesigns  CustomDesign[]
+  // Capture de l'aperçu 3D, pour l'afficher vite dans le monitoring.
+  previewUrl     String?
 
   size           Size
   color          String

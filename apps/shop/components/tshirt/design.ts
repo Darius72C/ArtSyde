@@ -43,3 +43,16 @@ export const DESIGN_FILE_RULES = {
   /** En dessous de cette largeur, l'impression risque d'être floue. */
   recommendedMinWidth: 1500,
 } as const;
+
+/** Nombre maximum d'images sur un même t-shirt. */
+export const MAX_DESIGN_LAYERS = 10;
+
+/** Une image du client posée sur le t-shirt (un « calque »). */
+export type DesignLayer = {
+  id: string;
+  file: File;
+  url: string;
+  width: number;
+  height: number;
+  placement: DesignPlacement;
+};

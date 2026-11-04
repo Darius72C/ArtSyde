@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
 import { ContactShadows, Html, OrbitControls, useProgress } from "@react-three/drei";
 import { brand } from "@artsyde/ui";
-import { TshirtModel } from "./TshirtModel";
+import { TshirtModel, type PlacedDesign } from "./TshirtModel";
 import type { DesignPlacement } from "./design";
 
 function Loader() {
@@ -18,12 +18,13 @@ function Loader() {
 
 type TshirtViewerProps = {
   color: string;
-  design?: { url: string; placement: DesignPlacement } | null;
+  designs?: PlacedDesign[];
+  focusSide?: DesignPlacement["side"];
   className?: string;
 };
 
 /** Visionneuse 3D : le client peut tourner autour du t-shirt et zoomer. */
-export function TshirtViewer({ color, design, className }: TshirtViewerProps) {
+export function TshirtViewer({ color, designs = [], focusSide, className }: TshirtViewerProps) {
   return (
     <div className={className}>
       <Canvas
@@ -40,7 +41,7 @@ export function TshirtViewer({ color, design, className }: TshirtViewerProps) {
         <pointLight position={[0, -2, 2]} intensity={0.4} />
 
         <Suspense fallback={<Loader />}>
-          <TshirtModel color={color} design={design} />
+          <TshirtModel color={color} designs={designs} focusSide={focusSide} />
         </Suspense>
 
         <ContactShadows position={[0, -1, 0]} opacity={0.5} scale={4} blur={2.5} far={2} />
@@ -53,7 +54,7 @@ export function TshirtViewer({ color, design, className }: TshirtViewerProps) {
           minPolarAngle={Math.PI / 4}
           maxPolarAngle={Math.PI / 1.7}
           // La rotation automatique s'arrête quand le client place son design.
-          autoRotate={!design}
+          autoRotate={designs.length === 0}
           autoRotateSpeed={1.2}
         />
       </Canvas>
