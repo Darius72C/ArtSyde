@@ -1,49 +1,36 @@
-# ArtSyde
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-> Wear the curse.
+## Getting Started
 
-Boutique en ligne de t-shirts personnalisés de style manga. L'identité de la marque est décrite dans [BRAND.md](./BRAND.md).
-
-## Structure
-
-Le projet est un monorepo (Turborepo + pnpm) qui contient deux applications Next.js et deux packages partagés.
-
-```
-apps/
-  shop/     Boutique publique (port 3000) : catalogue, t-shirt 3D, designs clients, panier
-  admin/    Monitoring privé (port 3001) : commandes, catalogue, statistiques
-packages/
-  db/       Prisma + schéma de la base PostgreSQL (Neon), client partagé
-  ui/       Thème ArtSyde (couleurs, polices) et composants communs (logo…)
-```
-
-Les deux apps importent `@artsyde/db` et `@artsyde/ui`, donc un changement de schéma ou de design est visible des deux côtés.
-
-## Démarrer
-
-Il faut Node.js 20.9 ou plus récent et pnpm (`npm install -g pnpm`).
+First, run the development server:
 
 ```bash
-pnpm install
-cp .env.example .env     # puis colle tes URLs Neon dans .env
-pnpm db:migrate          # crée les tables dans Neon (demande un nom de migration, ex. "init")
-pnpm dev                 # lance la boutique et le monitoring en même temps
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
 
-La boutique est sur http://localhost:3000 et le monitoring sur http://localhost:3001. Pour lancer une seule app : `pnpm dev:shop` ou `pnpm dev:admin`.
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-## Base de données (Neon)
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-Dans la console Neon, choisis une région en Europe (la plus proche de la Côte d'Ivoire). Le fichier `.env` a besoin de deux URLs : `DATABASE_URL`, la connexion poolée (son hôte contient `-pooler`), utilisée par les apps, et `DIRECT_URL`, la connexion directe, utilisée par Prisma pour les migrations.
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-Les prix sont stockés en francs CFA (XOF), en nombres entiers.
+## Learn More
 
-## Commandes utiles
+To learn more about Next.js, take a look at the following resources:
 
-| Commande | Rôle |
-|---|---|
-| `pnpm dev` | Lance les deux apps en mode développement |
-| `pnpm build` | Compile les deux apps pour la production |
-| `pnpm typecheck` | Vérifie les types TypeScript partout |
-| `pnpm db:migrate` | Applique les changements du schéma Prisma à la base |
-| `pnpm db:studio` | Ouvre une interface pour voir et modifier les données |
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

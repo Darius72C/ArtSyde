@@ -1,5 +1,0 @@
-@import "tailwindcss";
-@import "@artsyde/ui/theme.css";
-
-/* Tailwind doit aussi lire les composants partagés pour générer leurs classes. */
-@source "../../../packages/ui/src";

@@ -1,0 +1,484 @@
+"use client";
+
+import dynamic from "next/dynamic";
+import Link from "next/link";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { gsap } from "@/lib/gsap";
+import { TEE_COLORS } from "@/lib/data";
+import { cart, SIZES } from "@/lib/cart";
+import { formatFCFA } from "@/lib/products";
+import { teeState } from "../story/teeState";
+import { ColorPicker, nearest } from "../ColorPicker";
+
+const TeeScene = dynamic(() => import("../story/TeeScene"), {
+  ssr: false,
+  loading: () => <div className="absolute inset-0 m-auto h-px w-24 animate-pulse bg-ink/40" aria-hidden />,
+});
+
+// Print area preview canvas (ratio 0.7 ≈ A3 portrait). The HD print file (3508×4961 px) will be generated server-side.
+const W = 700;
+const H = 1000;
+const PRINT_WIDTH_CM = 29.7;
+const BASE_PRICE = 8000;
+const BACK_PRICE = 2000;
+
+type Img = { src: string; nw: number; nh: number; x: number; y: number; scale: number; rot: number };
+type Txt = { value: string; font: "serif" | "italic" | "sans"; color: string; x: number; y: number; size: number; rot: number };
+type Side = { image?: Img; text?: Txt };
+type SideId = "front" | "back";
+type Layer = "image" | "text";
+
+const FONTS = { serif: "Serif", italic: "Italique", sans: "Linéaire" } as const;
+const INK = ["#efe9df", "#1a1a1a", "#8a6a4a", "#c8102e", "#1f2a44", "#d8c7a5", "#6b6b47", "#9ea0a3"];
+
+const DEFAULT_TEXT: Txt = { value: "Atelier", font: "italic", color: "#efe9df", x: 0.5, y: 0.26, size: 0.17, rot: 0 };
+
+// Print canvases live outside React (they are drawing surfaces, not state).
+let shared: Record<"front" | "back", HTMLCanvasElement> | null = null;
+function getCanvases() {
+  if (!shared) {
+    const mk = () => Object.assign(document.createElement("canvas"), { width: W, height: H });
+    shared = { front: mk(), back: mk() };
+  }
+  return shared;
+}
+const noop = () => () => {};
+
+function fontFamily(f: Txt["font"]) {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(f === "sans" ? "--font-body" : "--font-display").trim();
+  return v || (f === "sans" ? "sans-serif" : "serif");
+}
+
+export function StudioView() {
+  const mounted = useSyncExternalStore(noop, () => true, () => false);
+  const canvases = mounted ? getCanvases() : null;
+  const images = useRef(new Map<string, HTMLImageElement>());
+  const [design, setDesign] = useState<Record<SideId, Side>>({ front: { text: DEFAULT_TEXT }, back: {} });
+  const [side, setSide] = useState<SideId>("front");
+  const [selected, setSelected] = useState<Layer | null>("text");
+  const [tab, setTab] = useState<"couleur" | "image" | "texte">("texte");
+  const [teeHex, setTeeHex] = useState<string>(TEE_COLORS[0].hex.toLowerCase());
+  const [pickerKey, setPickerKey] = useState(0); // remounts the picker when the colour is set from outside
+  const [tokens, setTokens] = useState(5); // mock balance — will come from the user's account
+  const [size, setSize] = useState("M");
+  const [qty, setQty] = useState(1);
+  const [toast, setToast] = useState<string | null>(null);
+  const [noTokens, setNoTokens] = useState(false);
+  const preview = useRef<HTMLDivElement>(null);
+  const stage = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    Object.assign(teeState, { hex: TEE_COLORS[0].hex, rotY: 0, scrollRot: 0, scale: 1, parallax: 0.25 });
+    return () => void Object.assign(teeState, { parallax: 1, hex: null });
+  }, []);
+
+  // Redraw both print areas whenever the design changes.
+  const draw = useCallback(() => {
+    if (!canvases) return;
+    (["front", "back"] as SideId[]).forEach((id) => {
+      const ctx = canvases[id].getContext("2d")!;
+      ctx.clearRect(0, 0, W, H);
+      const d = design[id];
+      if (d.image) {
+        const el = images.current.get(d.image.src);
+        if (el) {
+          const w = d.image.scale * W;
+          const h = (w * d.image.nh) / d.image.nw;
+          ctx.save();
+          ctx.translate(d.image.x * W, d.image.y * H);
+          ctx.rotate((d.image.rot * Math.PI) / 180);
+          ctx.drawImage(el, -w / 2, -h / 2, w, h);
+          ctx.restore();
+        }
+      }
+      if (d.text?.value) {
+        const t = d.text;
+        ctx.save();
+        ctx.translate(t.x * W, t.y * H);
+        ctx.rotate((t.rot * Math.PI) / 180);
+        ctx.font = `${t.font === "italic" ? "italic " : ""}${t.font === "sans" ? 500 : 400} ${t.size * W}px ${fontFamily(t.font)}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = t.color;
+        t.value.split("\n").forEach((line, i, all) => ctx.fillText(line, 0, (i - (all.length - 1) / 2) * t.size * W * 1.05));
+        ctx.restore();
+      }
+    });
+    teeState.texVersion++;
+  }, [canvases, design]);
+
+  useEffect(() => {
+    draw();
+    document.fonts?.ready.then(draw);
+  }, [draw]);
+
+  // Show the current side's print canvas in the preview box.
+  useEffect(() => {
+    const box = preview.current;
+    if (!box || !canvases) return;
+    box.replaceChildren(canvases[side]);
+    Object.assign(canvases[side].style, { width: "100%", height: "100%", display: "block" });
+  }, [canvases, side]);
+
+  const flash = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2200);
+  };
+  const spend = (n: number) => {
+    if (tokens < n) {
+      setNoTokens(true);
+      return false;
+    }
+    setTokens((t) => t - n);
+    return true;
+  };
+
+  const update = <K extends Layer>(layer: K, patch: Partial<K extends "image" ? Img : Txt>) =>
+    setDesign((d) => {
+      const cur = d[side][layer];
+      if (!cur) return d;
+      return { ...d, [side]: { ...d[side], [layer]: { ...cur, ...patch } } };
+    });
+
+  const flip = (s: SideId) => {
+    setSide(s);
+    setSelected(design[s].text ? "text" : design[s].image ? "image" : null);
+    gsap.to(teeState, { rotY: s === "front" ? 0 : Math.PI, duration: 1, ease: "back.out(1.4)" });
+  };
+  const pickColor = (hex: string) => {
+    setTeeHex(hex);
+    teeState.hex = hex; // the 3D scene eases towards it
+  };
+
+
+  const onUpload = (file?: File) => {
+    if (!file) return;
+    if (!/^image\/(png|jpeg|webp)$/.test(file.type)) return flash("Format accepté : PNG, JPG ou WEBP");
+    if (file.size > 15 * 1024 * 1024) return flash("Image trop lourde (15 Mo max)");
+    if (!spend(1)) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const src = String(reader.result);
+      const el = new Image();
+      el.onload = () => {
+        images.current.set(src, el);
+        setDesign((d) => ({ ...d, [side]: { ...d[side], image: { src, nw: el.naturalWidth, nh: el.naturalHeight, x: 0.5, y: 0.55, scale: 0.7, rot: 0 } } }));
+        setSelected("image");
+        flash("Image ajoutée · 1 crédit utilisé");
+      };
+      el.src = src;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Drag the selected layer directly on the print preview.
+  const dragging = useRef(false);
+  const moveTo = (e: React.PointerEvent) => {
+    if (!selected || !preview.current) return;
+    const r = preview.current.getBoundingClientRect();
+    const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+    const y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+    update(selected, { x, y });
+  };
+
+  // Drag on the 3D stage rotates the tee.
+  const spin = useRef<number | null>(null);
+
+  const cur = design[side];
+  const layer = selected ? cur[selected] : undefined;
+  const hasBack = Boolean(design.back.image || design.back.text?.value);
+  const price = BASE_PRICE + (hasBack ? BACK_PRICE : 0);
+  const dpi = cur.image ? Math.round(cur.image.nw / ((cur.image.scale * PRINT_WIDTH_CM) / 2.54)) : null;
+
+  const addToCart = () => {
+    const gl = stage.current?.querySelector("canvas");
+    let thumb: string | undefined;
+    if (gl) {
+      const c = Object.assign(document.createElement("canvas"), { width: 220, height: 220 });
+      const s = Math.min(gl.width, gl.height);
+      c.getContext("2d")!.drawImage(gl, (gl.width - s) / 2, (gl.height - s) / 2, s, s, 0, 0, 220, 220);
+      thumb = c.toDataURL("image/png");
+    }
+    cart.add({ key: `custom-${Date.now()}`, productId: null, name: "T-shirt personnalisé", price, color: teeHex, size, qty, preview: thumb, bg: "#e7e0d3" });
+    flash("Ajouté au panier");
+  };
+
+  const slider = (label: string, value: number, min: number, max: number, step: number, on: (v: number) => void, fmt?: (v: number) => string) => (
+    <label className="block">
+      <span className="flex justify-between text-[11px] tracking-[0.18em] uppercase">
+        <span className="text-muted">{label}</span> <span className="tabular-nums">{fmt ? fmt(value) : value}</span>
+      </span>
+      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => on(Number(e.target.value))} className="range mt-3" />
+    </label>
+  );
+
+  const tabBtn = (t: "couleur" | "image" | "texte") => (
+    <button
+      key={t}
+      role="tab"
+      aria-selected={tab === t}
+      onClick={() => (setTab(t), t !== "couleur" && setSelected(t === "image" ? "image" : "text"))}
+      className={`relative pb-2 text-[11px] tracking-[0.2em] uppercase transition-colors ${tab === t ? "" : "text-muted hover:text-ink"}`}
+    >
+      {t}
+      {tab === t && <motion.span layoutId="tool-line" className="absolute inset-x-0 bottom-0 h-px bg-ink" transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }} />}
+    </button>
+  );
+
+  return (
+    <div className="mx-auto max-w-[1440px] px-5 pb-16 pt-10 md:px-10">
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-6">
+        <div>
+                    <h1 className="display text-5xl md:text-6xl">
+            Studio 3D. <span className="text-muted">Crée le tien.</span>
+          </h1>
+        </div>
+        <div className="flex items-center gap-6 text-sm">
+          <motion.span key={tokens} initial={{ opacity: 0.3 }} animate={{ opacity: 1 }} className="tabular-nums">
+            {tokens} crédit{tokens > 1 ? "s" : ""}
+          </motion.span>
+          <Link href="/#credits" className="link-line">
+            Recharger <span className="arrow">→</span>
+          </Link>
+        </div>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-[300px_1fr] xl:grid-cols-[320px_1fr_320px]">
+        {/* 3D stage */}
+        <section
+          ref={stage}
+          className="relative order-1 h-[56svh] min-h-[380px] touch-none overflow-hidden rounded-[28px] bg-surface select-none lg:order-2 lg:h-[calc(100svh-200px)]"
+          onPointerDown={(e) => (spin.current = e.clientX)}
+          onPointerMove={(e) => {
+            if (spin.current === null) return;
+            teeState.rotY += (e.clientX - spin.current) * 0.012;
+            spin.current = e.clientX;
+          }}
+          onPointerUp={() => (spin.current = null)}
+          onPointerLeave={() => (spin.current = null)}
+        >
+          {canvases && <TeeScene front={canvases.front} back={canvases.back} preserve />}
+          <div className="absolute left-1/2 top-5 flex -translate-x-1/2 gap-6">
+            {(["front", "back"] as const).map((s) => (
+              <button key={s} onClick={() => flip(s)} aria-pressed={side === s} className={`relative pb-1.5 text-[11px] tracking-[0.2em] uppercase ${side === s ? "" : "text-muted"}`}>
+                {s === "front" ? "Devant" : "Dos"}
+                {side === s && <motion.span layoutId="side-line" className="absolute inset-x-0 bottom-0 h-px bg-ink" />}
+              </button>
+            ))}
+          </div>
+          <p className="eyebrow pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap">Glisse pour tourner</p>
+        </section>
+
+        {/* Tools */}
+        <aside className="tile order-2 p-6 lg:order-1 lg:max-h-[calc(100svh-200px)] lg:overflow-auto">
+          <div className="flex gap-6 border-b border-line" role="tablist">
+            {(["couleur", "image", "texte"] as const).map(tabBtn)}
+          </div>
+
+          <AnimatePresence mode="wait">
+            <motion.div key={tab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.4 }} className="mt-8 space-y-6">
+              {tab === "couleur" && (
+                <>
+                  <ColorPicker key={pickerKey} initial={teeHex} presets={TEE_COLORS} onChange={pickColor} />
+                  {(() => {
+                    const n = nearest(teeHex, TEE_COLORS);
+                    const exact = n.hex.toLowerCase() === teeHex;
+                    return (
+                      <p className="border-t border-line pt-4 text-sm text-muted">
+                        {exact ? (
+                          <>
+                            <span className="text-ok">●</span> {n.name}, disponible en atelier.
+                          </>
+                        ) : (
+                          <>
+                            Teinte sur mesure. Plus proche en stock : <span className="text-ink">{n.name}</span>.{" "}
+                            <button onClick={() => (pickColor(n.hex.toLowerCase()), setPickerKey((k) => k + 1))} className="text-ink underline underline-offset-4">
+                              Utiliser
+                            </button>
+                          </>
+                        )}
+                      </p>
+                    );
+                  })()}
+                </>
+              )}
+
+              {tab === "image" && (
+                <>
+                  <label className="flex cursor-pointer flex-col items-center gap-2 rounded-2xl border border-dashed border-line bg-bg px-6 py-10 text-center transition-colors duration-300 hover:border-accent">
+                    <span className="text-[17px] font-semibold text-link">{cur.image ? "Remplacer l'image" : "Importer une image"}</span>
+                    <span className="text-xs text-muted">PNG, JPG ou WEBP · 1 crédit</span>
+                    <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => (onUpload(e.target.files?.[0]), (e.target.value = ""))} />
+                  </label>
+                  {cur.image && dpi !== null && (
+                    <p className="text-sm">
+                      <span className={dpi >= 150 ? "text-ok" : "text-danger"}>●</span>{" "}
+                      {dpi >= 150 ? `Qualité d'impression satisfaisante (${dpi} DPI).` : `Image un peu petite (${dpi} DPI) : réduis-la ou choisis une image plus grande.`}
+                    </p>
+                  )}
+                </>
+              )}
+
+              {tab === "texte" && (
+                <>
+                  <label className="block">
+                    <span className="mb-1.5 block text-[14px] text-muted">Ton texte</span>
+                    <textarea
+                      rows={2}
+                      maxLength={40}
+                      value={cur.text?.value ?? ""}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setDesign((d) => ({ ...d, [side]: { ...d[side], text: { ...(d[side].text ?? { ...DEFAULT_TEXT, value: "" }), value } } }));
+                        setSelected("text");
+                      }}
+                      placeholder="Écris ton texte"
+                      className="field resize-none"
+                    />
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(Object.keys(FONTS) as Txt["font"][]).map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => update("text", { font: f })}
+                        className={`rounded-xl border py-2.5 text-[15px] transition-colors duration-300 ${cur.text?.font === f ? "border-accent font-medium shadow-[0_0_0_1px_var(--accent)]" : "border-line hover:border-muted"}`}
+                        style={{ fontFamily: f === "sans" ? "var(--font-body)" : "var(--font-display)", fontStyle: f === "italic" ? "italic" : "normal" }}
+                      >
+                        {FONTS[f]}
+                      </button>
+                    ))}
+                  </div>
+                  <div>
+                    <span className="eyebrow">Couleur d&apos;impression</span>
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      {INK.map((c) => (
+                        <button key={c} onClick={() => update("text", { color: c })} aria-label={`Couleur du texte ${c}`} className={`h-6 w-6 rounded-full ring-1 ring-offset-[3px] ring-offset-bg transition ${cur.text?.color === c ? "ring-ink" : "ring-line"}`} style={{ background: c }} />
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {tab !== "couleur" && layer && (
+                <div className="space-y-6 border-t border-line pt-6">
+                  <p className="eyebrow">Ajuster {selected === "image" ? "l'image" : "le texte"}</p>
+                  {selected === "image" && cur.image && slider("Taille", cur.image.scale, 0.15, 1, 0.01, (v) => update("image", { scale: v }), (v) => `${Math.round(v * 100)} %`)}
+                  {selected === "text" && cur.text && slider("Taille", cur.text.size, 0.05, 0.3, 0.005, (v) => update("text", { size: v }), (v) => `${Math.round(v * 100)}`)}
+                  {slider("Horizontal", layer.x, 0, 1, 0.01, (v) => update(selected!, { x: v }), (v) => `${Math.round(v * 100)} %`)}
+                  {slider("Vertical", layer.y, 0, 1, 0.01, (v) => update(selected!, { y: v }), (v) => `${Math.round(v * 100)} %`)}
+                  {slider("Rotation", layer.rot, -180, 180, 1, (v) => update(selected!, { rot: v }), (v) => `${v}°`)}
+                  <div className="flex gap-6 pt-2">
+                    <button onClick={() => update(selected!, { x: 0.5 })} className="link-line">Centrer</button>
+                    <button
+                      onClick={() => {
+                        setDesign((d) => ({ ...d, [side]: { ...d[side], [selected!]: undefined } }));
+                        setSelected(null);
+                      }}
+                      className="link-line text-danger"
+                    >
+                      Supprimer
+                    </button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </aside>
+
+        {/* Print preview + order */}
+        <aside className="tile order-3 space-y-8 p-6 lg:col-span-2 xl:col-span-1 xl:max-h-[calc(100svh-200px)] xl:overflow-auto">
+          <div>
+            <div className="flex items-center justify-between">
+              <p className="eyebrow">Zone d&apos;impression · {side === "front" ? "devant" : "dos"}</p>
+              <span className="text-[10px] tracking-[0.15em] text-muted uppercase">Glisser pour placer</span>
+            </div>
+            <div
+              ref={preview}
+              className="checker mx-auto mt-4 aspect-[7/10] w-full max-w-[200px] cursor-move touch-none overflow-hidden rounded-xl border border-dashed border-line"
+              style={{ backgroundColor: teeHex }}
+              onPointerDown={(e) => {
+                dragging.current = true;
+                (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+                moveTo(e);
+              }}
+              onPointerMove={(e) => dragging.current && moveTo(e)}
+              onPointerUp={() => (dragging.current = false)}
+            />
+          </div>
+
+          <div className="border-t border-line pt-8">
+            <p className="eyebrow">Taille</p>
+            <div className="mt-3 grid grid-cols-5 gap-2">
+              {SIZES.map((s) => (
+                <button key={s} onClick={() => setSize(s)} aria-pressed={size === s} className={`rounded-xl border py-2.5 text-sm transition-colors duration-300 ${size === s ? "border-accent font-medium shadow-[0_0_0_1px_var(--accent)]" : "border-line hover:border-muted"}`}>
+                  {s}
+                </button>
+              ))}
+            </div>
+            <div className="mt-6 flex items-center justify-between">
+              <div className="flex items-center rounded-full border border-line">
+                <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="h-10 w-10 text-lg font-extralight" aria-label="Moins">−</button>
+                <span className="w-8 text-center text-sm tabular-nums">{qty}</span>
+                <button onClick={() => setQty((q) => Math.min(20, q + 1))} className="h-10 w-10 text-lg font-extralight" aria-label="Plus">+</button>
+              </div>
+              <motion.p key={price * qty} initial={{ opacity: 0.3 }} animate={{ opacity: 1 }} className="text-[24px] font-semibold tabular-nums">
+                {formatFCFA(price * qty)}
+              </motion.p>
+            </div>
+            <p className="mt-2 text-right text-xs text-muted">{hasBack ? `Devant et dos (+${formatFCFA(BACK_PRICE)})` : "Impression devant"}</p>
+            <button onClick={addToCart} className="btn mt-6 w-full">Ajouter au panier</button>
+            <button onClick={() => spend(1) && flash("Design sauvegardé · 1 crédit utilisé")} className="btn-outline mt-3 w-full">
+              Sauvegarder · 1 crédit
+            </button>
+          </div>
+        </aside>
+      </div>
+
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            role="status"
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 24 }}
+            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-6 bg-ink px-6 py-4 text-sm text-on-ink"
+          >
+            {toast}
+            {toast.includes("panier") && (
+              <Link href="/panier" className="text-[11px] tracking-[0.2em] uppercase underline underline-offset-4">
+                Voir
+              </Link>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {noTokens && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[80] grid place-items-center bg-ink/50 p-5 backdrop-blur-sm" onClick={() => setNoTokens(false)}>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-sm rounded-[28px] bg-bg p-10 text-center"
+              role="dialog"
+              aria-modal
+            >
+              <p className="eyebrow">Crédits épuisés</p>
+              <h2 className="display mt-2 text-4xl">Recharge pour continuer.</h2>
+              <p className="mt-4 text-sm text-muted">Les crédits servent à importer et sauvegarder tes créations.</p>
+              <div className="mt-8 flex flex-col items-center gap-4">
+                <Link href="/#credits" className="btn">Recharger</Link>
+                <button onClick={() => setNoTokens(false)} className="link-line">Plus tard</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}

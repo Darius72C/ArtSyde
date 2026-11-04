@@ -1,0 +1,186 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { cart, cartSubtotal, useCart } from "@/lib/cart";
+import { DELIVERY, saveOrder } from "@/lib/orders";
+import { formatFCFA } from "@/lib/products";
+import { Thumb } from "./CartView";
+import { RevealLines } from "../Reveal";
+
+const EASE = [0.22, 1, 0.36, 1] as const;
+
+function Field({ name, label, error, ...rest }: { name: string; label: string; error?: string } & React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-[14px] text-muted">{label}</span>
+      {/* Shakes when an error appears. */}
+      <motion.div animate={error ? { x: [0, -8, 7, -5, 3, 0] } : { x: 0 }} transition={{ duration: 0.45 }}>
+        <input name={name} className={`field ${error ? "!border-danger" : ""}`} {...rest} />
+      </motion.div>
+      <AnimatePresence>
+        {error && (
+          <motion.span initial={{ opacity: 0, y: -6, height: 0 }} animate={{ opacity: 1, y: 0, height: "auto" }} exit={{ opacity: 0, y: -6, height: 0 }} className="mt-2 block overflow-hidden text-sm text-danger">
+            {error}
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </label>
+  );
+}
+
+function Steps({ current }: { current: number }) {
+  return (
+    <ol className="flex items-center gap-3 text-[14px]">
+      {["Panier", "Livraison", "Confirmation"].map((s, i) => (
+        <li key={s} className={`flex items-center gap-3 ${i === current ? "text-ink" : "text-muted"}`}>
+          <span className={`grid h-6 w-6 place-items-center rounded-full text-[12px] font-semibold ${i < current ? "bg-ok text-white" : i === current ? "bg-accent text-white" : "bg-surface"}`}>{i < current ? "✓" : i + 1}</span>
+          <span className={i === current ? "font-medium" : ""}>{s}</span>
+          {i < 2 && <span className="hidden h-px w-10 bg-line sm:block" />}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+export function CheckoutView() {
+  const items = useCart();
+  const router = useRouter();
+  const [delivery, setDelivery] = useState<keyof typeof DELIVERY>("standard");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [sending, setSending] = useState(false);
+  const subtotal = cartSubtotal(items);
+  const shipping = DELIVERY[delivery].price;
+
+  function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.currentTarget)) as Record<string, string>;
+    const err: Record<string, string> = {};
+    if ((f.name ?? "").trim().length < 2) err.name = "Indique ton nom complet.";
+    if (!/^\+?[\d\s]{8,}$/.test(f.phone ?? "")) err.phone = "Numéro invalide.";
+    if (f.email && !/^\S+@\S+\.\S+$/.test(f.email)) err.email = "E-mail invalide.";
+    if (delivery !== "retrait" && (f.city ?? "").trim().length < 2) err.city = "Indique ta ville.";
+    if (delivery !== "retrait" && (f.address ?? "").trim().length < 4) err.address = "Indique une adresse ou un repère.";
+    setErrors(err);
+    if (Object.keys(err).length) return;
+    setSending(true);
+    // TODO: POST /orders to the API, then redirect to the payment provider.
+    const order = saveOrder({
+      items,
+      customer: { name: f.name, phone: f.phone, email: f.email || undefined, city: f.city ?? "", address: f.address ?? "", notes: f.notes || undefined },
+      delivery,
+      subtotal,
+      shipping,
+      total: subtotal + shipping,
+    });
+    setTimeout(() => {
+      cart.clear();
+      router.push(`/commande/${order.id}`);
+    }, 900);
+  }
+
+  if (items.length === 0 && !sending) {
+    return (
+      <div className="mx-auto max-w-[1440px] px-5 py-28 md:px-10">
+        <p className="display text-5xl">Rien à commander pour l&apos;instant.</p>
+        <Link href="/#boutique" className="btn mt-10">La boutique</Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-[1440px] px-5 md:px-10">
+      <div className="pb-10 pt-14 md:pt-20">
+        <Steps current={1} />
+        <RevealLines as="h1" lines={["Finaliser ma commande."]} className="display mt-8 text-5xl md:text-7xl" />
+      </div>
+
+      <form onSubmit={submit} noValidate className="grid items-start gap-14 pb-24 lg:grid-cols-[1fr_400px] lg:gap-20">
+        <div className="space-y-16">
+          <section>
+            <p className="border-b border-line pb-4 text-[24px] font-semibold tracking-[-0.02em]">Tes coordonnées</p>
+            <div className="mt-8 grid gap-8 sm:grid-cols-2">
+              <Field error={errors.name} name="name" label="Nom complet" autoComplete="name" />
+              <Field error={errors.phone} name="phone" label="Téléphone" type="tel" autoComplete="tel" />
+              <div className="sm:col-span-2">
+                <Field error={errors.email} name="email" label="E-mail (facultatif)" type="email" autoComplete="email" placeholder="Pour recevoir la confirmation" />
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <p className="border-b border-line pb-4 text-[24px] font-semibold tracking-[-0.02em]">Livraison</p>
+            <div className="mt-6" role="radiogroup">
+              {(Object.keys(DELIVERY) as (keyof typeof DELIVERY)[]).map((k) => {
+                const d = DELIVERY[k];
+                const on = delivery === k;
+                return (
+                  <button type="button" role="radio" aria-checked={on} key={k} onClick={() => setDelivery(k)} className={`mb-3 flex w-full items-center gap-5 rounded-2xl border px-5 py-4 text-left transition-colors ${on ? "border-accent shadow-[0_0_0_1px_var(--accent)]" : "border-line hover:border-muted"}`}>
+                    <span className={`grid h-5 w-5 place-items-center rounded-full border transition ${on ? "border-accent" : "border-line"}`}>
+                      {on && <motion.span layoutId="ship-dot" className="h-2.5 w-2.5 rounded-full bg-accent" />}
+                    </span>
+                    <span className="flex-1">
+                      <span className="block text-[17px] font-semibold">{d.label}</span>
+                      <span className="text-sm text-muted">{d.note}</span>
+                    </span>
+                    <span className="text-sm">{d.price ? formatFCFA(d.price) : "Offert"}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <AnimatePresence initial={false}>
+              {delivery !== "retrait" && (
+                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.6, ease: EASE }} className="overflow-hidden">
+                  <div className="grid gap-8 pt-8 sm:grid-cols-2">
+                    <Field error={errors.city} name="city" label="Ville ou commune" autoComplete="address-level2" />
+                    <Field error={errors.address} name="address" label="Adresse ou repère" autoComplete="street-address" />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <label className="mt-8 block">
+              <span className="mb-1.5 block text-[14px] text-muted">Note (facultatif)</span>
+              <textarea name="notes" rows={2} className="field resize-none" />
+            </label>
+          </section>
+
+          <section>
+            <p className="border-b border-line pb-4 text-[24px] font-semibold tracking-[-0.02em]">Paiement</p>
+            <p className="mt-6 text-[21px] font-semibold">Paiement en ligne bientôt disponible.</p>
+            <p className="mt-2 max-w-lg text-sm text-muted">Ta commande est enregistrée et on te contacte pour le règlement.</p>
+          </section>
+        </div>
+
+        <aside className="tile p-8 lg:sticky lg:top-20">
+          <p className="text-[21px] font-semibold">Ta commande</p>
+          <ul className="mt-6 max-h-72 space-y-5 overflow-auto">
+            {items.map((it) => (
+              <li key={it.key} className="flex items-center gap-4">
+                <Thumb item={it} className="aspect-[4/5] w-14" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold">{it.name}</p>
+                  <p className="text-xs text-muted">Taille {it.size} · × {it.qty}</p>
+                </div>
+                <p className="text-sm tabular-nums">{formatFCFA(it.price * it.qty)}</p>
+              </li>
+            ))}
+          </ul>
+          <dl className="mt-6 space-y-3 border-t border-line pt-6 text-sm">
+            <div className="flex justify-between"><dt className="text-muted">Sous-total</dt><dd className="tabular-nums">{formatFCFA(subtotal)}</dd></div>
+            <div className="flex justify-between"><dt className="text-muted">{DELIVERY[delivery].label}</dt><dd className="tabular-nums">{shipping ? formatFCFA(shipping) : "Offert"}</dd></div>
+          </dl>
+          <div className="mt-6 flex items-baseline justify-between border-t border-line pt-6">
+            <span className="font-semibold">Total</span>
+            <motion.span key={subtotal + shipping} initial={{ opacity: 0.4 }} animate={{ opacity: 1 }} className="display text-3xl tabular-nums">{formatFCFA(subtotal + shipping)}</motion.span>
+          </div>
+          <button disabled={sending} className="btn mt-8 w-full">
+            {sending ? <span className="h-4 w-4 animate-spin rounded-full border border-on-ink border-t-transparent" aria-label="Envoi" /> : "Valider la commande"}
+          </button>
+          <Link href="/panier" className="mt-5 block text-center text-sm text-muted underline-offset-4 hover:text-ink hover:underline">Modifier le panier</Link>
+        </aside>
+      </form>
+    </div>
+  );
+}

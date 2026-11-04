@@ -1,0 +1,276 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------
+   Clean product-store look: big tight sans headlines, lots of white
+   (black in dark mode), rounded tiles, blue pill buttons, smooth motion.
+   Light/dark follows the device setting.
+------------------------------------------------------------------- */
+:root {
+  --bg: #ffffff;
+  --surface: #f5f5f7; /* tiles, panels */
+  --sand: #f5f5f7; /* product image backdrops */
+  --sand-deep: #e8e8ed;
+  --ink: #1d1d1f; /* text */
+  --muted: #6e6e73; /* secondary text */
+  --line: #d2d2d7;
+  --accent: #0071e3; /* buttons */
+  --link: #0066cc; /* text links */
+  --new: #bf4800; /* "Nouveau" labels */
+  --on-ink: #ffffff;
+  --danger: #e30000;
+  --ok: #1d8a3e;
+  /* Always-dark bands (studio, teams) look the same in both themes */
+  --night: #000000;
+  --night-2: #161617;
+  --on-night: #f5f5f7;
+  --night-muted: #86868b;
+  --nav: rgba(251, 251, 253, 0.8);
+  --tee-rim: transparent; /* outline on tee illustrations (keeps dark tees visible on dark tiles) */
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000000;
+    --surface: #161617;
+    --sand: #1d1d1f;
+    --sand-deep: #2a2a2d;
+    --ink: #f5f5f7;
+    --muted: #86868b;
+    --line: #424245;
+    --accent: #0071e3;
+    --link: #2997ff;
+    --new: #ff791b;
+    --on-ink: #000000;
+    --danger: #ff453a;
+    --ok: #30d158;
+    --nav: rgba(22, 22, 23, 0.8);
+    --tee-rim: rgba(255, 255, 255, 0.14);
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-sand: var(--sand);
+  --color-sand-deep: var(--sand-deep);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-link: var(--link);
+  --color-new: var(--new);
+  --color-on-ink: var(--on-ink);
+  --color-danger: var(--danger);
+  --color-ok: var(--ok);
+  --color-night: var(--night);
+  --color-night-2: var(--night-2);
+  --color-on-night: var(--on-night);
+  --color-night-muted: var(--night-muted);
+  --font-sans: var(--font-body);
+  --font-serif: var(--font-display);
+}
+
+html {
+  background: var(--bg);
+}
+body {
+  background: var(--bg);
+  color: var(--ink);
+  overflow-x: clip;
+  font-size: 17px;
+  line-height: 1.47;
+  letter-spacing: -0.022em;
+  -webkit-font-smoothing: antialiased;
+}
+::selection {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+/* ---------- Typography ---------- */
+.display {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+  text-wrap: balance;
+}
+.eyebrow {
+  @apply text-[14px] font-semibold tracking-[-0.01em] text-new;
+}
+.lead {
+  @apply text-[19px] leading-[1.4] text-muted md:text-[21px];
+  letter-spacing: -0.02em;
+}
+
+/* ---------- Buttons & links ---------- */
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-full bg-accent px-6 py-3 text-[15px] font-medium text-white transition-[filter,transform] duration-300 hover:brightness-110 active:scale-[0.98] disabled:opacity-50;
+  letter-spacing: -0.01em;
+}
+.btn-outline {
+  @apply inline-flex items-center justify-center gap-2 rounded-full border border-accent px-6 py-3 text-[15px] font-medium text-link transition-colors duration-300 hover:bg-accent hover:text-white;
+}
+.btn-dark {
+  @apply inline-flex items-center justify-center gap-2 rounded-full bg-ink px-6 py-3 text-[15px] font-medium text-on-ink transition-opacity duration-300 hover:opacity-85;
+}
+/* "En savoir plus ›" text link */
+.link-line {
+  @apply inline-flex items-center gap-1 text-[17px] text-link hover:underline;
+  text-underline-offset: 3px;
+}
+.link-line .arrow {
+  display: inline-block;
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.link-line:hover .arrow {
+  transform: translateX(3px);
+}
+.nav-link {
+  @apply text-[12px] text-ink/80 transition-colors duration-300 hover:text-ink;
+  letter-spacing: -0.01em;
+}
+.nav-link[aria-current="page"] {
+  @apply text-ink;
+}
+
+/* Nav bar over always-dark sections (ScrollStory): swap its tokens to the dark set. */
+.nav-tone[data-tone="dark"] {
+  --ink: #f5f5f7;
+  --on-ink: #000000;
+  --line: #424245;
+  --nav: rgba(22, 22, 23, 0.72);
+  color-scheme: dark;
+}
+
+/* Magnetic buttons: `translate` is driven by JS (see Magnetic.tsx), separate from the press `transform`. */
+.btn,
+.btn-outline,
+.btn-dark {
+  transition-property: filter, transform, translate, background-color, color, opacity, box-shadow;
+  transition-duration: 0.3s, 0.3s, 0.5s, 0.3s, 0.3s, 0.3s, 0.3s;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ---------- Tiles ---------- */
+.tile {
+  @apply overflow-hidden rounded-[28px] bg-surface;
+}
+
+/* ---------- Form fields ---------- */
+.field {
+  @apply w-full rounded-xl border border-line bg-bg px-4 py-3.5 text-[17px] text-ink transition-[border-color,box-shadow] duration-300 outline-none placeholder:text-muted focus:border-accent focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_20%,transparent)];
+}
+.field-box {
+  @apply w-full rounded-xl border border-line bg-bg px-4 py-3.5 text-[17px] text-ink outline-none focus:border-accent;
+}
+
+/* Idle float for hero tees */
+@keyframes idle-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-14px) rotate(0.6deg);
+  }
+}
+.idle-float {
+  animation: idle-float 6s ease-in-out infinite;
+}
+
+/* Gentle image zoom on hover */
+.zoom-img {
+  transition: transform 1s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.group:hover .zoom-img {
+  transform: scale(1.04);
+}
+
+/* Horizontal product rail */
+.rail {
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.rail::-webkit-scrollbar {
+  display: none;
+}
+.rail > * {
+  scroll-snap-align: start;
+}
+
+/* Range sliders (studio) */
+.range {
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--sand-deep);
+  width: 100%;
+}
+.range::-webkit-slider-thumb {
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
+  cursor: grab;
+}
+.range::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  cursor: grab;
+}
+.checker {
+  background-image: linear-gradient(45deg, rgba(128, 128, 128, 0.12) 25%, transparent 25%, transparent 75%, rgba(128, 128, 128, 0.12) 75%),
+    linear-gradient(45deg, rgba(128, 128, 128, 0.12) 25%, transparent 25%, transparent 75%, rgba(128, 128, 128, 0.12) 75%);
+  background-size: 14px 14px;
+  background-position: 0 0, 7px 7px;
+}
+
+/* ---------- Page transitions (React <ViewTransition>, see PageShell.tsx) ---------- */
+::view-transition-old(.page-exit) {
+  animation: page-out 0.28s cubic-bezier(0.4, 0, 1, 1) both;
+}
+::view-transition-new(.page-enter) {
+  animation: page-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
+}
+@keyframes page-out {
+  to {
+    opacity: 0;
+    transform: translateY(-24px) scale(0.985);
+    filter: blur(4px);
+  }
+}
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+    filter: blur(6px);
+  }
+}
+/* The header stays put while the page changes underneath it. */
+::view-transition-group(site-header) {
+  animation: none;
+  z-index: 10;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

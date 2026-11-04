@@ -1,24 +1,35 @@
 {
   "name": "artsyde",
+  "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@10.28.0",
-  "engines": {
-    "node": ">=20.9.0"
-  },
   "scripts": {
-    "dev": "turbo run dev",
-    "dev:shop": "turbo run dev --filter=@artsyde/shop",
-    "dev:admin": "turbo run dev --filter=@artsyde/admin",
-    "build": "turbo run build",
-    "lint": "turbo run lint",
-    "typecheck": "turbo run typecheck",
-    "db:generate": "pnpm --filter @artsyde/db db:generate",
-    "db:migrate": "pnpm --filter @artsyde/db db:migrate",
-    "db:studio": "pnpm --filter @artsyde/db db:studio",
-    "db:seed": "pnpm --filter @artsyde/db db:seed"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@gsap/react": "^2.1.2",
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.2",
+    "gsap": "^3.15.0",
+    "lenis": "^1.3.27",
+    "motion": "^14.9.0",
+    "next": "16.4.5",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "three": "^0.187.0"
   },
   "devDependencies": {
-    "turbo": "2.9.14",
-    "typescript": "^5.9.0"
-  }
+    "@tailwindcss/turbopack": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/three": "^0.187.0",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.5",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  },
+  "packageManager": "pnpm@10.28.0"
 }
