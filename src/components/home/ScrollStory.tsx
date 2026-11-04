@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { gsap, useGSAP } from "@/lib/gsap";
 import { teeState } from "../story/teeState";
 
@@ -19,6 +19,15 @@ const STEPS = [
 /** Pinned, Apple-style product story: the 3D tee turns and recolours while the copy changes. */
 export function ScrollStory() {
   const root = useRef<HTMLElement>(null);
+  // Start the 3D scene when the section is getting close, not with the page (the hero has its own).
+  const [near, setNear] = useState(false);
+  useEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => e.isIntersecting && (setNear(true), io.disconnect()), { rootMargin: "40% 0px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   useGSAP(
     () => {
@@ -74,7 +83,7 @@ export function ScrollStory() {
         </div>
       </div>
       <div className="absolute inset-x-0 bottom-[8%] top-[30%] md:bottom-[6%] md:top-[36%]">
-        <TeeScene />
+        {near && <TeeScene />}
       </div>
       <div className="story-bar absolute bottom-8 left-1/2 z-10 flex -translate-x-1/2 gap-2" aria-hidden>
         {STEPS.map((s) => (

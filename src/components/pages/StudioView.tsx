@@ -14,6 +14,7 @@ import { fadeUp, RevealLines } from "../Reveal";
 import { DUR, EASE, STAGGER } from "@/lib/motion";
 import { PRINT_QUALITIES, PRINT_QUALITY, PRINT_WIDTH_CM, type PrintQuality } from "@/lib/studio";
 import { TEE_ASPECT, TEE_PATH_01, teePath2D } from "../story/teeOutline";
+import { teeSnapshot } from "../story/snapshot";
 
 const TeeScene = dynamic(() => import("../story/TeeScene"), {
   ssr: false,
@@ -235,12 +236,22 @@ export function StudioView() {
     flash(q.credits ? `Ajouté au panier · ${creditsLabel(q.credits)} utilisé${q.credits > 1 ? "s" : ""}` : "Ajouté au panier");
   };
 
+  // Download: the 3D view of the tee exactly as posed in the studio (angle, colour, design), then the
+  // flat print file of each printed side, all at the chosen quality.
   const exportDesign = async () => {
     const sides = (["front", "back"] as SideId[]).filter((id) => hasContent(design[id]));
-    if (!sides.length) return flash("Ajoute une image ou un texte d'abord");
     if (!spend(q.credits)) return;
     setExporting(true);
+    const tag = q.label.toLowerCase().replace(/\s+/g, "-");
+    const save = (blob: Blob, name: string) => {
+      const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: name });
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    };
     try {
+      const view = await teeSnapshot.current?.(q.view);
+      if (!view) throw new Error("3D view unavailable");
+      save(view, `artsyde-vue-3d-${tag}.png`);
       for (const id of sides) {
         const c = Object.assign(document.createElement("canvas"), { width: q.px, height: Math.round(q.px / TEE_ASPECT) });
         const ctx = c.getContext("2d");
@@ -248,9 +259,7 @@ export function StudioView() {
         paint(ctx, design[id], c.width, c.height, images.current);
         const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/png"));
         if (!blob) throw new Error("canvas too large");
-        const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: `artsyde-${id === "front" ? "devant" : "dos"}-${q.label.toLowerCase().replace(/\s+/g, "-")}.png` });
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+        save(blob, `artsyde-${id === "front" ? "devant" : "dos"}-${tag}.png`);
       }
       flash(q.credits ? `Visuel ${q.label} téléchargé · ${creditsLabel(q.credits)} utilisé${q.credits > 1 ? "s" : ""}` : "Visuel téléchargé");
     } catch {
@@ -459,7 +468,7 @@ export function StudioView() {
               ))}
             </div>
             <p className="mt-3 text-xs text-muted">
-              {q.dpi} DPI sur tout le t-shirt ({q.px.toLocaleString("fr-FR")} px de large). C&apos;est aussi la qualité du fichier d&apos;impression envoyé avec ta commande{q.credits ? ` : ${creditsLabel(q.credits)} à l'ajout au panier` : ""}.
+              Le t-shirt en 3D tel que tu l&apos;as placé ({q.view.toLocaleString("fr-FR")} px), et le fichier d&apos;impression à {q.dpi} DPI ({q.px.toLocaleString("fr-FR")} px de large). C&apos;est aussi la qualité du fichier d&apos;impression envoyé avec ta commande{q.credits ? ` : ${creditsLabel(q.credits)} à l'ajout au panier` : ""}.
             </p>
             <button onClick={exportDesign} disabled={exporting} className="btn-outline mt-4 w-full">
               {exporting ? <span className="h-4 w-4 animate-spin rounded-full border border-accent border-t-transparent" aria-label="Export en cours" /> : `Télécharger le visuel${q.credits ? ` · ${creditsLabel(q.credits)}` : ""}`}

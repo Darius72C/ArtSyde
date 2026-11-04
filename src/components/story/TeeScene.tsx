@@ -1,13 +1,15 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { ContactShadows, Environment, Float, Lightformer } from "@react-three/drei";
+import { Environment, Float, Lightformer } from "@react-three/drei";
 import { TEE_COLORS } from "@/lib/data";
 import { cubicBezier } from "motion/react";
 import { DUR, EASE } from "@/lib/motion";
 import { teeState } from "./teeState";
+import { SoftShadow } from "./SoftShadow";
+import { teeSnapshot } from "./snapshot";
 import { TEE_HEIGHT, TEE_WIDTH, canvasTexture, colorTrue, printMaterial, stickerTexture, tintSheen, useTeeModel } from "./teeModel";
 
 const tmpA = new THREE.Color();
@@ -111,10 +113,49 @@ function Tee({ front: frontCanvas, back: backCanvas, play }: Props & { play: Pla
   );
 }
 
+/**
+ * Studio only: lets the page render the scene, exactly as it is on screen, at a chosen width
+ * (the 3D view in the download). The canvas keeps its size on the page; only the drawing buffer
+ * is enlarged for one frame, then put back.
+ */
+function SnapshotBridge() {
+  const get = useThree((s) => s.get);
+  useEffect(() => {
+    teeSnapshot.current = (width) => {
+      const { gl, scene, camera, size } = get();
+      const max = gl.capabilities.maxTextureSize;
+      const scale = Math.min(1, max / Math.max(width, (width * size.height) / size.width));
+      const w = Math.round(width * scale);
+      const h = Math.round(((width * size.height) / size.width) * scale);
+      const ratio = gl.getPixelRatio();
+      gl.setPixelRatio(1);
+      gl.setSize(w, h, false);
+      gl.render(scene, camera);
+      return new Promise<Blob | null>((resolve) => {
+        gl.domElement.toBlob(resolve, "image/png"); // the pixels are captured now, encoded afterwards
+        gl.setPixelRatio(ratio);
+        gl.setSize(size.width, size.height, false);
+        gl.render(scene, camera);
+      });
+    };
+    return () => void (teeSnapshot.current = null);
+  }, [get]);
+  return null;
+}
+
 export default function TeeScene(props: Props) {
   const play = useRef<boolean>(false);
   const seenOnScreen = useRef<IntersectionObserver | null>(null);
-  useEffect(() => () => seenOnScreen.current?.disconnect(), []);
+  // Render only while the canvas is on screen: off screen it costs nothing.
+  const [onScreen, setOnScreen] = useState(true);
+  const watchOnScreen = useRef<IntersectionObserver | null>(null);
+  useEffect(
+    () => () => {
+      seenOnScreen.current?.disconnect();
+      watchOnScreen.current?.disconnect();
+    },
+    [],
+  );
 
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
@@ -126,9 +167,11 @@ export default function TeeScene(props: Props) {
   }, []);
 
   return (
-    <Canvas dpr={[1, 1.75]} camera={{ position: [0, 0, 6.2], fov: 35 }} gl={{ antialias: true, alpha: true, preserveDrawingBuffer: props.preserve }}
+    <Canvas dpr={[1, 1.5]} frameloop={onScreen ? "always" : "never"} camera={{ position: [0, 0, 6.2], fov: 35 }} gl={{ antialias: true, alpha: true, preserveDrawingBuffer: props.preserve }}
       onCreated={({ gl }) => {
         colorTrue(gl);
+        watchOnScreen.current = new IntersectionObserver(([e]) => setOnScreen(e.isIntersecting));
+        watchOnScreen.current.observe(gl.domElement);
         // Start the entrance when a third of the canvas is visible (the home story sits below the fold).
         seenOnScreen.current = new IntersectionObserver(
           ([e]) => {
@@ -151,11 +194,12 @@ export default function TeeScene(props: Props) {
         <Lightformer intensity={0.9} position={[-5, 0, 2]} scale={[3, 8, 1]} />
         <Lightformer intensity={0.9} position={[5, 0, 2]} scale={[3, 8, 1]} />
       </Environment>
-      <ContactShadows position={[0, -TEE_HEIGHT / 2 - 0.25, 0]} opacity={0.3} scale={7} blur={2.8} far={3} />
+      <SoftShadow y={-TEE_HEIGHT / 2 - 0.25} width={TEE_WIDTH * 1.3} opacity={0.3} />
       {/* The model streams in; the entrance plays once it is there. */}
       <Suspense fallback={null}>
         <Tee {...props} play={play} />
       </Suspense>
+      {props.preserve && <SnapshotBridge />}
     </Canvas>
   );
 }

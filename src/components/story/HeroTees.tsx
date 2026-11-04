@@ -3,11 +3,12 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { ContactShadows, Environment, Float, Lightformer } from "@react-three/drei";
+import { Environment, Float, Lightformer } from "@react-three/drei";
 import { cubicBezier } from "motion/react";
 import { DUR, EASE } from "@/lib/motion";
-import { TEE_HEIGHT, colorTrue, emptyTexture, printMaterial, stickerTexture, tintSheen, useTeeModel } from "./teeModel";
+import { TEE_HEIGHT, TEE_WIDTH, colorTrue, emptyTexture, printMaterial, stickerTexture, tintSheen, useTeeModel } from "./teeModel";
 import { heroState } from "./heroState";
+import { SoftShadow } from "./SoftShadow";
 
 /*
  * The hero's three real tees: white in front with the wordmark, red and navy behind it.
@@ -94,7 +95,7 @@ export default function HeroTees() {
 
   return (
     <div ref={wrap} className="absolute inset-0">
-      <Canvas dpr={[1, 1.75]} frameloop={onScreen ? "always" : "never"} camera={{ position: [0, 0, 6.2], fov: 35 }} gl={{ antialias: true, alpha: true }} onCreated={({ gl }) => {
+      <Canvas dpr={[1, 1.5]} frameloop={onScreen ? "always" : "never"} camera={{ position: [0, 0, 6.2], fov: 35 }} gl={{ antialias: true, alpha: true }} onCreated={({ gl }) => {
           colorTrue(gl);
           gl.domElement.style.opacity = "0";
         }}>
@@ -107,7 +108,7 @@ export default function HeroTees() {
           <Lightformer intensity={0.9} position={[-5, 0, 2]} scale={[3, 8, 1]} />
           <Lightformer intensity={0.9} position={[5, 0, 2]} scale={[3, 8, 1]} />
         </Environment>
-        <ContactShadows position={[0, -TEE_HEIGHT / 2 - 0.2, 0]} opacity={0.35} scale={9} blur={2.6} far={3} />
+        <SoftShadow y={-TEE_HEIGHT / 2 - 0.2} width={TEE_WIDTH * 2.9} depth={TEE_WIDTH * 0.9} opacity={0.35} />
         <Suspense fallback={null}>
           <Tees />
         </Suspense>
