@@ -1,0 +1,23 @@
+{
+  "name": "artsyde",
+  "private": true,
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "dev:shop": "turbo run dev --filter=@artsyde/shop",
+    "dev:admin": "turbo run dev --filter=@artsyde/admin",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "db:generate": "pnpm --filter @artsyde/db db:generate",
+    "db:migrate": "pnpm --filter @artsyde/db db:migrate",
+    "db:studio": "pnpm --filter @artsyde/db db:studio"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.0",
+    "typescript": "^5.9.0"
+  }
+}

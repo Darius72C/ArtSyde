@@ -1,0 +1,125 @@
+// Schéma de la base ArtSyde (PostgreSQL sur Neon).
+// Les prix sont en francs CFA (XOF), stockés en entiers : le FCFA n'a pas de centimes.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // connexion poolée, pour les apps
+  directUrl = env("DIRECT_URL")   // connexion directe, pour les migrations
+}
+
+// ---------- Catalogue ----------
+
+model Product {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String
+  priceXof    Int
+  // Image du design appliquée sur le modèle 3D (URL dans le stockage de fichiers).
+  designUrl   String
+  colors      String[] // couleurs de t-shirt disponibles, en hexadécimal
+  sizes       Size[]
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orderItems OrderItem[]
+}
+
+enum Size {
+  XS
+  S
+  M
+  L
+  XL
+  XXL
+}
+
+// ---------- Designs envoyés par les clients ----------
+
+model CustomDesign {
+  id        String   @id @default(cuid())
+  // Fichier original, en haute qualité, pour la conception et l'impression.
+  fileUrl   String
+  fileName  String
+  mimeType  String
+  // Position du design sur le t-shirt 3D (face, x, y, échelle, rotation).
+  placement Json
+  // Capture de l'aperçu 3D, pour l'afficher vite dans le monitoring.
+  previewUrl String?
+  notes     String?
+  createdAt DateTime @default(now())
+
+  orderItem OrderItem?
+}
+
+// ---------- Commandes ----------
+
+model Order {
+  id            String        @id @default(cuid())
+  // Référence courte lisible, ex. "AS-2611-0042", donnée au client.
+  reference     String        @unique
+  status        OrderStatus   @default(PENDING_PAYMENT)
+
+  customerName  String
+  customerPhone String
+  customerEmail String?
+  city          String
+  address       String
+  deliveryNotes String?
+
+  subtotalXof   Int
+  deliveryXof   Int           @default(0)
+  totalXof      Int
+
+  paymentStatus PaymentStatus @default(UNPAID)
+  paymentMethod String?       // ex. "WAVE", "ORANGE_MONEY", "MTN", "MOOV", "CARD"
+  paymentRef    String?       @unique // identifiant de transaction du prestataire
+
+  items         OrderItem[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id             String        @id @default(cuid())
+  orderId        String
+  order          Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  // Un article est soit un modèle du catalogue, soit un design client.
+  productId      String?
+  product        Product?      @relation(fields: [productId], references: [id])
+  customDesignId String?       @unique
+  customDesign   CustomDesign? @relation(fields: [customDesignId], references: [id])
+
+  size           Size
+  color          String
+  quantity       Int           @default(1)
+  unitPriceXof   Int
+
+  @@index([orderId])
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT // en attente de paiement
+  PAID            // payée, à traiter
+  IN_DESIGN       // design client en cours de conception
+  IN_PRODUCTION   // en impression
+  SHIPPED         // en livraison
+  DELIVERED       // livrée
+  CANCELLED       // annulée
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  FAILED
+  REFUNDED
+}
