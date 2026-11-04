@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { Suspense, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { ContactShadows, Environment, Float, Lightformer } from "@react-three/drei";
@@ -8,75 +8,7 @@ import { TEE_COLORS } from "@/lib/data";
 import { cubicBezier } from "motion/react";
 import { DUR, EASE } from "@/lib/motion";
 import { teeState } from "./teeState";
-import { TEE_BOUNDS, TEE_OUTLINE } from "./teeOutline";
-
-/**
- * TEMPORARY procedural t-shirt. Replace with the purchased model:
- *   const { nodes } = useGLTF("/models/tshirt.glb")
- * and keep the same material / colour logic.
- */
-function teeShape() {
-  const s = new THREE.Shape();
-  for (const c of TEE_OUTLINE) {
-    if (c[0] === "Q") s.quadraticCurveTo(c[1], c[2], c[3], c[4]);
-    else if (c[0] === "M") s.moveTo(c[1], c[2]);
-    else s.lineTo(c[1], c[2]);
-  }
-  s.closePath();
-  return s;
-}
-
-function teeGeometry() {
-  const shape = teeShape();
-  const body = new THREE.ExtrudeGeometry(shape, {
-    depth: 0.3,
-    bevelEnabled: true,
-    bevelThickness: 0.18,
-    bevelSize: 0.1,
-    bevelSegments: 10,
-    curveSegments: 32,
-  });
-  body.computeBoundingBox();
-  const offset = body.boundingBox!.getCenter(new THREE.Vector3()).negate();
-  body.translate(offset.x, offset.y, offset.z);
-
-  // Print surface (studio): the flat silhouette laid on the front / back face, so a design can go
-  // anywhere on the tee, sleeves included. UVs span TEE_BOUNDS, the same rectangle as the print canvas.
-  const print = new THREE.ShapeGeometry(shape, 32);
-  const pos = print.attributes.position;
-  const uv = print.attributes.uv;
-  const { minX, maxX, minY, maxY } = TEE_BOUNDS;
-  for (let i = 0; i < pos.count; i++) uv.setXY(i, (pos.getX(i) - minX) / (maxX - minX), (pos.getY(i) - minY) / (maxY - minY));
-  print.translate(offset.x, offset.y, 0);
-
-  // The flat front face of the extrusion (the back one is its mirror).
-  return { body, print, face: body.boundingBox!.max.z };
-}
-
-function stickerTexture(kind: "front" | "back") {
-  // Minimal demo prints (home page). The studio replaces these with the customer's own canvases.
-  const c = document.createElement("canvas");
-  c.width = c.height = 1024;
-  const x = c.getContext("2d")!;
-  const serif = getComputedStyle(document.documentElement).getPropertyValue("--font-display").trim() || "serif";
-  x.fillStyle = "#efe9df";
-  x.textAlign = "center";
-  x.textBaseline = "middle";
-  if (kind === "front") {
-    x.font = `400 92px ${serif}`;
-    if ("letterSpacing" in x) (x as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = "28px";
-    x.fillText("ARTSYDE", 512, 470);
-    x.fillRect(452, 560, 120, 3);
-  } else {
-    x.font = `italic 300 190px ${serif}`;
-    x.fillText("Atelier", 512, 480);
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 8;
-  return t;
-}
-
+import { TEE_HEIGHT, TEE_WIDTH, canvasTexture, printMaterial, stickerTexture, useTeeModel } from "./teeModel";
 
 const tmpA = new THREE.Color();
 const tmpTarget = new THREE.Color();
@@ -92,7 +24,7 @@ function colorAt(t: number, out: THREE.Color) {
 }
 
 type Props = {
-  /** Studio mode: live 2D canvases (print areas) mapped on the front and back. */
+  /** Studio mode: live 2D canvases (print areas) projected on the front and back. */
   front?: HTMLCanvasElement | null;
   back?: HTMLCanvasElement | null;
   /** Keep the WebGL buffer so the studio can take a snapshot for the cart. */
@@ -112,44 +44,47 @@ function Tee({ front: frontCanvas, back: backCanvas, play }: Props & { play: Pla
   const group = useRef<THREE.Group>(null);
   const lift = useRef<THREE.Group>(null);
   const intro = useRef(reducedMotion() ? 1 : 0); // 0 → 1 over INTRO.s
-  const mat = useRef<THREE.MeshPhysicalMaterial>(null);
-  const front = useRef<THREE.MeshBasicMaterial>(null);
-  const backMat = useRef<THREE.MeshBasicMaterial>(null);
   const { viewport } = useThree();
-  const { body, print, face } = useMemo(() => teeGeometry(), []);
+  const { geometry, box, maps } = useTeeModel();
   const studio = Boolean(frontCanvas || backCanvas);
-  const frontTex = useMemo(() => {
-    if (!frontCanvas) return stickerTexture("front");
-    const t = new THREE.CanvasTexture(frontCanvas);
-    t.colorSpace = THREE.SRGBColorSpace;
-    return t;
-  }, [frontCanvas]);
-  const backTex = useMemo(() => {
-    if (!backCanvas) return stickerTexture("back");
-    const t = new THREE.CanvasTexture(backCanvas);
-    t.colorSpace = THREE.SRGBColorSpace;
-    return t;
-  }, [backCanvas]);
+  const print = useMemo(() => {
+    const frontTex = frontCanvas ? canvasTexture(frontCanvas) : stickerTexture("front");
+    const backTex = backCanvas ? canvasTexture(backCanvas) : stickerTexture("back");
+    const { mat, uniforms } = printMaterial(box, frontTex, backTex);
+    Object.assign(mat, maps);
+    return { mat, uniforms, frontTex, backTex };
+  }, [box, maps, frontCanvas, backCanvas]);
+  // The frame loop changes the material every frame: it reaches it through a ref, not the memo.
+  const live = useRef(print);
+  useEffect(() => {
+    live.current = print;
+    return () => {
+      print.mat.dispose();
+      print.frontTex.dispose();
+      print.backTex.dispose();
+    };
+  }, [print]);
 
   useFrame((state, dt) => {
     const g = group.current;
-    if (!g || !mat.current || !front.current) return;
+    if (!g) return;
+    const { mat, uniforms, frontTex, backTex } = live.current;
     if (studio && seen.current !== teeState.texVersion) {
       seen.current = teeState.texVersion;
-      if (front.current.map) front.current.map.needsUpdate = true;
-      if (backMat.current?.map) backMat.current.map.needsUpdate = true;
+      frontTex.needsUpdate = true;
+      backTex.needsUpdate = true;
     }
     const k = 1 - Math.exp(-dt * 6); // frame-rate independent smoothing
-    // Fit the tee to the visible width (world units), so it never overflows.
-    // Also fit the height (tee ≈ 3 units tall incl. float) so it never runs into the copy above it.
-    const fit = Math.min(1, (viewport.width * 0.78) / 3.5, (viewport.height * 0.86) / 3);
+    // Fit the tee to the visible width and height (world units, with room for the float),
+    // so it never overflows nor runs into the copy above it.
+    const fit = Math.min(1, (viewport.width * 0.78) / (TEE_WIDTH + 0.4), (viewport.height * 0.86) / (TEE_HEIGHT + 0.2));
     const targetS = teeState.scale * fit;
     g.scale.setScalar(g.scale.x + (targetS - g.scale.x) * k);
     g.rotation.y += (teeState.rotY + teeState.scrollRot + teeState.pointerX * 0.35 * teeState.parallax - g.rotation.y) * k;
     g.rotation.x += (-teeState.pointerY * 0.15 * teeState.parallax - g.rotation.x) * k;
-    if (teeState.hex) mat.current.color.lerp(tmpTarget.set(teeState.hex), k);
-    else colorAt(teeState.colorT, mat.current.color);
-    front.current.opacity = studio ? 1 : teeState.design;
+    if (teeState.hex) mat.color.lerp(tmpTarget.set(teeState.hex), k);
+    else colorAt(teeState.colorT, mat.color);
+    uniforms.uFrontOpacity.value = studio ? 1 : teeState.design;
 
     // Entrance, on its own inner group so it never fights the scroll / pointer values above.
     const l = lift.current;
@@ -164,40 +99,12 @@ function Tee({ front: frontCanvas, back: backCanvas, play }: Props & { play: Pla
     }
   });
 
-  const lift3 = face + 0.003; // just above the fabric, so the print never flickers into it
-
   return (
     <group ref={group}>
       <group ref={lift}>
-      <Float speed={1} rotationIntensity={0.04} floatIntensity={studio ? 0.1 : 0.25}>
-        {/* Fabric look: rough cotton with a soft sheen */}
-        <mesh geometry={body} castShadow>
-          <meshPhysicalMaterial ref={mat} roughness={0.9} metalness={0} sheen={0.5} sheenRoughness={0.8} sheenColor="#bbbbbb" envMapIntensity={0.55} />
-        </mesh>
-        {studio ? (
-          <>
-            {/* Studio: the customer's canvases cover the whole front and the whole back. */}
-            <mesh geometry={print} position={[0, 0, lift3]}>
-              <meshBasicMaterial ref={front} map={frontTex} transparent toneMapped={false} />
-            </mesh>
-            <mesh geometry={print} position={[0, 0, -lift3]} rotation={[0, Math.PI, 0]}>
-              <meshBasicMaterial ref={backMat} map={backTex} transparent toneMapped={false} />
-            </mesh>
-          </>
-        ) : (
-          <>
-            {/* Home page: small demo prints. */}
-            <mesh position={[0, 0.12, lift3]}>
-              <planeGeometry args={[1.15, 1.15]} />
-              <meshBasicMaterial ref={front} map={frontTex} transparent opacity={0} toneMapped={false} />
-            </mesh>
-            <mesh position={[0, 0.1, -lift3]} rotation={[0, Math.PI, 0]}>
-              <planeGeometry args={[1.3, 1.3]} />
-              <meshBasicMaterial ref={backMat} map={backTex} transparent toneMapped={false} />
-            </mesh>
-          </>
-        )}
-      </Float>
+        <Float speed={1} rotationIntensity={0.04} floatIntensity={studio ? 0.1 : 0.25}>
+          <mesh geometry={geometry} material={print.mat} castShadow />
+        </Float>
       </group>
     </group>
   );
@@ -240,8 +147,11 @@ export default function TeeScene(props: Props) {
         <Lightformer intensity={0.9} position={[-5, 0, 2]} scale={[3, 8, 1]} />
         <Lightformer intensity={0.9} position={[5, 0, 2]} scale={[3, 8, 1]} />
       </Environment>
-      <ContactShadows position={[0, -1.85, 0]} opacity={0.3} scale={7} blur={2.8} far={3} />
-      <Tee {...props} play={play} />
+      <ContactShadows position={[0, -TEE_HEIGHT / 2 - 0.25, 0]} opacity={0.3} scale={7} blur={2.8} far={3} />
+      {/* The model streams in; the entrance plays once it is there. */}
+      <Suspense fallback={null}>
+        <Tee {...props} play={play} />
+      </Suspense>
     </Canvas>
   );
 }

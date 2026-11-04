@@ -14,7 +14,9 @@ export function SmoothScroll() {
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    lenis = new Lenis({ autoRaf: false, anchors: { offset: -90 }, lerp: 0.1 });
+    // lerp: how much of the remaining distance is covered each frame (lower = longer, softer glide).
+    // wheelMultiplier: distance per wheel notch (below 1 = each notch travels a little less).
+    lenis = new Lenis({ autoRaf: false, anchors: { offset: -90 }, lerp: 0.07, wheelMultiplier: 0.8 });
     lenis.on("scroll", ScrollTrigger.update);
     const tick = (time: number) => lenis?.raf(time * 1000);
     gsap.ticker.add(tick);

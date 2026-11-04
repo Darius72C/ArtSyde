@@ -5,7 +5,7 @@ import { useRef, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { cart } from "@/lib/cart";
 import { flyToCart } from "@/lib/flyToCart";
-import { formatFCFA, PRODUCTS, type Product } from "@/lib/products";
+import { formatFCFA, type Product } from "@/lib/products";
 import { ProductImage } from "../ProductImage";
 import { RevealLines, Tilt } from "../Reveal";
 import { DUR, EASE, SPRING, STAGGER, VIEWPORT } from "@/lib/motion";
@@ -45,7 +45,7 @@ function Card({ p, i, onAdd }: { p: Product; i: number; onAdd: (p: Product, colo
             exit={{ opacity: 0, scale: 1.04 }}
             transition={{ duration: DUR.base, ease: EASE.out }}
           >
-            <ProductImage color={color} art={p.art} bg="transparent" className="h-full w-full" />
+            <ProductImage color={color} art={p.art} photo={p.photo} alt={p.name} bg="transparent" className="h-full w-full rounded-[22px]" />
           </motion.div>
         </AnimatePresence>
       </div>
@@ -73,15 +73,16 @@ function Card({ p, i, onAdd }: { p: Product; i: number; onAdd: (p: Product, colo
   );
 }
 
-export function Shop() {
+/** `products` come from the database (src/lib/catalog.ts), read by the home page. */
+export function Shop({ products }: { products: Product[] }) {
   const [tab, setTab] = useState<Tab>("all");
   const [toast, setToast] = useState<string | null>(null);
   const timer = useRef<number | undefined>(undefined);
-  const list = tab === "all" ? PRODUCTS : PRODUCTS.filter((p) => p.tag === tab);
+  const list = tab === "all" ? products : products.filter((p) => p.tag === tab);
 
   const add = (p: Product, color: string, from: Element | null) => {
     flyToCart(from);
-    cart.add({ productId: p.id, name: p.name, price: p.price, color, size: "M", art: p.art, bg: p.bg });
+    cart.add({ productId: p.id, name: p.name, price: p.price, color, size: p.sizes.includes("M") ? "M" : (p.sizes[0] ?? "M"), art: p.art, bg: p.bg, photo: p.photo });
     setToast(p.name);
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => setToast(null), 2600);

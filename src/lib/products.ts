@@ -1,17 +1,27 @@
-// Placeholder catalogue — replace with products from the API.
 export type Art = "wordmark" | "line" | "sun" | "script" | "crest" | "plain";
+export type ProductTagLabel = "Nouveau" | "Best-seller" | "Promo";
+
+/** A t-shirt as the shop shows it, read from the Product table (src/lib/catalog.ts). */
 export type Product = {
-  id: number;
+  id: string; // Product.id in the database
+  slug: string;
   name: string;
   price: number;
   oldPrice?: number;
-  tag?: "Nouveau" | "Best-seller" | "Promo";
+  tag?: ProductTagLabel;
   colors: string[];
-  art: Art;
+  sizes: string[];
+  art?: Art | string; // built-in illustration, shown when there is no photo
   bg: string;
+  photo?: string; // first photo uploaded from the admin
 };
 
-export const PRODUCTS: Product[] = [
+/**
+ * The starting catalogue. The shop no longer reads it: prisma/seed.ts writes it into the
+ * Product table, and src/lib/catalog.ts still takes each one's backdrop colour from here.
+ */
+export type SeedProduct = { id: number; name: string; price: number; oldPrice?: number; tag?: ProductTagLabel; colors: string[]; art: Art; bg: string };
+export const PRODUCTS: SeedProduct[] = [
   { id: 1, name: "L'Essentiel", price: 8000, tag: "Best-seller", colors: ["#F4F2EC", "#1C1C1E", "#D8C7A5"], art: "wordmark", bg: "var(--sand)" },
   { id: 2, name: "Horizon", price: 8500, tag: "Nouveau", colors: ["#1F2A44", "#F4F2EC"], art: "line", bg: "var(--surface)" },
   { id: 3, name: "Soleil", price: 8500, oldPrice: 10000, tag: "Promo", colors: ["#D8C7A5", "#F4F2EC"], art: "sun", bg: "var(--sand)" },

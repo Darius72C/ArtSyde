@@ -3,7 +3,6 @@
 import dynamic from "next/dynamic";
 import { useRef } from "react";
 import { gsap, useGSAP } from "@/lib/gsap";
-import { TEE_COLORS } from "@/lib/data";
 import { teeState } from "../story/teeState";
 
 const TeeScene = dynamic(() => import("../story/TeeScene"), {
@@ -12,7 +11,7 @@ const TeeScene = dynamic(() => import("../story/TeeScene"), {
 });
 
 const STEPS = [
-  { t: "Huit coloris.", s: "Du blanc au noir, du sable au marine. Tous en coton épais." },
+  { t: "Coupe oversize. Coton épais.", s: "Une coupe ample aux épaules tombantes, dans un coton épais et souple." },
   { t: "Ton design, devant et dos.", s: "Une image, un texte, placés au millimètre dans le studio 3D." },
   { t: "Imprimé dans notre atelier.", s: "Exactement comme à l'écran, contrôlé à la main, livré chez toi." },
 ];
@@ -43,12 +42,11 @@ export function ScrollStory() {
             onUpdate: (self) => bars.forEach((b, i) => gsap.set(b, { scaleX: Math.min(1, Math.max(0, self.progress * 3 - i)) })),
           },
         });
-        tl.to(teeState, { scale: 1, rotY: 0.4, duration: 1 }, 0)
-          .to(teeState, { colorT: TEE_COLORS.length - 1, duration: 2.2 }, 0.2)
+        // The tee turns slowly to show its cut (shoulders, sleeves, length), then faces front for the print.
+        tl.to(teeState, { scale: 1, rotY: 1.15, duration: 2.4, ease: "power1.inOut" }, 0)
           .to(steps[0], { autoAlpha: 0, y: -40, duration: 0.4 }, 2.4)
           .to(steps[1], { autoAlpha: 1, y: 0, duration: 0.4 }, 2.8)
-          // Land on navy: the light demo print reads clearly on it (it vanished on white).
-          .to(teeState, { colorT: 3, rotY: -0.2, duration: 0.8 }, 2.6)
+          .to(teeState, { rotY: -0.2, duration: 0.8 }, 2.6)
           .to(teeState, { design: 1, scale: 1.08, duration: 1 }, 2.8)
           .to(steps[1], { autoAlpha: 0, y: -40, duration: 0.4 }, 4.4)
           .to(steps[2], { autoAlpha: 1, y: 0, duration: 0.4 }, 4.8)

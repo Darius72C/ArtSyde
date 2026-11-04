@@ -2,8 +2,8 @@ import type { PrintQuality } from "@/generated/prisma/client";
 
 export type { PrintQuality };
 
-/** Physical width of the print area: sleeve tip to sleeve tip on a size M (52 cm chest). */
-export const PRINT_WIDTH_CM = 93;
+/** Physical width of the print area: sleeve tip to sleeve tip on the oversized tee, as measured on the 3D model. */
+export const PRINT_WIDTH_CM = 64;
 
 /** Output width in pixels for a resolution across the whole print area. */
 export const pxFor = (dpi: number) => Math.round((PRINT_WIDTH_CM / 2.54) * dpi);

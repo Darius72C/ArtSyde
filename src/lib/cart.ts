@@ -6,14 +6,15 @@ import type { Art } from "./products";
 
 export type CartItem = {
   key: string; // unique line id (product + colour + size, or a custom design id)
-  productId: number | null; // null = custom studio design
+  productId: string | null; // Product.id in the database; null = custom studio design
   name: string;
   price: number;
   color: string;
   size: string;
   qty: number;
-  art?: Art;
+  art?: Art | string;
   bg?: string;
+  photo?: string; // the product's first photo, when it has one
   preview?: string; // small data-URL thumbnail for custom designs
   quality?: PrintQuality; // custom designs: print file quality chosen in the studio
 };
@@ -29,7 +30,8 @@ function load() {
   loaded = true;
   try {
     const raw = localStorage.getItem(STORAGE);
-    if (raw) items = JSON.parse(raw);
+    // Carts saved before the catalogue moved to the database used numeric product ids: drop those lines.
+    if (raw) items = (JSON.parse(raw) as CartItem[]).filter((i) => i.productId === null || typeof i.productId === "string");
   } catch {}
 }
 function commit(next: CartItem[]) {

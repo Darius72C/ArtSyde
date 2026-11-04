@@ -10,8 +10,11 @@ import { Teams } from "@/components/home/Teams";
 import { Credits } from "@/components/home/Credits";
 import { Faq } from "@/components/home/Faq";
 import { Newsletter } from "@/components/home/Newsletter";
+import { getCatalog } from "@/lib/catalog";
 
-export default function Home() {
+export default async function Home() {
+  // Cached ("use cache", tag "catalog"): saving a product in the admin refreshes it.
+  const products = await getCatalog();
   return (
     <>
       <Header />
@@ -20,9 +23,9 @@ export default function Home() {
       <main>
         <Hero />
         <ScrollStory />
-        <NewArrivals />
+        <NewArrivals products={products} />
         <Bento />
-        <Shop />
+        <Shop products={products} />
         <Teams />
         <Credits />
         <Faq />

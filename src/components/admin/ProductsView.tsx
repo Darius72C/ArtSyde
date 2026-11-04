@@ -1,9 +1,10 @@
+import Link from "next/link";
 import { ProductImage } from "../ProductImage";
 import { STAGGER } from "@/lib/motion";
 import { formatFCFA } from "@/lib/products";
 import { PRODUCT_TAG, SIZE_ORDER, colorName, plural } from "@/lib/admin/labels";
 import { getCatalogue, load } from "@/lib/admin/queries";
-import { DbNotice, Panel, Stat, StatusLabel, Swatch, TableScroll, table, td, th } from "./ui";
+import { DbNotice, MoreLink, Panel, Stat, StatusLabel, Swatch, TableScroll, table, td, th } from "./ui";
 
 export async function ProductsView() {
   const r = await load(getCatalogue);
@@ -21,7 +22,7 @@ export async function ProductsView() {
         <Stat label="Créations studio vendues" value={studio.units} unit="t-shirts" note={formatFCFA(studio.revenue)} delay={STAGGER.item * 3} />
       </div>
 
-      <Panel title="Catalogue">
+      <Panel title="Catalogue" action={<MoreLink href="/admin/produits/nouveau">Nouveau modèle</MoreLink>}>
         {products.length ? (
           <TableScroll>
             <table className={`${table} min-w-[860px]`}>
@@ -41,9 +42,11 @@ export async function ProductsView() {
                   <tr key={p.id}>
                     <td className={td}>
                       <div className="flex items-center gap-4">
-                        <ProductImage color={p.colors[0] ?? "#F4F2EC"} art={p.art ?? undefined} bg="var(--bg)" className="aspect-[4/5] w-14 shrink-0" zoom={false} />
+                        <ProductImage color={p.colors[0] ?? "#F4F2EC"} art={p.art ?? undefined} photo={p.mockups[0]} bg="var(--bg)" className="aspect-[4/5] w-14 shrink-0" zoom={false} />
                         <div>
-                          <p className="font-semibold">{p.name}</p>
+                          <Link href={`/admin/produits/${p.id}`} className="font-semibold text-link hover:underline">
+                            {p.name}
+                          </Link>
                           {p.tag && <p className="text-xs text-new">{PRODUCT_TAG[p.tag]}</p>}
                         </div>
                       </div>
@@ -69,7 +72,7 @@ export async function ProductsView() {
             </table>
           </TableScroll>
         ) : (
-          <p className="text-muted">Aucun modèle dans la base. Le catalogue de la boutique vient encore de src/lib/products.ts.</p>
+          <p className="text-muted">Aucun modèle pour l&apos;instant. Crée le premier avec « Nouveau modèle ».</p>
         )}
         {products.length > 0 && lowHex.size > 0 && <p className="mt-4 text-sm text-muted">Une couleur cerclée d&apos;orange a au moins une taille en stock bas.</p>}
       </Panel>

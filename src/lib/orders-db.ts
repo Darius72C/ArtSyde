@@ -13,7 +13,7 @@ export async function getPublicOrder(reference: string, key: string | undefined)
   if (!key) return null;
   const o = await db.order.findUnique({
     where: { reference },
-    include: { items: { orderBy: { id: "asc" }, include: { product: { select: { name: true, slug: true, art: true } } } } },
+    include: { items: { orderBy: { id: "asc" }, include: { product: { select: { id: true, name: true, slug: true, art: true, mockups: true } } } } },
   });
   if (!o || orderKey(o.id) !== key) return null;
 
@@ -26,18 +26,19 @@ export async function getPublicOrder(reference: string, key: string | undefined)
     city: o.city,
     address: o.address,
     items: o.items.map((it) => {
-      // The shop's own artwork and background for this t-shirt, as in the cart.
+      // The starting products keep their backdrop, as in the shop (src/lib/catalog.ts).
       const shop = it.product ? PRODUCTS.find((p) => productSlug(p.name) === it.product!.slug) : undefined;
       return {
         key: it.id,
-        productId: shop?.id ?? null,
+        productId: it.product?.id ?? null,
         name: it.product?.name ?? "T-shirt personnalisé",
         price: it.unitPriceXof,
         color: it.color,
         size: it.size,
         qty: it.quantity,
-        art: shop?.art ?? ((it.product?.art ?? undefined) as Art | undefined),
+        art: (it.product?.art ?? undefined) as Art | undefined,
         bg: shop?.bg ?? (it.product ? undefined : "#e7e0d3"),
+        photo: it.product?.mockups[0],
         preview: it.previewUrl ?? undefined,
       };
     }),

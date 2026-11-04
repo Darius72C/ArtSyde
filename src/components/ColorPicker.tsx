@@ -50,7 +50,7 @@ type Props = {
 };
 
 /** Free colour picker: saturation/brightness gradient + hue rainbow + hex field + presets + eyedropper. */
-export function ColorPicker({ initial, presets, onChange, presetsLabel = "Coloris en stock" }: Props) {
+export function ColorPicker({ initial, presets, onChange, presetsLabel = "Teintes populaires" }: Props) {
   const [hsv, setHsv] = useState(() => hexToHsv(initial));
   const [text, setText] = useState(initial);
   const hex = hsvToHex(hsv.h, hsv.s, hsv.v);

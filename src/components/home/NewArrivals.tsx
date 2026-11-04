@@ -6,7 +6,7 @@ import { motion } from "motion/react";
 import { cart } from "@/lib/cart";
 import { flyToCart } from "@/lib/flyToCart";
 import { gsap, useGSAP } from "@/lib/gsap";
-import { formatFCFA, PRODUCTS } from "@/lib/products";
+import { formatFCFA, type Product } from "@/lib/products";
 import { ProductImage } from "../ProductImage";
 import { RevealLines, Tilt } from "../Reveal";
 import { DUR, EASE, STAGGER, VIEWPORT } from "@/lib/motion";
@@ -15,10 +15,11 @@ import { DUR, EASE, STAGGER, VIEWPORT } from "@/lib/motion";
  * New arrivals. Desktop: the section pins and vertical scrolling drives the rail sideways.
  * Mobile: a normal swipeable, snap-scrolling rail.
  */
-export function NewArrivals() {
+/** `products` come from the database (src/lib/catalog.ts), read by the home page. */
+export function NewArrivals({ products }: { products: Product[] }) {
   const root = useRef<HTMLElement>(null);
   const rail = useRef<HTMLDivElement>(null);
-  const items = PRODUCTS.filter((p) => p.tag === "Nouveau" || p.tag === "Best-seller");
+  const items = products.filter((p) => p.tag === "Nouveau" || p.tag === "Best-seller");
 
   useGSAP(
     () => {
@@ -62,7 +63,7 @@ export function NewArrivals() {
               <h3 className="display mt-1 text-[28px]">{p.name}</h3>
               <p className="mt-1 text-muted">À partir de {formatFCFA(p.price)}</p>
               <div className="na-art my-6 md:my-4" style={{ transform: "translateZ(40px)" }}>
-                <ProductImage color={p.colors[0]} art={p.art} bg="transparent" className="mx-auto aspect-square w-full md:w-auto md:h-[min(320px,34svh)]" />
+                <ProductImage color={p.colors[0]} art={p.art} photo={p.photo} alt={p.name} bg="transparent" className="mx-auto aspect-square w-full rounded-[22px] md:w-auto md:h-[min(320px,34svh)]" />
               </div>
               <div className="mt-auto flex items-center justify-between">
                 <div className="flex gap-1.5">
@@ -72,7 +73,7 @@ export function NewArrivals() {
                 </div>
                 <button
                   onClick={(e) => {
-                    cart.add({ productId: p.id, name: p.name, price: p.price, color: p.colors[0], size: "M", art: p.art, bg: p.bg });
+                    cart.add({ productId: p.id, name: p.name, price: p.price, color: p.colors[0], size: p.sizes.includes("M") ? "M" : (p.sizes[0] ?? "M"), art: p.art, bg: p.bg, photo: p.photo });
                     flyToCart(e.currentTarget.closest(".na-card")?.querySelector(".na-art") ?? null);
                   }}
                   className="btn !px-4 !py-1.5 !text-[14px]"

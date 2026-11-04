@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { cart, cartSubtotal, SIZES, useCart, type CartItem } from "@/lib/cart";
-import { formatFCFA, PRODUCTS } from "@/lib/products";
+import { formatFCFA, type Product } from "@/lib/products";
 import { TEE_COLORS } from "@/lib/data";
 
 const colorName = (hex: string) => TEE_COLORS.find((c) => c.hex.toLowerCase() === hex.toLowerCase())?.name ?? "Couleur libre";
 import { ProductImage } from "../ProductImage";
 import { FadeUp, RevealLines } from "../Reveal";
 import { DUR, EASE, STAGGER } from "@/lib/motion";
+import { flyToBin } from "@/lib/flyToBin";
 
 export function Thumb({ item, className = "" }: { item: CartItem; className?: string }) {
   if (item.preview)
@@ -19,7 +20,21 @@ export function Thumb({ item, className = "" }: { item: CartItem; className?: st
         <img src={item.preview} alt="" className="h-full w-full object-contain" />
       </div>
     );
-  return <ProductImage color={item.color} art={item.art} bg={item.bg ?? "var(--sand)"} className={`shrink-0 ${className}`} zoom={false} />;
+  return <ProductImage color={item.color} art={item.art} photo={item.photo} bg={item.bg ?? "var(--sand)"} className={`shrink-0 ${className}`} zoom={false} />;
+}
+
+/** Small trash can whose lid lifts on hover (.bin-link in globals.css). Same drawing as flyToBin's bin. */
+function BinIcon() {
+  return (
+    <svg viewBox="0 0 48 48" className="h-[18px] w-[18px] overflow-visible" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <g className="bin-lid">
+        <path d="M9 13h30" />
+        <path d="M19 13v-3a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v3" />
+      </g>
+      <path d="M13 17l2 23a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3l2-23" />
+      <path d="M20.5 23.5v12M27.5 23.5v12" />
+    </svg>
+  );
 }
 
 function Qty({ item }: { item: CartItem }) {
@@ -34,11 +49,12 @@ function Qty({ item }: { item: CartItem }) {
   );
 }
 
-export function CartView() {
+/** `products` (for the suggestions) come from the database, read by the /panier page. */
+export function CartView({ products }: { products: Product[] }) {
   const items = useCart();
   const subtotal = cartSubtotal(items);
   const count = items.reduce((n, i) => n + i.qty, 0);
-  const suggestions = PRODUCTS.filter((p) => !items.some((i) => i.productId === p.id)).slice(0, 4);
+  const suggestions = products.filter((p) => !items.some((i) => i.productId === p.id)).slice(0, 4);
 
   return (
     <div className="mx-auto max-w-[1440px] px-5 md:px-10">
@@ -60,14 +76,14 @@ export function CartView() {
         ) : (
           <motion.div key="full" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid items-start gap-12 lg:grid-cols-[1fr_380px] lg:gap-20">
             <ul className="border-t border-line">
-              <AnimatePresence initial={false}>
+              <AnimatePresence initial={false} mode="popLayout">
                 {items.map((it, i) => (
                   <motion.li
                     key={it.key}
                     layout
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0, transition: { duration: DUR.slow, ease: EASE.out, delay: i * STAGGER.item } }}
-                    exit={{ opacity: 0, x: 40, transition: { duration: DUR.fast, ease: EASE.in } }}
+                    exit={{ opacity: 0, scale: 0.97, transition: { duration: DUR.fast, ease: EASE.in } }}
                     className="flex gap-5 border-b border-line py-6 md:gap-8"
                   >
                     <Thumb item={it} className="aspect-[4/5] w-24 md:w-32" />
@@ -92,7 +108,15 @@ export function CartView() {
                           </select>
                         </label>
                         <Qty item={it} />
-                        <button onClick={() => cart.remove(it.key)} className="ml-auto text-[15px] text-link hover:underline">
+                        <button
+                          onClick={(e) => {
+                            // The item's picture flies into a bin that pops up, then the row goes.
+                            flyToBin(e.currentTarget.closest("li")?.firstElementChild ?? null);
+                            cart.remove(it.key);
+                          }}
+                          className="bin-link ml-auto inline-flex items-center gap-1.5 text-[15px] text-link hover:underline"
+                        >
+                          <BinIcon />
                           Retirer
                         </button>
                       </div>
@@ -126,9 +150,9 @@ export function CartView() {
             {suggestions.map((p, i) => (
               <FadeUp key={p.id} delay={i * STAGGER.item} className="group">
                 <div className="relative">
-                  <ProductImage color={p.colors[0]} art={p.art} bg={p.bg} className="aspect-[4/5] rounded-[22px]" />
+                  <ProductImage color={p.colors[0]} art={p.art} photo={p.photo} alt={p.name} bg={p.bg} className="aspect-[4/5] rounded-[22px]" />
                   <button
-                    onClick={() => cart.add({ productId: p.id, name: p.name, price: p.price, color: p.colors[0], size: "M", art: p.art, bg: p.bg })}
+                    onClick={() => cart.add({ productId: p.id, name: p.name, price: p.price, color: p.colors[0], size: p.sizes.includes("M") ? "M" : (p.sizes[0] ?? "M"), art: p.art, bg: p.bg, photo: p.photo })}
                     className="btn absolute bottom-4 left-1/2 -translate-x-1/2 !px-4 !py-1.5 !text-[14px] transition md:opacity-0 md:group-hover:opacity-100"
                   >
                     Ajouter — M

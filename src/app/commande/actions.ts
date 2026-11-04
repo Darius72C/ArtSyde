@@ -3,13 +3,13 @@
 import { db } from "@/lib/db";
 import { Prisma, Size } from "@/generated/prisma/client";
 import { DELIVERY, DELIVERY_METHODS, checkFields, orderKey, type CheckoutInput, type PlaceOrderResult } from "@/lib/orders";
-import { PRODUCTS, STUDIO_PRICE, productSlug } from "@/lib/products";
+import { STUDIO_PRICE } from "@/lib/products";
 import { PRINT_QUALITIES, type PrintQuality } from "@/lib/studio";
 
 /*
  * Places an order from the checkout. Anyone can POST here, so nothing from the browser is
  * trusted beyond "which t-shirt, which colour, which size, how many": prices and totals are
- * recomputed from PRODUCTS. The order waits for payment (PENDING_PAYMENT / UNPAID).
+ * recomputed from the Product table (active products only). The order waits for payment (PENDING_PAYMENT / UNPAID).
  */
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -32,8 +32,18 @@ export async function placeOrder(input: CheckoutInput): Promise<PlaceOrderResult
   const lines = Array.isArray(input.lines) ? input.lines : [];
   if (lines.length === 0 || lines.length > MAX_LINES) return { ok: false, errors: {}, message: CART_CHANGED };
 
+  // The catalogue lines' products, read once. Prices, colours and sizes come from here.
+  const ids = [...new Set(lines.flatMap((l) => (typeof l?.productId === "string" ? [l.productId] : [])))];
+  let catalogue: { id: string; priceXof: number; colors: string[]; sizes: Size[] }[] = [];
+  try {
+    catalogue = ids.length ? await db.product.findMany({ where: { id: { in: ids }, active: true }, select: { id: true, priceXof: true, colors: true, sizes: true } }) : [];
+  } catch (e) {
+    console.error("placeOrder: catalogue read failed", e);
+    return { ok: false, errors: {}, message: "On n'a pas pu enregistrer ta commande. Réessaie dans un instant." };
+  }
+
   // Recompute every line from the catalogue.
-  const items: { slug: string | null; size: Size; color: string; quantity: number; unitPriceXof: number; previewUrl: string | null; printQuality: PrintQuality | null }[] = [];
+  const items: { productId: string | null; size: Size; color: string; quantity: number; unitPriceXof: number; previewUrl: string | null; printQuality: PrintQuality | null }[] = [];
   for (const l of lines) {
     const size = Object.values(Size).find((s) => s === l?.size);
     const quantity = Number(l?.qty);
@@ -46,12 +56,12 @@ export async function placeOrder(input: CheckoutInput): Promise<PlaceOrderResult
       if (!HEX.test(color) || !STUDIO_PRICES.includes(price)) return { ok: false, errors: {}, message: CART_CHANGED };
       const preview = typeof l.preview === "string" && l.preview.startsWith("data:image/") && l.preview.length <= MAX_PREVIEW ? l.preview : null;
       const printQuality = PRINT_QUALITIES.find((q) => q === l.quality) ?? "STANDARD";
-      items.push({ slug: null, size, color, quantity, unitPriceXof: price, previewUrl: preview, printQuality });
+      items.push({ productId: null, size, color, quantity, unitPriceXof: price, previewUrl: preview, printQuality });
     } else {
-      const p = PRODUCTS.find((x) => x.id === l.productId);
+      const p = catalogue.find((x) => x.id === l.productId);
       const known = p?.colors.find((c) => c.toLowerCase() === color.toLowerCase());
-      if (!p || !known) return { ok: false, errors: {}, message: CART_CHANGED };
-      items.push({ slug: productSlug(p.name), size, color: known, quantity, unitPriceXof: p.price, previewUrl: null, printQuality: null });
+      if (!p || !known || !p.sizes.includes(size)) return { ok: false, errors: {}, message: CART_CHANGED };
+      items.push({ productId: p.id, size, color: known, quantity, unitPriceXof: p.priceXof, previewUrl: null, printQuality: null });
     }
   }
 
@@ -59,11 +69,6 @@ export async function placeOrder(input: CheckoutInput): Promise<PlaceOrderResult
   const deliveryXof = DELIVERY[delivery].price;
 
   try {
-    // Link catalogue lines to their Product row (by slug). A product missing from the database stays unlinked.
-    const slugs = [...new Set(items.flatMap((i) => (i.slug ? [i.slug] : [])))];
-    const rows = slugs.length ? await db.product.findMany({ where: { slug: { in: slugs } }, select: { id: true, slug: true } }) : [];
-    const productIds = new Map(rows.map((r) => [r.slug, r.id]));
-
     const data = {
       status: "PENDING_PAYMENT",
       paymentStatus: "UNPAID",
@@ -78,7 +83,7 @@ export async function placeOrder(input: CheckoutInput): Promise<PlaceOrderResult
       deliveryXof,
       totalXof: subtotalXof + deliveryXof,
       items: {
-        create: items.map(({ slug, ...i }) => ({ ...i, productId: slug ? (productIds.get(slug) ?? null) : null })),
+        create: items,
       },
     } satisfies Omit<Prisma.OrderUncheckedCreateInput, "reference">;
 

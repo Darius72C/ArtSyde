@@ -36,6 +36,22 @@ export function Footer() {
           <span>© ArtSyde. Tous droits réservés.</span>
           <span>Imprimé dans notre atelier</span>
         </div>
+        {/* Required by the 3D model's licence (CC BY 4.0). */}
+        <p className="mt-3">
+          Modèle 3D du t-shirt : «{" "}
+          <a href="https://sketchfab.com/3d-models/oversized-t-shirt-3b6e78d6a1a74370a6e5af6f312d38f7" className="hover:text-ink hover:underline" target="_blank" rel="noopener noreferrer">
+            Oversized t-shirt
+          </a>{" "}
+          » par{" "}
+          <a href="https://sketchfab.com/kylelhb" className="hover:text-ink hover:underline" target="_blank" rel="noopener noreferrer">
+            kylelhb
+          </a>
+          , licence{" "}
+          <a href="http://creativecommons.org/licenses/by/4.0/" className="hover:text-ink hover:underline" target="_blank" rel="noopener noreferrer">
+            CC BY 4.0
+          </a>
+          .
+        </p>
       </div>
     </footer>
   );

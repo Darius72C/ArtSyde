@@ -9,7 +9,7 @@ import { TEE_COLORS } from "@/lib/data";
 import { cart, SIZES } from "@/lib/cart";
 import { STUDIO_PRICE, formatFCFA } from "@/lib/products";
 import { teeState } from "../story/teeState";
-import { ColorPicker, nearest } from "../ColorPicker";
+import { ColorPicker } from "../ColorPicker";
 import { fadeUp, RevealLines } from "../Reveal";
 import { DUR, EASE, STAGGER } from "@/lib/motion";
 import { PRINT_QUALITIES, PRINT_QUALITY, PRINT_WIDTH_CM, type PrintQuality } from "@/lib/studio";
@@ -48,8 +48,8 @@ const INKS = [
 const panelIn = (i: number) => fadeUp(0.15 + i * STAGGER.item);
 
 // Positions are fractions of the print area; sizes are fractions of its width (× PRINT_WIDTH_CM for cm).
-const DEFAULT_TEXT: Txt = { value: "Atelier", font: "italic", color: "#efe9df", x: 0.5, y: 0.39, size: 0.058, rot: 0 };
-const DEFAULT_IMAGE = { x: 0.5, y: 0.58, scale: 0.24, rot: 0 };
+const DEFAULT_TEXT: Txt = { value: "Atelier", font: "italic", color: "#efe9df", x: 0.5, y: 0.27, size: 0.085, rot: 0 };
+const DEFAULT_IMAGE = { x: 0.5, y: 0.4, scale: 0.34, rot: 0 };
 
 // Print canvases live outside React (they are drawing surfaces, not state).
 let shared: Record<"front" | "back", HTMLCanvasElement> | null = null;
@@ -110,7 +110,6 @@ export function StudioView() {
   const [selected, setSelected] = useState<Layer | null>("text");
   const [tab, setTab] = useState<"couleur" | "image" | "texte">("texte");
   const [teeHex, setTeeHex] = useState<string>(TEE_COLORS[0].hex.toLowerCase());
-  const [pickerKey, setPickerKey] = useState(0); // remounts the picker when the colour is set from outside
   const [tokens, setTokens] = useState(5); // mock balance — will come from the user's account
   const [size, setSize] = useState("M");
   const [qty, setQty] = useState(1);
@@ -336,27 +335,7 @@ export function StudioView() {
             <motion.div key={tab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: DUR.fast, ease: EASE.out }} className="mt-8 space-y-6">
               {tab === "couleur" && (
                 <>
-                  <ColorPicker key={pickerKey} initial={teeHex} presets={TEE_COLORS} onChange={pickColor} />
-                  {(() => {
-                    const n = nearest(teeHex, TEE_COLORS);
-                    const exact = n.hex.toLowerCase() === teeHex;
-                    return (
-                      <p className="border-t border-line pt-4 text-sm text-muted">
-                        {exact ? (
-                          <>
-                            <span className="text-ok">●</span> {n.name}, disponible en atelier.
-                          </>
-                        ) : (
-                          <>
-                            Teinte sur mesure. Plus proche en stock : <span className="text-ink">{n.name}</span>.{" "}
-                            <button onClick={() => (pickColor(n.hex.toLowerCase()), setPickerKey((k) => k + 1))} className="text-ink underline underline-offset-4">
-                              Utiliser
-                            </button>
-                          </>
-                        )}
-                      </p>
-                    );
-                  })()}
+                  <ColorPicker initial={teeHex} presets={TEE_COLORS} presetsLabel="Teintes populaires" onChange={pickColor} />
                 </>
               )}
 
@@ -416,7 +395,7 @@ export function StudioView() {
                 <div className="space-y-6 border-t border-line pt-6">
                   <p className="eyebrow">Ajuster {selected === "image" ? "l'image" : "le texte"}</p>
                   {selected === "image" && cur.image && slider("Largeur", cur.image.scale, 0.05, 1, 0.005, (v) => update("image", { scale: v }), (v) => `${Math.round(v * PRINT_WIDTH_CM)} cm`)}
-                  {selected === "text" && cur.text && slider("Taille", cur.text.size, 0.015, 0.15, 0.001, (v) => update("text", { size: v }), (v) => `${(v * PRINT_WIDTH_CM).toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} cm`)}
+                  {selected === "text" && cur.text && slider("Taille", cur.text.size, 0.02, 0.22, 0.001, (v) => update("text", { size: v }), (v) => `${(v * PRINT_WIDTH_CM).toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} cm`)}
                   {slider("Horizontal", layer.x, 0, 1, 0.01, (v) => update(selected!, { x: v }), (v) => `${Math.round(v * 100)} %`)}
                   {slider("Vertical", layer.y, 0, 1, 0.01, (v) => update(selected!, { y: v }), (v) => `${Math.round(v * 100)} %`)}
                   {slider("Rotation", layer.rot, -180, 180, 1, (v) => update(selected!, { rot: v }), (v) => `${v}°`)}

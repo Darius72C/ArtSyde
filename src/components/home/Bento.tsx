@@ -28,13 +28,9 @@ export function Bento() {
             <p className="mt-1 text-muted">Pas de minimum de commande en impression DTF.</p>
           </FadeUp>
           <FadeUp delay={STAGGER.item * 2} className="tile bg-bg p-8 md:col-span-2">
-            <p className="display text-[56px] leading-none"><CountUp to={8} duration={DUR.hero} /></p>
-            <h3 className="mt-3 text-[19px] font-semibold">coloris en stock.</h3>
-            <div className="mt-4 flex gap-1.5">
-              {["#1C1C1E", "#F4F2EC", "#9EA0A3", "#1F2A44", "#C8102E", "#6B6B47", "#D8C7A5", "#E9A7B8"].map((c) => (
-                <span key={c} className="h-5 w-5 rounded-full ring-1 ring-ink/25 transition-transform duration-300 hover:-translate-y-1 hover:scale-125" style={{ background: c }} />
-              ))}
-            </div>
+            <p className="display text-[44px] leading-none">Oversize</p>
+            <h3 className="mt-3 text-[19px] font-semibold">coupe ample.</h3>
+            <p className="mt-1 text-muted">Épaules tombantes, coton épais et souple.</p>
           </FadeUp>
           <FadeUp delay={STAGGER.item} className="tile bg-bg p-8 md:col-span-3">
             <h3 className="text-[19px] font-semibold">Imprimé à la main.</h3>
