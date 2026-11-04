@@ -14,7 +14,8 @@
     "typecheck": "turbo run typecheck",
     "db:generate": "pnpm --filter @artsyde/db db:generate",
     "db:migrate": "pnpm --filter @artsyde/db db:migrate",
-    "db:studio": "pnpm --filter @artsyde/db db:studio"
+    "db:studio": "pnpm --filter @artsyde/db db:studio",
+    "db:seed": "pnpm --filter @artsyde/db db:seed"
   },
   "devDependencies": {
     "turbo": "2.9.14",

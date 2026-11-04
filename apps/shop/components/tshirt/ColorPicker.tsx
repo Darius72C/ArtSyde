@@ -6,6 +6,10 @@ type ColorPickerProps = {
   /** Couleur actuelle en hexadécimal, ex. "#8B3DFF". */
   value: string;
   onChange: (hex: string) => void;
+  /** Couleurs proposées. Par défaut, tout le nuancier. */
+  palette?: readonly string[];
+  /** Affiche la pastille arc-en-ciel pour une couleur libre. */
+  allowCustom?: boolean;
 };
 
 /** Vrai si la couleur est claire : la coche est alors dessinée en noir. */
@@ -33,22 +37,35 @@ function Check({ light }: { light: boolean }) {
 }
 
 const swatch =
-  "relative flex aspect-square w-full items-center justify-center rounded-md border border-black/10 transition hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-curse-violet";
+  "relative flex aspect-square items-center justify-center rounded-md border border-black/10 transition hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-curse-violet";
 
 /** Nuancier : une grille de pastilles carrées, plus une pastille « couleur libre ». */
-export function ColorPicker({ value, onChange }: ColorPickerProps) {
+export function ColorPicker({
+  value,
+  onChange,
+  palette = TSHIRT_PALETTE,
+  allowCustom = true,
+}: ColorPickerProps) {
   const current = value.toUpperCase();
-  const inPalette = (TSHIRT_PALETTE as readonly string[]).includes(current);
+  const colors = palette.map((c) => c.toUpperCase());
+  const inPalette = colors.includes(current);
+  // Peu de couleurs (fiche produit) : grille compacte au lieu du grand nuancier.
+  const small = colors.length <= 8;
 
   return (
     <div
       role="radiogroup"
       aria-label="Couleur du t-shirt"
-      className="grid w-full max-w-2xl grid-cols-8 gap-1.5 rounded-xl bg-white p-2 sm:grid-cols-16"
+      className={
+        small
+          ? "flex flex-wrap gap-2"
+          : "grid w-full max-w-2xl grid-cols-8 gap-1.5 rounded-xl bg-white p-2 sm:grid-cols-16"
+      }
     >
       {/* Couleur libre : ouvre le sélecteur de couleur du système. */}
+      {allowCustom && (
       <label
-        className={`${swatch} cursor-pointer ${!inPalette ? "ring-2 ring-[#3A3346]" : ""}`}
+        className={`${swatch} ${small ? "size-10" : "w-full"} cursor-pointer ${!inPalette ? "ring-2 ring-[#3A3346]" : ""}`}
         style={{
           background:
             "conic-gradient(from 180deg, #ff3b3b, #ffd93b, #3bff6b, #3bd8ff, #6b3bff, #ff3bd8, #ff3b3b)",
@@ -64,8 +81,9 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
         />
         {!inPalette && <Check light={false} />}
       </label>
+      )}
 
-      {TSHIRT_PALETTE.map((hex) => {
+      {colors.map((hex) => {
         const selected = hex === current;
         return (
           <button
@@ -76,7 +94,13 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
             aria-label={hex}
             title={hex}
             onClick={() => onChange(hex)}
-            className={`${swatch} ${selected ? "ring-2 ring-[#3A3346] ring-offset-1" : ""}`}
+            className={`${swatch} ${small ? "size-10 border-white/20" : "w-full"} ${
+              selected
+                ? small
+                  ? "ring-2 ring-curse-violet ring-offset-2 ring-offset-curse-black"
+                  : "ring-2 ring-[#3A3346] ring-offset-1"
+                : ""
+            }`}
             style={{ backgroundColor: hex }}
           >
             {selected && <Check light={isLight(hex)} />}
