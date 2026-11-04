@@ -6,7 +6,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { ContactShadows, Environment, Float, Lightformer } from "@react-three/drei";
 import { cubicBezier } from "motion/react";
 import { DUR, EASE } from "@/lib/motion";
-import { TEE_HEIGHT, emptyTexture, printMaterial, stickerTexture, useTeeModel } from "./teeModel";
+import { TEE_HEIGHT, colorTrue, emptyTexture, printMaterial, stickerTexture, tintSheen, useTeeModel } from "./teeModel";
 import { heroState } from "./heroState";
 
 /*
@@ -33,6 +33,7 @@ function Tees() {
         const { mat } = printMaterial(box, front, back);
         Object.assign(mat, maps);
         mat.color.set(t.color);
+        tintSheen(mat);
         return { mat, front, back };
       }),
     [box, maps],
@@ -93,9 +94,14 @@ export default function HeroTees() {
 
   return (
     <div ref={wrap} className="absolute inset-0">
-      <Canvas dpr={[1, 1.75]} frameloop={onScreen ? "always" : "never"} camera={{ position: [0, 0, 6.2], fov: 35 }} gl={{ antialias: true, alpha: true }} onCreated={({ gl }) => void (gl.domElement.style.opacity = "0")}>
+      <Canvas dpr={[1, 1.75]} frameloop={onScreen ? "always" : "never"} camera={{ position: [0, 0, 6.2], fov: 35 }} gl={{ antialias: true, alpha: true }} onCreated={({ gl }) => {
+          colorTrue(gl);
+          gl.domElement.style.opacity = "0";
+        }}>
         <ambientLight intensity={0.35} />
         <directionalLight position={[3, 4, 5]} intensity={1.4} />
+        {/* Rim light from behind: outlines the tee, so dark colours stay readable on a dark page. */}
+        <directionalLight position={[-3, 3, -5]} intensity={0.9} />
         <Environment resolution={256}>
           <Lightformer intensity={2.2} position={[0, 3, 4]} scale={[10, 3, 1]} />
           <Lightformer intensity={0.9} position={[-5, 0, 2]} scale={[3, 8, 1]} />

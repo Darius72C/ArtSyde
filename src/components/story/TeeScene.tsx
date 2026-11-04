@@ -8,7 +8,7 @@ import { TEE_COLORS } from "@/lib/data";
 import { cubicBezier } from "motion/react";
 import { DUR, EASE } from "@/lib/motion";
 import { teeState } from "./teeState";
-import { TEE_HEIGHT, TEE_WIDTH, canvasTexture, printMaterial, stickerTexture, useTeeModel } from "./teeModel";
+import { TEE_HEIGHT, TEE_WIDTH, canvasTexture, colorTrue, printMaterial, stickerTexture, tintSheen, useTeeModel } from "./teeModel";
 
 const tmpA = new THREE.Color();
 const tmpTarget = new THREE.Color();
@@ -84,6 +84,7 @@ function Tee({ front: frontCanvas, back: backCanvas, play }: Props & { play: Pla
     g.rotation.x += (-teeState.pointerY * 0.15 * teeState.parallax - g.rotation.x) * k;
     if (teeState.hex) mat.color.lerp(tmpTarget.set(teeState.hex), k);
     else colorAt(teeState.colorT, mat.color);
+    tintSheen(mat);
     uniforms.uFrontOpacity.value = studio ? 1 : teeState.design;
 
     // Entrance, on its own inner group so it never fights the scroll / pointer values above.
@@ -127,6 +128,7 @@ export default function TeeScene(props: Props) {
   return (
     <Canvas dpr={[1, 1.75]} camera={{ position: [0, 0, 6.2], fov: 35 }} gl={{ antialias: true, alpha: true, preserveDrawingBuffer: props.preserve }}
       onCreated={({ gl }) => {
+        colorTrue(gl);
         // Start the entrance when a third of the canvas is visible (the home story sits below the fold).
         seenOnScreen.current = new IntersectionObserver(
           ([e]) => {
@@ -141,6 +143,8 @@ export default function TeeScene(props: Props) {
     >
       <ambientLight intensity={0.35} />
       <directionalLight position={[3, 4, 5]} intensity={1.4} />
+        {/* Rim light from behind: outlines the tee, so dark colours stay readable on a dark page. */}
+        <directionalLight position={[-3, 3, -5]} intensity={0.9} />
       {/* Studio lighting built in code (no HDR download) */}
       <Environment resolution={256}>
         <Lightformer intensity={2.2} position={[0, 3, 4]} scale={[10, 3, 1]} />

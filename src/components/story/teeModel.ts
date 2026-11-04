@@ -59,7 +59,8 @@ export function printMaterial(box: THREE.Box3, front: THREE.Texture, back: THREE
     uFrontOpacity: { value: 1 },
     uBackOpacity: { value: 1 },
   };
-  const mat = new THREE.MeshPhysicalMaterial({ roughness: 1, metalness: 0, sheen: 0.5, sheenRoughness: 0.8, sheenColor: new THREE.Color("#bbbbbb"), envMapIntensity: 0.55, side: THREE.DoubleSide });
+  // Cotton: fully rough, with a soft sheen in the fabric's own colour (see tintSheen), never a grey veil.
+  const mat = new THREE.MeshPhysicalMaterial({ roughness: 1, metalness: 0, sheen: 0.4, sheenRoughness: 0.85, envMapIntensity: 0.55, side: THREE.DoubleSide });
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
@@ -88,6 +89,28 @@ export function printMaterial(box: THREE.Box3, front: THREE.Texture, back: THREE
   };
   mat.customProgramCacheKey = () => "tee-print";
   return { mat, uniforms };
+}
+
+/**
+ * Sheen in the tee's own colour, slightly lighter: how cotton catches the light. A small floor of
+ * light keeps dark tees readable (folds, edges) without greying them. Call after changing `mat.color`.
+ */
+export function tintSheen(mat: THREE.MeshPhysicalMaterial) {
+  mat.sheenColor.copy(mat.color).lerp(WHITE, 0.15);
+  mat.sheenColor.r = Math.min(1, mat.sheenColor.r + SHEEN_FLOOR);
+  mat.sheenColor.g = Math.min(1, mat.sheenColor.g + SHEEN_FLOOR);
+  mat.sheenColor.b = Math.min(1, mat.sheenColor.b + SHEEN_FLOOR);
+}
+const WHITE = new THREE.Color("#ffffff");
+const SHEEN_FLOOR = 0.08; // linear
+
+/**
+ * Colour-true rendering for the tee scenes: Khronos PBR Neutral tone mapping keeps a product's
+ * colours as chosen (the default filmic curve dulls reds and lifts blacks). Use in `onCreated`.
+ */
+export function colorTrue(gl: THREE.WebGLRenderer) {
+  gl.toneMapping = THREE.NeutralToneMapping;
+  gl.toneMappingExposure = 1.12; // the fabric's lit side lands on the chosen colour, folds stay darker
 }
 
 /** Home page demo prints, drawn on full print-area canvases at chest / upper-back height. */
