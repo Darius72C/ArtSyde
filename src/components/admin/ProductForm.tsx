@@ -1,10 +1,11 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Field } from "../pages/CheckoutView";
+import { ColorPicker } from "../ColorPicker";
 import { TEE_COLORS } from "@/lib/data";
-import { DUR, EASE } from "@/lib/motion";
+import { DUR, EASE, SPRING } from "@/lib/motion";
 import { saveProduct, type ProductFormState } from "@/lib/admin/products";
 
 export type EditableProduct = { id: string; name: string; priceXof: number; oldPriceXof: number | null; tag: string | null; colors: string[]; sizes: string[]; active: boolean };
@@ -29,11 +30,17 @@ function FieldError({ children }: { children?: string }) {
   );
 }
 
+const colorName = (hex: string) => TEE_COLORS.find((c) => c.hex.toLowerCase() === hex)?.name ?? hex.toUpperCase();
+
 /** Name, prices, label, colours, sizes and visibility of one product. Empty `product.id` creates one. */
 export function ProductForm({ product }: { product: EditableProduct }) {
   const [state, action, pending] = useActionState<ProductFormState, FormData>(saveProduct, {});
   const e = state.errors ?? {};
   const isNew = !product.id;
+  // Colours: any tint, chosen with the same colour selector as the studio. Each one is sent as a hidden "colors" field.
+  const [colors, setColors] = useState(() => [...new Set(product.colors.map((c) => c.toLowerCase()))]);
+  const [draft, setDraft] = useState(TEE_COLORS[0].hex.toLowerCase());
+  const hasDraft = colors.includes(draft);
 
   return (
     <form action={action} noValidate className="space-y-8">
@@ -57,18 +64,40 @@ export function ProductForm({ product }: { product: EditableProduct }) {
 
       <fieldset>
         <legend className="mb-3 text-[14px] text-muted">Couleurs proposées</legend>
-        <div className="flex flex-wrap gap-2">
-          {TEE_COLORS.map((c) => (
-            <label key={c.hex} className="cursor-pointer">
-              <input type="checkbox" name="colors" value={c.hex} defaultChecked={product.colors.some((x) => x.toLowerCase() === c.hex.toLowerCase())} className="peer sr-only" />
-              <span className="flex items-center gap-2 rounded-full border border-line px-3 py-1.5 text-[14px] text-muted transition-colors duration-300 peer-checked:border-ink peer-checked:bg-bg peer-checked:font-medium peer-checked:text-ink peer-focus-visible:ring-2 peer-focus-visible:ring-accent">
-                <span className="h-3 w-3 rounded-full ring-1 ring-line" style={{ background: c.hex }} />
-                {c.name}
-              </span>
-            </label>
-          ))}
+        <div className="flex min-h-9 flex-wrap items-center gap-2">
+          <AnimatePresence initial={false}>
+            {colors.map((hex) => (
+              <motion.span
+                key={hex}
+                layout
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                transition={SPRING.pop}
+                className="flex items-center gap-2 rounded-full border border-ink bg-bg py-1.5 pl-3 pr-1.5 text-[14px] font-medium"
+              >
+                <input type="hidden" name="colors" value={hex} />
+                <span className="h-3 w-3 rounded-full ring-1 ring-line" style={{ background: hex }} />
+                {colorName(hex)}
+                <button type="button" onClick={() => setColors((cs) => cs.filter((c) => c !== hex))} aria-label={`Retirer ${colorName(hex)}`} className="grid h-5 w-5 place-items-center rounded-full text-muted transition-colors duration-300 hover:bg-surface hover:text-ink">
+                  ×
+                </button>
+              </motion.span>
+            ))}
+          </AnimatePresence>
+          {colors.length === 0 && <span className="text-sm text-muted">Aucune couleur pour l&apos;instant : choisis-en une ci-dessous.</span>}
         </div>
         <FieldError>{e.colors}</FieldError>
+        <div className="mt-5 grid items-start gap-6 rounded-2xl border border-line p-5 md:grid-cols-[minmax(0,320px)_1fr]">
+          <ColorPicker initial={draft} presets={TEE_COLORS} onChange={(hex) => setDraft(hex.toLowerCase())} />
+          <div className="flex flex-col items-start gap-4">
+            <span className="h-16 w-16 rounded-2xl ring-1 ring-line" style={{ background: draft }} aria-hidden />
+            <p className="text-sm text-muted">{colorName(draft)}</p>
+            <button type="button" disabled={hasDraft} onClick={() => setColors((cs) => [...cs, draft])} className="btn-outline">
+              {hasDraft ? "Déjà proposée" : "Ajouter cette couleur"}
+            </button>
+          </div>
+        </div>
       </fieldset>
 
       <fieldset>

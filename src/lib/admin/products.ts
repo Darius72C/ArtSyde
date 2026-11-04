@@ -6,7 +6,6 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { Prisma, ProductTag, Size } from "@/generated/prisma/client";
 import { CATALOG_TAG } from "@/lib/catalog";
-import { TEE_COLORS } from "@/lib/data";
 import { productSlug } from "@/lib/products";
 import { deleteObject, keyFromPublicUrl, presign, r2Config } from "@/lib/r2";
 import { requireAdmin } from "./auth";
@@ -19,7 +18,9 @@ import { requireAdmin } from "./auth";
 
 export type ProductFormState = { errors?: Partial<Record<"name" | "price" | "oldPrice" | "colors" | "sizes", string>>; message?: string; saved?: boolean };
 
-const HEXES = new Set(TEE_COLORS.map((c) => c.hex.toLowerCase()));
+// Any tee colour the workshop offers, picked with the colour selector: a #rrggbb code each.
+const HEX = /^#[0-9a-f]{6}$/;
+const MAX_COLORS = 24;
 const PHOTO_TYPES = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" } as const;
 const MAX_PHOTO = 8 * 1024 * 1024; // 8 Mo
 const MAX_PHOTOS = 12;
@@ -38,7 +39,7 @@ export async function saveProduct(_prev: ProductFormState, form: FormData): Prom
   const oldPriceXof = oldRaw ? price(oldRaw) : null;
   const tagRaw = String(form.get("tag") ?? "");
   const tag = Object.values(ProductTag).find((t) => t === tagRaw) ?? null;
-  const colors = TEE_COLORS.map((c) => c.hex).filter((hex) => form.getAll("colors").some((v) => String(v).toLowerCase() === hex.toLowerCase()));
+  const colors = [...new Set(form.getAll("colors").map((v) => String(v).trim().toLowerCase()))].filter((v) => HEX.test(v)).slice(0, MAX_COLORS);
   const sizes = Object.values(Size).filter((s) => form.getAll("sizes").includes(s));
   const active = form.get("active") === "on";
 
@@ -46,7 +47,7 @@ export async function saveProduct(_prev: ProductFormState, form: FormData): Prom
   if (name.length < 2) errors.name = "Donne un nom au modèle.";
   if (!(priceXof >= 500 && priceXof <= 500_000)) errors.price = "Un prix entre 500 et 500 000 FCFA.";
   if (oldPriceXof !== null && !(oldPriceXof > priceXof && oldPriceXof <= 1_000_000)) errors.oldPrice = "Le prix barré doit être plus élevé que le prix.";
-  if (!colors.length || colors.some((c) => !HEXES.has(c.toLowerCase()))) errors.colors = "Choisis au moins une couleur.";
+  if (!colors.length) errors.colors = "Ajoute au moins une couleur.";
   if (!sizes.length) errors.sizes = "Choisis au moins une taille.";
   if (Object.keys(errors).length) return { errors };
 
