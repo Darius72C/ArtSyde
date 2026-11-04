@@ -65,12 +65,3 @@ export const PRODUCT_PLACEMENT: DesignPlacement = {
   width: 13,
   rotation: 0,
 };
-
-/** Position du design des modèles du catalogue : centré sur la poitrine. */
-export const PRODUCT_PLACEMENT: DesignPlacement = {
-  side: "front",
-  x: 0,
-  y: 23,
-  width: 13,
-  rotation: 0,
-};
