@@ -13,7 +13,8 @@ import { Thumb } from "./CartView";
 import { RevealLines } from "../Reveal";
 import { DUR, EASE } from "@/lib/motion";
 
-function Field({ name, label, error, ...rest }: { name: string; label: string; error?: string } & React.InputHTMLAttributes<HTMLInputElement>) {
+/** Labelled input with an error under it that shakes in. Also used by the credits page. */
+export function Field({ name, label, error, ...rest }: { name: string; label: string; error?: string } & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <label className="block">
       <span className="mb-1.5 block text-[14px] text-muted">{label}</span>
@@ -67,7 +68,7 @@ export function CheckoutView() {
     setErrors(err);
     setMessage(undefined);
     if (Object.keys(err).length) return;
-    const lines = items.map(({ productId, color, size, qty, price, preview }) => ({ productId, color, size, qty, price, preview }));
+    const lines = items.map(({ productId, color, size, qty, price, preview, quality }) => ({ productId, color, size, qty, price, preview, quality }));
     startTransition(async () => {
       const r = await placeOrder({ fields, delivery, lines }).catch(() => null);
       if (!r) return setMessage("Connexion perdue. Vérifie ton réseau et réessaie.");

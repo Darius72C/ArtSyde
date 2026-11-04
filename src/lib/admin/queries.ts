@@ -247,6 +247,34 @@ export async function getStudio() {
   };
 }
 
+// ---------- Credit purchases (/credits) ----------
+
+export async function getCreditPurchases({ paid, q }: { paid?: boolean; q?: string }) {
+  const search = q?.trim();
+  const where: Prisma.CreditPurchaseWhereInput = {
+    ...(paid !== undefined && { paymentStatus: paid ? "PAID" : "UNPAID" }),
+    ...(search && {
+      OR: [
+        { reference: { contains: search, mode: "insensitive" } },
+        { customerName: { contains: search, mode: "insensitive" } },
+        { customerPhone: { contains: search } },
+        { paymentRef: { contains: search, mode: "insensitive" } },
+      ],
+    }),
+  };
+  const [purchases, counts] = await Promise.all([
+    // Waiting for payment first (Postgres sorts an enum in declaration order: UNPAID, PAID, …), newest first within each.
+    db.creditPurchase.findMany({ where, orderBy: [{ paymentStatus: "asc" }, { createdAt: "desc" }], take: 200 }),
+    db.creditPurchase.groupBy({ by: ["paymentStatus"], _count: { _all: true }, _sum: { priceXof: true } }),
+  ]);
+  const of = (s: "PAID" | "UNPAID") => counts.find((c) => c.paymentStatus === s);
+  return {
+    purchases,
+    unpaid: { count: of("UNPAID")?._count._all ?? 0, value: of("UNPAID")?._sum.priceXof ?? 0 },
+    paid: { count: of("PAID")?._count._all ?? 0, value: of("PAID")?._sum.priceXof ?? 0 },
+  };
+}
+
 // ---------- Sales ----------
 
 export const PERIODS = [7, 30, 90] as const;

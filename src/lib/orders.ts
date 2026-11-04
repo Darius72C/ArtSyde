@@ -28,7 +28,7 @@ export function checkFields(f: CheckoutFields, delivery: DeliveryMethod) {
 }
 
 /** What the browser sends: which items, never what they cost. */
-export type CheckoutLine = Pick<CartItem, "productId" | "color" | "size" | "qty" | "price" | "preview">;
+export type CheckoutLine = Pick<CartItem, "productId" | "color" | "size" | "qty" | "price" | "preview" | "quality">;
 export type CheckoutInput = { fields: CheckoutFields; delivery: DeliveryMethod; lines: CheckoutLine[] };
 export type PlaceOrderResult =
   | { ok: true; reference: string; key: string }

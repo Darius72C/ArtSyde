@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { Prisma, Size } from "@/generated/prisma/client";
 import { DELIVERY, DELIVERY_METHODS, checkFields, orderKey, type CheckoutInput, type PlaceOrderResult } from "@/lib/orders";
 import { PRODUCTS, STUDIO_PRICE, productSlug } from "@/lib/products";
+import { PRINT_QUALITIES, type PrintQuality } from "@/lib/studio";
 
 /*
  * Places an order from the checkout. Anyone can POST here, so nothing from the browser is
@@ -32,7 +33,7 @@ export async function placeOrder(input: CheckoutInput): Promise<PlaceOrderResult
   if (lines.length === 0 || lines.length > MAX_LINES) return { ok: false, errors: {}, message: CART_CHANGED };
 
   // Recompute every line from the catalogue.
-  const items: { slug: string | null; size: Size; color: string; quantity: number; unitPriceXof: number; previewUrl: string | null }[] = [];
+  const items: { slug: string | null; size: Size; color: string; quantity: number; unitPriceXof: number; previewUrl: string | null; printQuality: PrintQuality | null }[] = [];
   for (const l of lines) {
     const size = Object.values(Size).find((s) => s === l?.size);
     const quantity = Number(l?.qty);
@@ -44,12 +45,13 @@ export async function placeOrder(input: CheckoutInput): Promise<PlaceOrderResult
       const price = Number(l.price);
       if (!HEX.test(color) || !STUDIO_PRICES.includes(price)) return { ok: false, errors: {}, message: CART_CHANGED };
       const preview = typeof l.preview === "string" && l.preview.startsWith("data:image/") && l.preview.length <= MAX_PREVIEW ? l.preview : null;
-      items.push({ slug: null, size, color, quantity, unitPriceXof: price, previewUrl: preview });
+      const printQuality = PRINT_QUALITIES.find((q) => q === l.quality) ?? "STANDARD";
+      items.push({ slug: null, size, color, quantity, unitPriceXof: price, previewUrl: preview, printQuality });
     } else {
       const p = PRODUCTS.find((x) => x.id === l.productId);
       const known = p?.colors.find((c) => c.toLowerCase() === color.toLowerCase());
       if (!p || !known) return { ok: false, errors: {}, message: CART_CHANGED };
-      items.push({ slug: productSlug(p.name), size, color: known, quantity, unitPriceXof: p.price, previewUrl: null });
+      items.push({ slug: productSlug(p.name), size, color: known, quantity, unitPriceXof: p.price, previewUrl: null, printQuality: null });
     }
   }
 

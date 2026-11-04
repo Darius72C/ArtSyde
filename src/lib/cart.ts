@@ -1,5 +1,6 @@
 "use client";
 
+import type { PrintQuality } from "@/generated/prisma/client";
 import { useSyncExternalStore } from "react";
 import type { Art } from "./products";
 
@@ -14,6 +15,7 @@ export type CartItem = {
   art?: Art;
   bg?: string;
   preview?: string; // small data-URL thumbnail for custom designs
+  quality?: PrintQuality; // custom designs: print file quality chosen in the studio
 };
 
 const STORAGE = "cart:v1";

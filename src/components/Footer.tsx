@@ -5,7 +5,7 @@ import { FadeUp } from "./Reveal";
 const COLS = [
   { t: "Boutique", l: [["Tous les t-shirts", "/#boutique"], ["Nouveautés", "/#nouveautes"], ["Studio 3D", "/studio"], ["Panier", "/panier"]] },
   { t: "Aide", l: [["Livraison", "/#aide"], ["Guide des tailles", "/#aide"], ["Suivi de commande", "/connexion"], ["Contact", "#"]] },
-  { t: "Compte", l: [["Se connecter", "/connexion"], ["Créer un compte", "/connexion"], ["Crédits studio", "/#credits"]] },
+  { t: "Compte", l: [["Se connecter", "/connexion"], ["Créer un compte", "/connexion"], ["Crédits studio", "/credits"]] },
   { t: "ArtSyde", l: [["L'atelier", "#"], ["Équipes et associations", "/#equipes"], ["Mentions légales", "#"], ["Conditions de vente", "#"]] },
 ];
 

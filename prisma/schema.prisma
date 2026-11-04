@@ -76,9 +76,10 @@ model Customer {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  orders  Order[]
-  credits CreditEntry[]
-  designs SavedDesign[]
+  orders          Order[]
+  credits         CreditEntry[]
+  creditPurchases CreditPurchase[]
+  designs         SavedDesign[]
 }
 
 // ---------- Studio ----------
@@ -110,6 +111,34 @@ enum CreditReason {
   HD_PREVIEW // génération de l'aperçu HD
   REFUND // crédits rendus
   ADJUSTMENT // correction manuelle
+}
+
+// Achat d'un pack de crédits depuis /credits. Il attend le paiement : les crédits ne sont versés
+// (une ligne CreditEntry PURCHASE) qu'une fois le paiement confirmé dans l'admin.
+model CreditPurchase {
+  id            String        @id @default(cuid())
+  // Référence courte lisible, ex. "CR-2611-0007", donnée au client.
+  reference     String        @unique
+  pack          CreditPack
+  credits       Int
+  priceXof      Int
+  paymentMethod String // "WAVE", "ORANGE_MONEY", "MTN", "MOOV"
+  paymentStatus PaymentStatus @default(UNPAID)
+  paymentRef    String?       @unique // identifiant de transaction du prestataire
+
+  // Client existant retrouvé par son numéro, s'il y en a un. Les champs ci-dessous gardent ce qui a été saisi.
+  customerId    String?
+  customer      Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName  String
+  customerPhone String
+  customerEmail String?
+
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([paymentStatus])
+  @@index([createdAt])
+  @@index([customerId])
 }
 
 enum CreditPack {
@@ -212,8 +241,10 @@ model OrderItem {
 
   size         Size
   color        String
-  quantity     Int    @default(1)
+  quantity     Int           @default(1)
   unitPriceXof Int
+  // Studio : qualité choisie pour le fichier d'impression (null pour un modèle du catalogue).
+  printQuality PrintQuality?
 
   @@index([orderId])
 }
@@ -239,4 +270,11 @@ enum PaymentStatus {
   PAID
   FAILED
   REFUNDED
+}
+
+// Qualité de sortie d'un design du studio : image téléchargée et fichier d'impression.
+enum PrintQuality {
+  STANDARD // 150 DPI sur toute la zone d'impression
+  HD // 225 DPI
+  ULTRA_HD // 300 DPI
 }

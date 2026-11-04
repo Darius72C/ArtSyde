@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import { motion } from "motion/react";
 import { SPRING } from "@/lib/motion";
 
@@ -39,10 +39,18 @@ function useDrag(onMove: (x: number, y: number) => void) {
   };
 }
 
-type Props = { initial: string; presets: readonly { name: string; hex: string }[]; onChange: (hex: string) => void };
+const noop = () => () => {};
+
+type Props = {
+  initial: string;
+  presets: readonly { name: string; hex: string }[];
+  onChange: (hex: string) => void;
+  /** Title over the preset swatches. */
+  presetsLabel?: string;
+};
 
 /** Free colour picker: saturation/brightness gradient + hue rainbow + hex field + presets + eyedropper. */
-export function ColorPicker({ initial, presets, onChange }: Props) {
+export function ColorPicker({ initial, presets, onChange, presetsLabel = "Coloris en stock" }: Props) {
   const [hsv, setHsv] = useState(() => hexToHsv(initial));
   const [text, setText] = useState(initial);
   const hex = hsvToHex(hsv.h, hsv.s, hsv.v);
@@ -65,7 +73,8 @@ export function ColorPicker({ initial, presets, onChange }: Props) {
   const sv = useDrag((x, y) => set({ ...hsv, s: x, v: 1 - y }));
   const hue = useDrag((x) => set({ ...hsv, h: x * 359.9 }));
 
-  const canPick = typeof window !== "undefined" && "EyeDropper" in window;
+  // Browser-only feature: false on the server and during hydration, then the real answer (no mismatch).
+  const canPick = useSyncExternalStore(noop, () => "EyeDropper" in window, () => false);
   const pick = async () => {
     try {
       // @ts-expect-error EyeDropper is not in TS's DOM lib yet (Chromium only)
@@ -159,7 +168,7 @@ export function ColorPicker({ initial, presets, onChange }: Props) {
 
       {/* Presets */}
       <div>
-        <p className="eyebrow mb-3">Coloris en stock</p>
+        <p className="eyebrow mb-3">{presetsLabel}</p>
         <div className="flex flex-wrap gap-3">
           {presets.map((c) => (
             <motion.button

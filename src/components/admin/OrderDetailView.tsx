@@ -6,6 +6,7 @@ import { formatFCFA } from "@/lib/products";
 import type { DeliveryMethod, OrderStatus } from "@/generated/prisma/client";
 import { DELIVERY_METHOD, ORDER_STATUS, PAYMENT_STATUS, colorName, longDate, paymentMethod, plural, shortDate } from "@/lib/admin/labels";
 import { getOrder, load } from "@/lib/admin/queries";
+import { PRINT_QUALITY } from "@/lib/studio";
 import { Track } from "./Track";
 import { DbNotice, Empty, MoreLink, PageTitle, StatusLabel, Swatch } from "./ui";
 
@@ -81,6 +82,7 @@ export async function OrderDetailView({ params }: { params: Promise<{ reference:
                       <p className="mt-1 flex items-center gap-2 text-xs text-muted">
                         <Swatch hex={it.color} />
                         {it.productId ? colorName(it.color) : `Création personnalisée · ${colorName(it.color)}`} · Taille {it.size} · × {it.quantity}
+                        {it.printQuality && ` · Impression ${PRINT_QUALITY[it.printQuality].label}`}
                       </p>
                     </div>
                     <p className="whitespace-nowrap text-sm tabular-nums">{formatFCFA(it.unitPriceXof * it.quantity)}</p>

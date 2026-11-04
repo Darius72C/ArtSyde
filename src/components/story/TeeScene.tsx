@@ -8,30 +8,27 @@ import { TEE_COLORS } from "@/lib/data";
 import { cubicBezier } from "motion/react";
 import { DUR, EASE } from "@/lib/motion";
 import { teeState } from "./teeState";
+import { TEE_BOUNDS, TEE_OUTLINE } from "./teeOutline";
 
 /**
  * TEMPORARY procedural t-shirt. Replace with the purchased model:
  *   const { nodes } = useGLTF("/models/tshirt.glb")
  * and keep the same material / colour logic.
  */
-function teeGeometry() {
+function teeShape() {
   const s = new THREE.Shape();
-  s.moveTo(-0.38, 1.3);
-  s.quadraticCurveTo(0, 0.92, 0.38, 1.3);
-  s.lineTo(0.95, 1.18);
-  s.lineTo(1.75, 0.55);
-  s.lineTo(1.35, 0.1);
-  s.lineTo(0.98, 0.4);
-  s.lineTo(1.02, -1.22);
-  s.quadraticCurveTo(1.03, -1.35, 0.9, -1.35);
-  s.lineTo(-0.9, -1.35);
-  s.quadraticCurveTo(-1.03, -1.35, -1.02, -1.22);
-  s.lineTo(-0.98, 0.4);
-  s.lineTo(-1.35, 0.1);
-  s.lineTo(-1.75, 0.55);
-  s.lineTo(-0.95, 1.18);
+  for (const c of TEE_OUTLINE) {
+    if (c[0] === "Q") s.quadraticCurveTo(c[1], c[2], c[3], c[4]);
+    else if (c[0] === "M") s.moveTo(c[1], c[2]);
+    else s.lineTo(c[1], c[2]);
+  }
   s.closePath();
-  const g = new THREE.ExtrudeGeometry(s, {
+  return s;
+}
+
+function teeGeometry() {
+  const shape = teeShape();
+  const body = new THREE.ExtrudeGeometry(shape, {
     depth: 0.3,
     bevelEnabled: true,
     bevelThickness: 0.18,
@@ -39,8 +36,21 @@ function teeGeometry() {
     bevelSegments: 10,
     curveSegments: 32,
   });
-  g.center();
-  return g;
+  body.computeBoundingBox();
+  const offset = body.boundingBox!.getCenter(new THREE.Vector3()).negate();
+  body.translate(offset.x, offset.y, offset.z);
+
+  // Print surface (studio): the flat silhouette laid on the front / back face, so a design can go
+  // anywhere on the tee, sleeves included. UVs span TEE_BOUNDS, the same rectangle as the print canvas.
+  const print = new THREE.ShapeGeometry(shape, 32);
+  const pos = print.attributes.position;
+  const uv = print.attributes.uv;
+  const { minX, maxX, minY, maxY } = TEE_BOUNDS;
+  for (let i = 0; i < pos.count; i++) uv.setXY(i, (pos.getX(i) - minX) / (maxX - minX), (pos.getY(i) - minY) / (maxY - minY));
+  print.translate(offset.x, offset.y, 0);
+
+  // The flat front face of the extrusion (the back one is its mirror).
+  return { body, print, face: body.boundingBox!.max.z };
 }
 
 function stickerTexture(kind: "front" | "back") {
@@ -97,9 +107,6 @@ const INTRO = { s: DUR.grand, scale: 0.35, turn: -1.4, drop: -0.6 };
 const settle = cubicBezier(...EASE.out);
 const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-// Print areas on the tee (world units, ratio 0.7 ≈ A3 portrait).
-const PRINT = { w: 1.2, h: 1.7, y: -0.12 };
-
 function Tee({ front: frontCanvas, back: backCanvas, play }: Props & { play: Play }) {
   const seen = useRef(-1);
   const group = useRef<THREE.Group>(null);
@@ -109,7 +116,7 @@ function Tee({ front: frontCanvas, back: backCanvas, play }: Props & { play: Pla
   const front = useRef<THREE.MeshBasicMaterial>(null);
   const backMat = useRef<THREE.MeshBasicMaterial>(null);
   const { viewport } = useThree();
-  const geometry = useMemo(() => teeGeometry(), []);
+  const { body, print, face } = useMemo(() => teeGeometry(), []);
   const studio = Boolean(frontCanvas || backCanvas);
   const frontTex = useMemo(() => {
     if (!frontCanvas) return stickerTexture("front");
@@ -157,25 +164,39 @@ function Tee({ front: frontCanvas, back: backCanvas, play }: Props & { play: Pla
     }
   });
 
-  const frontSize: [number, number] = studio ? [PRINT.w, PRINT.h] : [1.15, 1.15];
-  const backSize: [number, number] = studio ? [PRINT.w, PRINT.h] : [1.3, 1.3];
+  const lift3 = face + 0.003; // just above the fabric, so the print never flickers into it
 
   return (
     <group ref={group}>
       <group ref={lift}>
       <Float speed={1} rotationIntensity={0.04} floatIntensity={studio ? 0.1 : 0.25}>
         {/* Fabric look: rough cotton with a soft sheen */}
-        <mesh geometry={geometry} castShadow>
+        <mesh geometry={body} castShadow>
           <meshPhysicalMaterial ref={mat} roughness={0.9} metalness={0} sheen={0.5} sheenRoughness={0.8} sheenColor="#bbbbbb" envMapIntensity={0.55} />
         </mesh>
-        <mesh position={[0, studio ? PRINT.y : 0.12, 0.336]}>
-          <planeGeometry args={frontSize} />
-          <meshBasicMaterial ref={front} map={frontTex} transparent opacity={0} toneMapped={false} />
-        </mesh>
-        <mesh position={[0, studio ? PRINT.y : 0.1, -0.336]} rotation={[0, Math.PI, 0]}>
-          <planeGeometry args={backSize} />
-          <meshBasicMaterial ref={backMat} map={backTex} transparent toneMapped={false} />
-        </mesh>
+        {studio ? (
+          <>
+            {/* Studio: the customer's canvases cover the whole front and the whole back. */}
+            <mesh geometry={print} position={[0, 0, lift3]}>
+              <meshBasicMaterial ref={front} map={frontTex} transparent toneMapped={false} />
+            </mesh>
+            <mesh geometry={print} position={[0, 0, -lift3]} rotation={[0, Math.PI, 0]}>
+              <meshBasicMaterial ref={backMat} map={backTex} transparent toneMapped={false} />
+            </mesh>
+          </>
+        ) : (
+          <>
+            {/* Home page: small demo prints. */}
+            <mesh position={[0, 0.12, lift3]}>
+              <planeGeometry args={[1.15, 1.15]} />
+              <meshBasicMaterial ref={front} map={frontTex} transparent opacity={0} toneMapped={false} />
+            </mesh>
+            <mesh position={[0, 0.1, -lift3]} rotation={[0, Math.PI, 0]}>
+              <planeGeometry args={[1.3, 1.3]} />
+              <meshBasicMaterial ref={backMat} map={backTex} transparent toneMapped={false} />
+            </mesh>
+          </>
+        )}
       </Float>
       </group>
     </group>

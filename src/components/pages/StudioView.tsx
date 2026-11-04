@@ -12,16 +12,18 @@ import { teeState } from "../story/teeState";
 import { ColorPicker, nearest } from "../ColorPicker";
 import { fadeUp, RevealLines } from "../Reveal";
 import { DUR, EASE, STAGGER } from "@/lib/motion";
+import { PRINT_QUALITIES, PRINT_QUALITY, PRINT_WIDTH_CM, type PrintQuality } from "@/lib/studio";
+import { TEE_ASPECT, TEE_PATH_01, teePath2D } from "../story/teeOutline";
 
 const TeeScene = dynamic(() => import("../story/TeeScene"), {
   ssr: false,
   loading: () => <div className="absolute inset-0 m-auto h-px w-24 animate-pulse bg-ink/40" aria-hidden />,
 });
 
-// Print area preview canvas (ratio 0.7 ≈ A3 portrait). The HD print file (3508×4961 px) will be generated server-side.
-const W = 700;
-const H = 1000;
-const PRINT_WIDTH_CM = 29.7;
+// Print canvases: the whole tee, front or back, sleeves included (the rectangle around the silhouette).
+// The downloadable image and the print file are painted again at the chosen output quality.
+const W = 1400;
+const H = Math.round(W / TEE_ASPECT);
 const { base: BASE_PRICE, back: BACK_PRICE } = STUDIO_PRICE;
 
 type Img = { src: string; nw: number; nh: number; x: number; y: number; scale: number; rot: number };
@@ -31,12 +33,23 @@ type SideId = "front" | "back";
 type Layer = "image" | "text";
 
 const FONTS = { serif: "Serif", italic: "Italique", sans: "Linéaire" } as const;
-const INK = ["#efe9df", "#1a1a1a", "#8a6a4a", "#c8102e", "#1f2a44", "#d8c7a5", "#6b6b47", "#9ea0a3"];
+const INKS = [
+  { name: "Crème", hex: "#efe9df" },
+  { name: "Noir", hex: "#1a1a1a" },
+  { name: "Caramel", hex: "#8a6a4a" },
+  { name: "Rouge", hex: "#c8102e" },
+  { name: "Marine", hex: "#1f2a44" },
+  { name: "Sable", hex: "#d8c7a5" },
+  { name: "Olive", hex: "#6b6b47" },
+  { name: "Gris", hex: "#9ea0a3" },
+];
 
 // The stage and the two tool panels rise into place one after the other (FadeUp's move, on the elements themselves).
 const panelIn = (i: number) => fadeUp(0.15 + i * STAGGER.item);
 
-const DEFAULT_TEXT: Txt = { value: "Atelier", font: "italic", color: "#efe9df", x: 0.5, y: 0.26, size: 0.17, rot: 0 };
+// Positions are fractions of the print area; sizes are fractions of its width (× PRINT_WIDTH_CM for cm).
+const DEFAULT_TEXT: Txt = { value: "Atelier", font: "italic", color: "#efe9df", x: 0.5, y: 0.39, size: 0.058, rot: 0 };
+const DEFAULT_IMAGE = { x: 0.5, y: 0.58, scale: 0.24, rot: 0 };
 
 // Print canvases live outside React (they are drawing surfaces, not state).
 let shared: Record<"front" | "back", HTMLCanvasElement> | null = null;
@@ -54,6 +67,40 @@ function fontFamily(f: Txt["font"]) {
   return v || (f === "sans" ? "sans-serif" : "serif");
 }
 
+/** Paints one side's layers on a canvas of any size (live preview, download, print file), cut to the tee. */
+function paint(ctx: CanvasRenderingContext2D, d: Side, w: number, h: number, images: Map<string, HTMLImageElement>) {
+  ctx.clearRect(0, 0, w, h);
+  ctx.save();
+  ctx.clip(teePath2D(w, h));
+  if (d.image) {
+    const el = images.get(d.image.src);
+    if (el) {
+      const iw = d.image.scale * w;
+      const ih = (iw * d.image.nh) / d.image.nw;
+      ctx.save();
+      ctx.translate(d.image.x * w, d.image.y * h);
+      ctx.rotate((d.image.rot * Math.PI) / 180);
+      ctx.drawImage(el, -iw / 2, -ih / 2, iw, ih);
+      ctx.restore();
+    }
+  }
+  if (d.text?.value) {
+    const t = d.text;
+    ctx.save();
+    ctx.translate(t.x * w, t.y * h);
+    ctx.rotate((t.rot * Math.PI) / 180);
+    ctx.font = `${t.font === "italic" ? "italic " : ""}${t.font === "sans" ? 500 : 400} ${t.size * w}px ${fontFamily(t.font)}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = t.color;
+    t.value.split("\n").forEach((line, i, all) => ctx.fillText(line, 0, (i - (all.length - 1) / 2) * t.size * w * 1.05));
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+const hasContent = (d: Side) => Boolean(d.image || d.text?.value);
+
 export function StudioView() {
   const mounted = useSyncExternalStore(noop, () => true, () => false);
   const canvases = mounted ? getCanvases() : null;
@@ -69,6 +116,8 @@ export function StudioView() {
   const [qty, setQty] = useState(1);
   const [toast, setToast] = useState<string | null>(null);
   const [noTokens, setNoTokens] = useState(false);
+  const [quality, setQuality] = useState<PrintQuality>("STANDARD");
+  const [exporting, setExporting] = useState(false);
   const preview = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
 
@@ -80,35 +129,7 @@ export function StudioView() {
   // Redraw both print areas whenever the design changes.
   const draw = useCallback(() => {
     if (!canvases) return;
-    (["front", "back"] as SideId[]).forEach((id) => {
-      const ctx = canvases[id].getContext("2d")!;
-      ctx.clearRect(0, 0, W, H);
-      const d = design[id];
-      if (d.image) {
-        const el = images.current.get(d.image.src);
-        if (el) {
-          const w = d.image.scale * W;
-          const h = (w * d.image.nh) / d.image.nw;
-          ctx.save();
-          ctx.translate(d.image.x * W, d.image.y * H);
-          ctx.rotate((d.image.rot * Math.PI) / 180);
-          ctx.drawImage(el, -w / 2, -h / 2, w, h);
-          ctx.restore();
-        }
-      }
-      if (d.text?.value) {
-        const t = d.text;
-        ctx.save();
-        ctx.translate(t.x * W, t.y * H);
-        ctx.rotate((t.rot * Math.PI) / 180);
-        ctx.font = `${t.font === "italic" ? "italic " : ""}${t.font === "sans" ? 500 : 400} ${t.size * W}px ${fontFamily(t.font)}`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillStyle = t.color;
-        t.value.split("\n").forEach((line, i, all) => ctx.fillText(line, 0, (i - (all.length - 1) / 2) * t.size * W * 1.05));
-        ctx.restore();
-      }
-    });
+    (["front", "back"] as SideId[]).forEach((id) => paint(canvases[id].getContext("2d")!, design[id], W, H, images.current));
     teeState.texVersion++;
   }, [canvases, design]);
 
@@ -167,7 +188,7 @@ export function StudioView() {
       const el = new Image();
       el.onload = () => {
         images.current.set(src, el);
-        setDesign((d) => ({ ...d, [side]: { ...d[side], image: { src, nw: el.naturalWidth, nh: el.naturalHeight, x: 0.5, y: 0.55, scale: 0.7, rot: 0 } } }));
+        setDesign((d) => ({ ...d, [side]: { ...d[side], image: { src, nw: el.naturalWidth, nh: el.naturalHeight, ...DEFAULT_IMAGE } } }));
         setSelected("image");
         flash("Image ajoutée · 1 crédit utilisé");
       };
@@ -194,8 +215,14 @@ export function StudioView() {
   const hasBack = Boolean(design.back.image || design.back.text?.value);
   const price = BASE_PRICE + (hasBack ? BACK_PRICE : 0);
   const dpi = cur.image ? Math.round(cur.image.nw / ((cur.image.scale * PRINT_WIDTH_CM) / 2.54)) : null;
+  const q = PRINT_QUALITY[quality];
+  const creditsLabel = (n: number) => `${n} crédit${n > 1 ? "s" : ""}`;
+  const setInk = (color: string) =>
+    setDesign((d) => ({ ...d, [side]: { ...d[side], text: { ...(d[side].text ?? { ...DEFAULT_TEXT, value: "" }), color } } }));
 
+  // An HD / Ultra HD print file costs its credits once per design added, whatever the quantity.
   const addToCart = () => {
+    if (!spend(q.credits)) return;
     const gl = stage.current?.querySelector("canvas");
     let thumb: string | undefined;
     if (gl) {
@@ -204,8 +231,35 @@ export function StudioView() {
       c.getContext("2d")!.drawImage(gl, (gl.width - s) / 2, (gl.height - s) / 2, s, s, 0, 0, 220, 220);
       thumb = c.toDataURL("image/png");
     }
-    cart.add({ key: `custom-${Date.now()}`, productId: null, name: "T-shirt personnalisé", price, color: teeHex, size, qty, preview: thumb, bg: "#e7e0d3" });
-    flash("Ajouté au panier");
+    const name = quality === "STANDARD" ? "T-shirt personnalisé" : `T-shirt personnalisé · ${q.label}`;
+    cart.add({ key: `custom-${Date.now()}`, productId: null, name, price, color: teeHex, size, qty, preview: thumb, bg: "#e7e0d3", quality });
+    flash(q.credits ? `Ajouté au panier · ${creditsLabel(q.credits)} utilisé${q.credits > 1 ? "s" : ""}` : "Ajouté au panier");
+  };
+
+  const exportDesign = async () => {
+    const sides = (["front", "back"] as SideId[]).filter((id) => hasContent(design[id]));
+    if (!sides.length) return flash("Ajoute une image ou un texte d'abord");
+    if (!spend(q.credits)) return;
+    setExporting(true);
+    try {
+      for (const id of sides) {
+        const c = Object.assign(document.createElement("canvas"), { width: q.px, height: Math.round(q.px / TEE_ASPECT) });
+        const ctx = c.getContext("2d");
+        if (!ctx) throw new Error("canvas too large");
+        paint(ctx, design[id], c.width, c.height, images.current);
+        const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/png"));
+        if (!blob) throw new Error("canvas too large");
+        const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: `artsyde-${id === "front" ? "devant" : "dos"}-${q.label.toLowerCase().replace(/\s+/g, "-")}.png` });
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      }
+      flash(q.credits ? `Visuel ${q.label} téléchargé · ${creditsLabel(q.credits)} utilisé${q.credits > 1 ? "s" : ""}` : "Visuel téléchargé");
+    } catch {
+      if (q.credits) setTokens((t) => t + q.credits);
+      flash(quality === "STANDARD" ? "Trop lourd pour cet appareil : essaie depuis un ordinateur" : "Trop lourd pour cet appareil : choisis une qualité plus basse");
+    } finally {
+      setExporting(false);
+    }
   };
 
   const slider = (label: string, value: number, min: number, max: number, step: number, on: (v: number) => void, fmt?: (v: number) => string) => (
@@ -238,7 +292,7 @@ export function StudioView() {
           <motion.span key={tokens} initial={{ opacity: 0.3 }} animate={{ opacity: 1 }} className="tabular-nums">
             {tokens} crédit{tokens > 1 ? "s" : ""}
           </motion.span>
-          <Link href="/#credits" className="link-line">
+          <Link href="/credits" className="link-line">
             Recharger <span className="arrow">→</span>
           </Link>
         </div>
@@ -272,7 +326,8 @@ export function StudioView() {
         </motion.section>
 
         {/* Tools */}
-        <motion.aside {...panelIn(1)} className="tile order-2 p-6 lg:order-1 lg:max-h-[calc(100svh-200px)] lg:overflow-auto">
+        {/* `!`: `.tile` (unlayered in globals.css) sets overflow: hidden, which beats a plain utility and cropped the panel. */}
+        <motion.aside {...panelIn(1)} data-lenis-prevent className="tile order-2 p-6 lg:order-1 lg:max-h-[calc(100svh-200px)] lg:!overflow-y-auto lg:overscroll-contain">
           <div className="flex gap-6 border-b border-line" role="tablist">
             {(["couleur", "image", "texte"] as const).map(tabBtn)}
           </div>
@@ -350,13 +405,9 @@ export function StudioView() {
                       </button>
                     ))}
                   </div>
-                  <div>
-                    <span className="eyebrow">Couleur d&apos;impression</span>
-                    <div className="mt-3 flex flex-wrap gap-3">
-                      {INK.map((c) => (
-                        <button key={c} onClick={() => update("text", { color: c })} aria-label={`Couleur du texte ${c}`} className={`h-6 w-6 rounded-full ring-1 ring-offset-[3px] ring-offset-bg transition ${cur.text?.color === c ? "ring-ink" : "ring-line"}`} style={{ background: c }} />
-                      ))}
-                    </div>
+                  <div className="space-y-4 border-t border-line pt-6">
+                    <p className="eyebrow">Couleur du texte</p>
+                    <ColorPicker key={`ink-${side}-${cur.text ? "on" : "off"}`} initial={(cur.text?.color ?? DEFAULT_TEXT.color).toLowerCase()} presets={INKS} presetsLabel="Encres de l'atelier" onChange={setInk} />
                   </div>
                 </>
               )}
@@ -364,8 +415,8 @@ export function StudioView() {
               {tab !== "couleur" && layer && (
                 <div className="space-y-6 border-t border-line pt-6">
                   <p className="eyebrow">Ajuster {selected === "image" ? "l'image" : "le texte"}</p>
-                  {selected === "image" && cur.image && slider("Taille", cur.image.scale, 0.15, 1, 0.01, (v) => update("image", { scale: v }), (v) => `${Math.round(v * 100)} %`)}
-                  {selected === "text" && cur.text && slider("Taille", cur.text.size, 0.05, 0.3, 0.005, (v) => update("text", { size: v }), (v) => `${Math.round(v * 100)}`)}
+                  {selected === "image" && cur.image && slider("Largeur", cur.image.scale, 0.05, 1, 0.005, (v) => update("image", { scale: v }), (v) => `${Math.round(v * PRINT_WIDTH_CM)} cm`)}
+                  {selected === "text" && cur.text && slider("Taille", cur.text.size, 0.015, 0.15, 0.001, (v) => update("text", { size: v }), (v) => `${(v * PRINT_WIDTH_CM).toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} cm`)}
                   {slider("Horizontal", layer.x, 0, 1, 0.01, (v) => update(selected!, { x: v }), (v) => `${Math.round(v * 100)} %`)}
                   {slider("Vertical", layer.y, 0, 1, 0.01, (v) => update(selected!, { y: v }), (v) => `${Math.round(v * 100)} %`)}
                   {slider("Rotation", layer.rot, -180, 180, 1, (v) => update(selected!, { rot: v }), (v) => `${v}°`)}
@@ -388,24 +439,52 @@ export function StudioView() {
         </motion.aside>
 
         {/* Print preview + order */}
-        <motion.aside {...panelIn(2)} className="tile order-3 space-y-8 p-6 lg:col-span-2 xl:col-span-1 xl:max-h-[calc(100svh-200px)] xl:overflow-auto">
+        <motion.aside {...panelIn(2)} data-lenis-prevent className="tile order-3 space-y-8 p-6 lg:col-span-2 xl:col-span-1 xl:max-h-[calc(100svh-200px)] xl:!overflow-y-auto xl:overscroll-contain">
           <div>
-            <div className="flex items-center justify-between">
-              <p className="eyebrow">Zone d&apos;impression · {side === "front" ? "devant" : "dos"}</p>
-              <span className="text-[10px] tracking-[0.15em] text-muted uppercase">Glisser pour placer</span>
-            </div>
+            <p className="eyebrow">Zone d&apos;impression · {side === "front" ? "devant" : "dos"}</p>
+            <p className="mt-1 text-xs text-muted">Tout le {side === "front" ? "devant" : "dos"}, manches comprises. Glisse pour placer.</p>
             <div
-              ref={preview}
-              className="checker mx-auto mt-4 aspect-[7/10] w-full max-w-[200px] cursor-move touch-none overflow-hidden rounded-xl border border-dashed border-line"
-              style={{ backgroundColor: teeHex }}
+              className="relative mx-auto mt-4 w-full max-w-[360px] cursor-move touch-none"
+              style={{ aspectRatio: `${W} / ${H}` }}
               onPointerDown={(e) => {
                 dragging.current = true;
-                (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+                e.currentTarget.setPointerCapture?.(e.pointerId);
                 moveTo(e);
               }}
               onPointerMove={(e) => dragging.current && moveTo(e)}
               onPointerUp={() => (dragging.current = false)}
-            />
+            >
+              <svg viewBox="0 0 1 1" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden>
+                <defs>
+                  <clipPath id="print-area" clipPathUnits="objectBoundingBox">
+                    <path d={TEE_PATH_01} />
+                  </clipPath>
+                </defs>
+                <path d={TEE_PATH_01} fill={teeHex} />
+              </svg>
+              <div ref={preview} className="absolute inset-0" style={{ clipPath: "url(#print-area)" }} />
+              <svg viewBox="0 0 1 1" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full text-muted" aria-hidden>
+                <path d={TEE_PATH_01} fill="none" stroke="currentColor" strokeWidth={1} strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />
+              </svg>
+            </div>
+          </div>
+
+          <div className="border-t border-line pt-8">
+            <p className="eyebrow">Qualité de sortie</p>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {PRINT_QUALITIES.map((k) => (
+                <button key={k} onClick={() => setQuality(k)} aria-pressed={quality === k} className={`rounded-xl border px-2 py-2.5 text-sm transition-colors duration-300 ${quality === k ? "border-accent font-medium shadow-[0_0_0_1px_var(--accent)]" : "border-line hover:border-muted"}`}>
+                  {PRINT_QUALITY[k].label}
+                  <span className="block text-[11px] font-normal text-muted">{PRINT_QUALITY[k].credits ? creditsLabel(PRINT_QUALITY[k].credits) : "Gratuit"}</span>
+                </button>
+              ))}
+            </div>
+            <p className="mt-3 text-xs text-muted">
+              {q.dpi} DPI sur tout le t-shirt ({q.px.toLocaleString("fr-FR")} px de large). C&apos;est aussi la qualité du fichier d&apos;impression envoyé avec ta commande{q.credits ? ` : ${creditsLabel(q.credits)} à l'ajout au panier` : ""}.
+            </p>
+            <button onClick={exportDesign} disabled={exporting} className="btn-outline mt-4 w-full">
+              {exporting ? <span className="h-4 w-4 animate-spin rounded-full border border-accent border-t-transparent" aria-label="Export en cours" /> : `Télécharger le visuel${q.credits ? ` · ${creditsLabel(q.credits)}` : ""}`}
+            </button>
           </div>
 
           <div className="border-t border-line pt-8">
@@ -428,7 +507,7 @@ export function StudioView() {
               </motion.p>
             </div>
             <p className="mt-2 text-right text-xs text-muted">{hasBack ? `Devant et dos (+${formatFCFA(BACK_PRICE)})` : "Impression devant"}</p>
-            <button onClick={addToCart} className="btn mt-6 w-full">Ajouter au panier</button>
+            <button onClick={addToCart} className="btn mt-6 w-full">Ajouter au panier{q.credits ? ` · ${creditsLabel(q.credits)}` : ""}</button>
             <button onClick={() => spend(1) && flash("Design sauvegardé · 1 crédit utilisé")} className="btn-outline mt-3 w-full">
               Sauvegarder · 1 crédit
             </button>
@@ -471,9 +550,9 @@ export function StudioView() {
             >
               <p className="eyebrow">Crédits épuisés</p>
               <h2 className="display mt-2 text-4xl">Recharge pour continuer.</h2>
-              <p className="mt-4 text-sm text-muted">Les crédits servent à importer et sauvegarder tes créations.</p>
+              <p className="mt-4 text-sm text-muted">Les crédits servent à importer une image, sauvegarder un design, télécharger ou commander en HD.</p>
               <div className="mt-8 flex flex-col items-center gap-4">
-                <Link href="/#credits" className="btn">Recharger</Link>
+                <Link href="/credits" className="btn">Recharger</Link>
                 <button onClick={() => setNoTokens(false)} className="link-line">Plus tard</button>
               </div>
             </motion.div>
