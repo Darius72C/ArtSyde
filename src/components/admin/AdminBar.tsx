@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useEffect, useRef } from "react";
-import { signOut } from "@/lib/admin/actions";
+import { signOut } from "@/server/admin/actions";
 
 export const ADMIN_LINKS = [
   { href: "/admin", label: "Vue d'ensemble" },

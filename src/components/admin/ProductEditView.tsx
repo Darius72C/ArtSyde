@@ -1,8 +1,8 @@
-import { db } from "@/lib/db";
+import { db } from "@/server/db";
 import { formatFCFA } from "@/lib/products";
-import { r2Config } from "@/lib/r2";
+import { r2Config } from "@/server/r2";
 import { STAGGER } from "@/lib/motion";
-import { load } from "@/lib/admin/queries";
+import { load } from "@/server/admin/queries";
 import { FadeUp } from "../Reveal";
 import { ProductImage } from "../ProductImage";
 import { PhotoManager } from "./PhotoManager";

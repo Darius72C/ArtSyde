@@ -4,7 +4,7 @@ import { STAGGER } from "@/lib/motion";
 import { formatFCFA } from "@/lib/products";
 import type { CreditPack } from "@/generated/prisma/client";
 import { CREDIT_PACK, CREDIT_REASON, dateTime, plural, shortDate } from "@/lib/admin/labels";
-import { getStudio, load } from "@/lib/admin/queries";
+import { getStudio, load } from "@/server/admin/queries";
 import { DbNotice, Empty, Panel, Share, Stat, TableScroll, table, td, th } from "./ui";
 
 const PACKS = Object.keys(CREDIT_PACK) as CreditPack[];

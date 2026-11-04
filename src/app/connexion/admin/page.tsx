@@ -4,8 +4,8 @@ import { Suspense } from "react";
 import { PageShell } from "@/components/PageShell";
 import { RevealLines } from "@/components/Reveal";
 import { SignInForm } from "@/components/admin/SignInForm";
-import { isAdmin } from "@/lib/admin/auth";
-import { safeAdminPath } from "@/lib/admin/token";
+import { isAdmin } from "@/server/admin/auth";
+import { safeAdminPath } from "@/server/admin/token";
 
 export const metadata: Metadata = {
   title: "Connexion admin — ArtSyde",

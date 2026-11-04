@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ProductImage } from "../ProductImage";
 import { STAGGER } from "@/lib/motion";
 import { ORDER_FLOW, ORDER_STATUS, plural, shortDate } from "@/lib/admin/labels";
-import { getOverview, load } from "@/lib/admin/queries";
+import { getOverview, load } from "@/server/admin/queries";
 import { OrderTable } from "./OrderTable";
 import { DbNotice, Delta, MoreLink, Panel, Stat, StatusLabel, Swatch } from "./ui";
 

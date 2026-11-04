@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { CreditPack } from "@/generated/prisma/client";
-import { buyCredits } from "@/app/credits/actions";
+import { buyCredits } from "@/server/buy-credits";
 import { CREDIT_PACKS, CREDIT_PACK_IDS, PAYMENT_METHODS, PAYMENT_METHOD_IDS, type CreditFields, type PaymentMethodId } from "@/lib/credits";
 import { checkFields } from "@/lib/orders";
 import { formatFCFA } from "@/lib/products";

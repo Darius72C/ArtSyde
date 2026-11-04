@@ -3,7 +3,7 @@ import { STAGGER } from "@/lib/motion";
 import { formatFCFA } from "@/lib/products";
 import type { DeliveryMethod } from "@/generated/prisma/client";
 import { DELIVERY_METHOD, paymentMethod, plural, shortDate } from "@/lib/admin/labels";
-import { PERIODS, getSales, load, type Period } from "@/lib/admin/queries";
+import { PERIODS, getSales, load, type Period } from "@/server/admin/queries";
 import { Bars } from "./Bars";
 import { Segments } from "./Segments";
 import { DbNotice, Delta, Panel, Share, Stat, TableScroll, table, td, th } from "./ui";

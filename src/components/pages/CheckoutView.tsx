@@ -6,7 +6,7 @@ import { useState, useTransition } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { cart, cartSubtotal, useCart } from "@/lib/cart";
 import { DELIVERY, DELIVERY_METHODS, checkFields, orderHref, type CheckoutFields } from "@/lib/orders";
-import { placeOrder } from "@/app/commande/actions";
+import { placeOrder } from "@/server/place-order";
 import type { DeliveryMethod } from "@/generated/prisma/client";
 import { formatFCFA } from "@/lib/products";
 import { Thumb } from "./CartView";

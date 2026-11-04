@@ -1,10 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { ADMIN_COOKIE, ADMIN_SIGN_IN, verifyAdminToken } from "@/lib/admin/token";
+import { ADMIN_COOKIE, ADMIN_SIGN_IN, verifyAdminToken } from "@/server/admin/token";
 
 /*
  * First gate in front of /admin: no valid admin cookie → the sign-in page, with the
  * page asked for kept in `?de=`. Every admin read checks the session again on the
- * server (requireAdmin in src/lib/admin/auth.ts), so this is not the only lock.
+ * server (requireAdmin in src/server/admin/auth.ts), so this is not the only lock.
  */
 export async function proxy(request: NextRequest) {
   const ok = await verifyAdminToken(request.cookies.get(ADMIN_COOKIE)?.value, process.env.ADMIN_PASSWORD);

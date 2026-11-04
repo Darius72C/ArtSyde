@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { db } from "@/lib/db";
+import { db } from "@/server/db";
 import { requireAdmin } from "./auth";
 
 export type MarkPaidState = { error?: string; done?: boolean };

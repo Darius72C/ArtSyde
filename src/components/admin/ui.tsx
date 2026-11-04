@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { CountUp, FadeUp, RevealLines, type Line } from "../Reveal";
 import { PageTransition } from "../PageShell";
 import { TONE_DOT, type Tone } from "@/lib/admin/labels";
-import type { DbProblem } from "@/lib/admin/queries";
+import type { DbProblem } from "@/server/admin/queries";
 
 /*
  * Building blocks shared by the admin pages only. They are the shop's own pieces

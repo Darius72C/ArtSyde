@@ -1,10 +1,10 @@
 import "server-only";
 import { cache } from "react";
 import { connection } from "next/server";
-import { db } from "@/lib/db";
+import { db } from "@/server/db";
 import { Prisma, type OrderStatus } from "@/generated/prisma/client";
 import { TEE_COLORS } from "@/lib/data";
-import { TO_HANDLE, colorName } from "./labels";
+import { TO_HANDLE, colorName } from "@/lib/admin/labels";
 import { requireAdmin } from "./auth";
 
 /*

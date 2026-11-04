@@ -2,7 +2,7 @@ import Link from "next/link";
 import { STAGGER } from "@/lib/motion";
 import { formatFCFA } from "@/lib/products";
 import { plural, shortDate } from "@/lib/admin/labels";
-import { getCustomers, load } from "@/lib/admin/queries";
+import { getCustomers, load } from "@/server/admin/queries";
 import { Search } from "./Search";
 import { DbNotice, Empty, MoreLink, Panel, Stat, TableScroll, table, td, th } from "./ui";
 

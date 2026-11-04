@@ -1,6 +1,6 @@
 import "server-only";
 import { connection } from "next/server";
-import { db } from "@/lib/db";
+import { db } from "@/server/db";
 import { orderKey, type PublicOrder } from "@/lib/orders";
 import { PRODUCTS, productSlug, type Art } from "@/lib/products";
 
@@ -26,7 +26,7 @@ export async function getPublicOrder(reference: string, key: string | undefined)
     city: o.city,
     address: o.address,
     items: o.items.map((it) => {
-      // The starting products keep their backdrop, as in the shop (src/lib/catalog.ts).
+      // The starting products keep their backdrop, as in the shop (src/server/catalog.ts).
       const shop = it.product ? PRODUCTS.find((p) => productSlug(p.name) === it.product!.slug) : undefined;
       return {
         key: it.id,

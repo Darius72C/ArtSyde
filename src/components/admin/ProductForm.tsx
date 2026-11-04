@@ -6,7 +6,7 @@ import { Field } from "../pages/CheckoutView";
 import { ColorPicker } from "../ColorPicker";
 import { TEE_COLORS } from "@/lib/data";
 import { DUR, EASE, SPRING } from "@/lib/motion";
-import { saveProduct, type ProductFormState } from "@/lib/admin/products";
+import { saveProduct, type ProductFormState } from "@/server/admin/products";
 
 export type EditableProduct = { id: string; name: string; priceXof: number; oldPriceXof: number | null; tag: string | null; colors: string[]; sizes: string[]; active: boolean };
 

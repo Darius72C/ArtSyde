@@ -149,12 +149,18 @@ src/
     Reveal.tsx           apparitions au défilement (titres, blocs, compteurs…)
     Magnetic.tsx         effets des boutons (attraction, onde au clic)
     SmoothScroll.tsx     défilement fluide (Lenis)
-  lib/
-    motion.ts            courbes, durées, ressorts : les valeurs d'animation partagées
+  server/                le backend : ce code ne tourne que sur le serveur
+    db.ts                connexion à la base Neon
     catalog.ts           catalogue lu depuis la base
+    place-order.ts       enregistre une commande (prix recalculés côté serveur)
+    order-lookup.ts      lit une commande pour sa page de suivi
+    buy-credits.ts       enregistre un achat de crédits
+    r2.ts                envoi des photos vers Cloudflare R2
+    admin/               connexion admin, produits, photos, paiements, lectures du tableau de bord
+  lib/                   code partagé entre le site et le serveur
+    motion.ts            courbes, durées, ressorts : les valeurs d'animation partagées
     credits.ts           packs de crédits et moyens de paiement
     studio.ts            qualités de sortie et taille réelle de la zone d'impression
-    r2.ts                envoi des photos vers Cloudflare R2
     flyToCart.ts         article qui vole jusqu'au panier
     flyToBin.ts          article retiré qui part dans la poubelle
 ```

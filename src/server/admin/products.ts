@@ -3,11 +3,11 @@
 import { randomUUID } from "node:crypto";
 import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
-import { db } from "@/lib/db";
+import { db } from "@/server/db";
 import { Prisma, ProductTag, Size } from "@/generated/prisma/client";
-import { CATALOG_TAG } from "@/lib/catalog";
+import { CATALOG_TAG } from "@/server/catalog";
 import { productSlug } from "@/lib/products";
-import { deleteObject, keyFromPublicUrl, presign, r2Config } from "@/lib/r2";
+import { deleteObject, keyFromPublicUrl, presign, r2Config } from "@/server/r2";
 import { requireAdmin } from "./auth";
 
 /*

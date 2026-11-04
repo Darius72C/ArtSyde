@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { FadeUp } from "../Reveal";
-import { signIn, type SignInState } from "@/lib/admin/actions";
+import { signIn, type SignInState } from "@/server/admin/actions";
 import { DUR, EASE } from "@/lib/motion";
 
 /** The admin password form, set like the shop's LoginView fields (label, field, red shake on error, full-width btn). */

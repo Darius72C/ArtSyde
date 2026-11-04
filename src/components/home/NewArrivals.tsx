@@ -15,7 +15,7 @@ import { DUR, EASE, STAGGER, VIEWPORT } from "@/lib/motion";
  * New arrivals. Desktop: the section pins and vertical scrolling drives the rail sideways.
  * Mobile: a normal swipeable, snap-scrolling rail.
  */
-/** `products` come from the database (src/lib/catalog.ts), read by the home page. */
+/** `products` come from the database (src/server/catalog.ts), read by the home page. */
 export function NewArrivals({ products }: { products: Product[] }) {
   const root = useRef<HTMLElement>(null);
   const rail = useRef<HTMLDivElement>(null);

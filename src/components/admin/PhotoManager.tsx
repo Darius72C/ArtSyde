@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { DUR, EASE, SPRING } from "@/lib/motion";
-import { addPhoto, movePhoto, presignPhoto, removePhoto } from "@/lib/admin/products";
+import { addPhoto, movePhoto, presignPhoto, removePhoto } from "@/server/admin/products";
 
 /**
  * A product's photos: upload (straight from the browser to R2 with a presigned URL),

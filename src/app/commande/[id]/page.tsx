@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { PageShell } from "@/components/PageShell";
 import { OrderView } from "@/components/pages/OrderView";
-import { getPublicOrder } from "@/lib/orders-db";
+import { getPublicOrder } from "@/server/order-lookup";
 
 export const metadata: Metadata = { title: "Ma commande — ArtSyde", robots: { index: false } };
 

@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/lib/db";
+import { db } from "@/server/db";
 import { Prisma } from "@/generated/prisma/client";
 import { checkFields } from "@/lib/orders";
 import { CREDIT_PACKS, CREDIT_PACK_IDS, PAYMENT_METHOD_IDS, type BuyCreditsInput, type BuyCreditsResult } from "@/lib/credits";

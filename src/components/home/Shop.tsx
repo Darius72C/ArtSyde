@@ -73,7 +73,7 @@ function Card({ p, i, onAdd }: { p: Product; i: number; onAdd: (p: Product, colo
   );
 }
 
-/** `products` come from the database (src/lib/catalog.ts), read by the home page. */
+/** `products` come from the database (src/server/catalog.ts), read by the home page. */
 export function Shop({ products }: { products: Product[] }) {
   const [tab, setTab] = useState<Tab>("all");
   const [toast, setToast] = useState<string | null>(null);

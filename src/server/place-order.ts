@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/lib/db";
+import { db } from "@/server/db";
 import { Prisma, Size } from "@/generated/prisma/client";
 import { DELIVERY, DELIVERY_METHODS, checkFields, orderKey, type CheckoutInput, type PlaceOrderResult } from "@/lib/orders";
 import { STUDIO_PRICE } from "@/lib/products";

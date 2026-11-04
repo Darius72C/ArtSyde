@@ -2,7 +2,7 @@ import { STAGGER } from "@/lib/motion";
 import { formatFCFA } from "@/lib/products";
 import { CREDIT_PACKS } from "@/lib/credits";
 import { dateTime, paymentMethod, plural } from "@/lib/admin/labels";
-import { getCreditPurchases, load } from "@/lib/admin/queries";
+import { getCreditPurchases, load } from "@/server/admin/queries";
 import { MarkPaid } from "./MarkPaid";
 import { Search } from "./Search";
 import { Segments } from "./Segments";

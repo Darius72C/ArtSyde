@@ -1,6 +1,6 @@
 // Schéma de la base ArtSyde (PostgreSQL sur Neon).
 // Les prix sont en francs CFA (XOF), stockés en entiers : le FCFA n'a pas de centimes.
-// Les URL de connexion sont lues dans prisma.config.ts (migrations) et src/lib/db.ts (application).
+// Les URL de connexion sont lues dans prisma.config.ts (migrations) et src/server/db.ts (application).
 
 generator client {
   provider = "prisma-client"

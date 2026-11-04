@@ -1,7 +1,7 @@
 export type Art = "wordmark" | "line" | "sun" | "script" | "crest" | "plain";
 export type ProductTagLabel = "Nouveau" | "Best-seller" | "Promo";
 
-/** A t-shirt as the shop shows it, read from the Product table (src/lib/catalog.ts). */
+/** A t-shirt as the shop shows it, read from the Product table (src/server/catalog.ts). */
 export type Product = {
   id: string; // Product.id in the database
   slug: string;
@@ -18,7 +18,7 @@ export type Product = {
 
 /**
  * The starting catalogue. The shop no longer reads it: prisma/seed.ts writes it into the
- * Product table, and src/lib/catalog.ts still takes each one's backdrop colour from here.
+ * Product table, and src/server/catalog.ts still takes each one's backdrop colour from here.
  */
 export type SeedProduct = { id: number; name: string; price: number; oldPrice?: number; tag?: ProductTagLabel; colors: string[]; art: Art; bg: string };
 export const PRODUCTS: SeedProduct[] = [

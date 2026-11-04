@@ -25,7 +25,7 @@ try {
   process.loadEnvFile(".env");
 } catch {}
 
-// Same as pgUrl in src/lib/db.ts: pg treats sslmode=require as verify-full; say it so it does not warn.
+// Same as pgUrl in src/server/db.ts: pg treats sslmode=require as verify-full; say it so it does not warn.
 const url = process.env.DATABASE_URL?.replace(/sslmode=(prefer|require|verify-ca)/, "sslmode=verify-full");
 const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
 

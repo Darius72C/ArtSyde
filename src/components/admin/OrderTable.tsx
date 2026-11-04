@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { formatFCFA } from "@/lib/products";
 import { ORDER_STATUS, PAYMENT_STATUS, dateTime, paymentMethod } from "@/lib/admin/labels";
-import type { OrderRow } from "@/lib/admin/queries";
+import type { OrderRow } from "@/server/admin/queries";
 import { StatusLabel, TableScroll, table, td, th } from "./ui";
 
 /** Orders as table rows; `compact` keeps reference, customer, total and status (overview). */

@@ -3,7 +3,7 @@ import { ProductImage } from "../ProductImage";
 import { STAGGER } from "@/lib/motion";
 import { formatFCFA } from "@/lib/products";
 import { PRODUCT_TAG, SIZE_ORDER, colorName, plural } from "@/lib/admin/labels";
-import { getCatalogue, load } from "@/lib/admin/queries";
+import { getCatalogue, load } from "@/server/admin/queries";
 import { DbNotice, MoreLink, Panel, Stat, StatusLabel, Swatch, TableScroll, table, td, th } from "./ui";
 
 export async function ProductsView() {

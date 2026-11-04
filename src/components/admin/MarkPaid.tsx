@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { markPurchasePaid, type MarkPaidState } from "@/lib/admin/purchases";
+import { markPurchasePaid, type MarkPaidState } from "@/server/admin/purchases";
 
 /** "Marquer payé" for one credit purchase; the spinner is the shop's (LoginView, CheckoutView). */
 export function MarkPaid({ id, label }: { id: string; label: string }) {

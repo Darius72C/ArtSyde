@@ -3,8 +3,8 @@ import type { CartItem } from "./cart";
 
 /*
  * What the checkout and the order page share, on both sides of the wire.
- * Orders themselves live in the database: written by `placeOrder` (src/app/commande/actions.ts),
- * read by `getPublicOrder` (src/lib/orders-db.ts).
+ * Orders themselves live in the database: written by `placeOrder` (src/server/place-order.ts),
+ * read by `getPublicOrder` (src/server/order-lookup.ts).
  */
 
 export const DELIVERY: Record<DeliveryMethod, { label: string; note: string; price: number }> = {

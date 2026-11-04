@@ -10,7 +10,7 @@ import { Teams } from "@/components/home/Teams";
 import { Credits } from "@/components/home/Credits";
 import { Faq } from "@/components/home/Faq";
 import { Newsletter } from "@/components/home/Newsletter";
-import { getCatalog } from "@/lib/catalog";
+import { getCatalog } from "@/server/catalog";
 
 export default async function Home() {
   // Cached ("use cache", tag "catalog"): saving a product in the admin refreshes it.

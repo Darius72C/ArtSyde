@@ -1,6 +1,6 @@
 import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
-import { db } from "@/lib/db";
+import { db } from "@/server/db";
 import { PRODUCTS, productSlug, type Product, type ProductTagLabel } from "@/lib/products";
 
 /** Cache tag of the shop's catalogue: the admin's product actions expire it. */

@@ -1,6 +1,6 @@
 import type { OrderStatus } from "@/generated/prisma/client";
 import { ORDER_FLOW, ORDER_STATUS, plural } from "@/lib/admin/labels";
-import { getOrders, load } from "@/lib/admin/queries";
+import { getOrders, load } from "@/server/admin/queries";
 import { OrderTable } from "./OrderTable";
 import { Search } from "./Search";
 import { Segments } from "./Segments";
