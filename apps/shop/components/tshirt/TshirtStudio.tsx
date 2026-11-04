@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { ColorPicker } from "./ColorPicker";
-import { TSHIRT_COLORS } from "./colors";
+import { DEFAULT_TSHIRT_COLOR } from "./colors";
 import { TshirtViewer } from "./TshirtViewer";
 
 /** Visionneuse 3D + choix de la couleur. Servira de base au configurateur. */
 export function TshirtStudio() {
-  const [color, setColor] = useState<string>(TSHIRT_COLORS[0].hex);
+  const [color, setColor] = useState<string>(DEFAULT_TSHIRT_COLOR);
 
   return (
     <section className="flex w-full flex-col items-center gap-6">

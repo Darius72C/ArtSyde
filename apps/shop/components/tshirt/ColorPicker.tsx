@@ -1,7 +1,6 @@
 "use client";
 
-import { HexColorInput, HexColorPicker } from "react-colorful";
-import { TSHIRT_COLORS } from "./colors";
+import { TSHIRT_PALETTE } from "./colors";
 
 type ColorPickerProps = {
   /** Couleur actuelle en hexadécimal, ex. "#8B3DFF". */
@@ -9,66 +8,81 @@ type ColorPickerProps = {
   onChange: (hex: string) => void;
 };
 
-/**
- * Choix de couleur : des pastilles pour les couleurs populaires, plus une
- * palette complète (carré de nuances + barre de teintes) et un champ hexadécimal.
- */
+/** Vrai si la couleur est claire : la coche est alors dessinée en noir. */
+function isLight(hex: string) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  return 0.299 * r + 0.587 * g + 0.114 * b > 160;
+}
+
+function Check({ light }: { light: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" className="size-5" aria-hidden="true">
+      <path
+        d="M5 12.5l4.5 4.5L19 7.5"
+        fill="none"
+        stroke={light ? "#0E0B14" : "#FFFFFF"}
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+const swatch =
+  "relative flex aspect-square w-full items-center justify-center rounded-md border border-black/10 transition hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-curse-violet";
+
+/** Nuancier : une grille de pastilles carrées, plus une pastille « couleur libre ». */
 export function ColorPicker({ value, onChange }: ColorPickerProps) {
-  const preset = TSHIRT_COLORS.find((c) => c.hex.toLowerCase() === value.toLowerCase());
+  const current = value.toUpperCase();
+  const inPalette = (TSHIRT_PALETTE as readonly string[]).includes(current);
 
   return (
-    <div className="flex w-full max-w-xs flex-col items-center gap-5">
-      <fieldset className="flex flex-col items-center gap-3">
-        <legend className="mb-3 text-sm text-ghost-white/70">
-          Couleur : <span className="text-ghost-white">{preset?.label ?? "Personnalisée"}</span>
-        </legend>
-        <div className="flex gap-3">
-          {TSHIRT_COLORS.map((c) => {
-            const selected = c.id === preset?.id;
-            return (
-              <label key={c.id} className="cursor-pointer" title={c.label}>
-                <input
-                  type="radio"
-                  name="tshirt-color"
-                  value={c.id}
-                  checked={selected}
-                  onChange={() => onChange(c.hex)}
-                  className="peer sr-only"
-                />
-                <span
-                  className={`block size-9 rounded-full border border-ash-gray transition peer-focus-visible:ring-2 peer-focus-visible:ring-curse-violet ${
-                    selected ? "ring-2 ring-curse-violet ring-offset-2 ring-offset-curse-black" : ""
-                  }`}
-                  style={{ backgroundColor: c.hex }}
-                />
-                <span className="sr-only">{c.label}</span>
-              </label>
-            );
-          })}
-        </div>
-      </fieldset>
-
-      <div className="artsyde-picker w-full">
-        <HexColorPicker color={value} onChange={onChange} />
-      </div>
-
-      <label className="flex items-center gap-3 text-sm text-ghost-white/70">
-        Code couleur
-        <span className="flex items-center rounded-md border border-ash-gray px-3 py-2 focus-within:border-curse-violet">
-          <span className="text-ghost-white/50">#</span>
-          <HexColorInput
-            color={value}
-            onChange={onChange}
-            className="w-20 bg-transparent uppercase text-ghost-white outline-none"
-            aria-label="Code couleur hexadécimal"
-          />
-        </span>
-        <span
-          className="size-8 rounded-md border border-ash-gray"
-          style={{ backgroundColor: value }}
-          aria-hidden="true"
+    <div
+      role="radiogroup"
+      aria-label="Couleur du t-shirt"
+      className="grid w-full max-w-2xl grid-cols-8 gap-1.5 rounded-xl bg-white p-2 sm:grid-cols-16"
+    >
+      {/* Couleur libre : ouvre le sélecteur de couleur du système. */}
+      <label
+        className={`${swatch} cursor-pointer ${!inPalette ? "ring-2 ring-[#3A3346]" : ""}`}
+        style={{
+          background:
+            "conic-gradient(from 180deg, #ff3b3b, #ffd93b, #3bff6b, #3bd8ff, #6b3bff, #ff3bd8, #ff3b3b)",
+        }}
+        title="Couleur personnalisée"
+      >
+        <input
+          type="color"
+          value={current.toLowerCase()}
+          onChange={(e) => onChange(e.target.value.toUpperCase())}
+          className="absolute inset-0 cursor-pointer opacity-0"
+          aria-label="Choisir une couleur personnalisée"
         />
+        {!inPalette && <Check light={false} />}
       </label>
+
+      {TSHIRT_PALETTE.map((hex) => {
+        const selected = hex === current;
+        return (
+          <button
+            key={hex}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            aria-label={hex}
+            title={hex}
+            onClick={() => onChange(hex)}
+            className={`${swatch} ${selected ? "ring-2 ring-[#3A3346] ring-offset-1" : ""}`}
+            style={{ backgroundColor: hex }}
+          >
+            {selected && <Check light={isLight(hex)} />}
+          </button>
+        );
+      })}
     </div>
   );
 }
