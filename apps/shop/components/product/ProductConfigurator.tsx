@@ -3,9 +3,8 @@
 import { useState } from "react";
 import type { Size } from "@artsyde/db";
 import { ColorPicker } from "@/components/tshirt/ColorPicker";
-import { PRODUCT_PLACEMENT } from "@/components/tshirt/design";
-import { TshirtViewer } from "@/components/tshirt/TshirtViewer";
 import { formatXof } from "@/lib/format";
+import { ProductMedia, type MediaMode } from "./ProductMedia";
 
 type ProductConfiguratorProps = {
   product: {
@@ -14,14 +13,23 @@ type ProductConfiguratorProps = {
     description: string;
     priceXof: number;
     designUrl: string;
+    mockups: string[];
     colors: string[];
     sizes: Size[];
   };
 };
 
-/** Fiche produit interactive : t-shirt 3D, couleur, taille et prix. */
+/** Fiche produit interactive : photos ou t-shirt 3D, couleur, taille et prix. */
 export function ProductConfigurator({ product }: ProductConfiguratorProps) {
   const [color, setColor] = useState(product.colors[0] ?? "#000000");
+  // Les photos d'abord quand il y en a ; sinon la 3D.
+  const [mode, setMode] = useState<MediaMode>(product.mockups.length > 0 ? "photos" : "3d");
+
+  function changeColor(hex: string) {
+    setColor(hex);
+    // Les photos ne montrent qu'une couleur : on passe en 3D pour voir le résultat.
+    setMode("3d");
+  }
   const [size, setSize] = useState<Size | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -36,10 +44,14 @@ export function ProductConfigurator({ product }: ProductConfiguratorProps) {
 
   return (
     <div className="grid gap-8 lg:grid-cols-2 lg:items-start">
-      <TshirtViewer
+      <ProductMedia
+        name={product.name}
+        productId={product.id}
+        designUrl={product.designUrl}
+        mockups={product.mockups}
         color={color}
-        designs={[{ id: product.id, url: product.designUrl, placement: PRODUCT_PLACEMENT }]}
-        className="h-[55vh] min-h-80 w-full rounded-xl border border-ash-gray lg:sticky lg:top-20"
+        mode={mode}
+        onModeChange={setMode}
       />
 
       <div className="flex flex-col gap-6 text-left">
@@ -54,7 +66,7 @@ export function ProductConfigurator({ product }: ProductConfiguratorProps) {
           <p className="text-sm text-ghost-white/70">Couleur</p>
           <ColorPicker
             value={color}
-            onChange={setColor}
+            onChange={changeColor}
             palette={product.colors}
             allowCustom={false}
           />

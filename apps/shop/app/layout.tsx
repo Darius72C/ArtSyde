@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { brand } from "@artsyde/ui";
 import { SiteHeader } from "@/components/SiteHeader";
-import { SceneCanvas } from "@/components/three/SceneCanvas";
 import { fontVariables } from "./fonts";
 import "./globals.css";
 
@@ -41,8 +40,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             .
           </p>
         </footer>
-        {/* Canvas 3D partagé : dessine les t-shirts des cartes du catalogue. */}
-        <SceneCanvas />
       </body>
     </html>
   );

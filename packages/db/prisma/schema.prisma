@@ -21,6 +21,8 @@ model Product {
   priceXof    Int
   // Image du design appliquée sur le modèle 3D (URL dans le stockage de fichiers).
   designUrl   String
+  // Photos de présentation (mockups). La première sert d'image dans le catalogue.
+  mockups     String[] @default([])
   colors      String[] // couleurs de t-shirt disponibles, en hexadécimal
   sizes       Size[]
   active      Boolean  @default(true)

@@ -8,6 +8,7 @@ const cardFields = {
   name: true,
   priceXof: true,
   designUrl: true,
+  mockups: true,
   colors: true,
 } as const;
 

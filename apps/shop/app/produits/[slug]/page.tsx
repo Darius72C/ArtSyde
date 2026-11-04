@@ -11,7 +11,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
   if (!product) return { title: "Produit introuvable" };
-  return { title: product.name, description: product.description };
+  return {
+    title: product.name,
+    description: product.description,
+    // Le premier mockup sert d'aperçu quand le lien est partagé (WhatsApp, Instagram…).
+    openGraph: product.mockups[0] ? { images: [product.mockups[0]] } : undefined,
+  };
 }
 
 export default async function ProductPage({ params }: Props) {
@@ -33,6 +38,7 @@ export default async function ProductPage({ params }: Props) {
           description: product.description,
           priceXof: product.priceXof,
           designUrl: product.designUrl,
+          mockups: product.mockups,
           colors: product.colors,
           sizes: product.sizes,
         }}
