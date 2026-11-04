@@ -22,4 +22,16 @@ export const PRODUCTS: Product[] = [
   { id: 8, name: "Sable", price: 8000, tag: "Nouveau", colors: ["#D8C7A5", "#E9A7B8"], art: "wordmark", bg: "var(--sand)" },
 ];
 
+/** A t-shirt made in the studio: front print, plus the back if there is one. */
+export const STUDIO_PRICE = { base: 8000, back: 2000 } as const;
+
+/** The product's slug in the database ("L'Essentiel" → "l-essentiel"), as prisma/seed.ts writes it. */
+export const productSlug = (name: string) =>
+  name
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+
 export const formatFCFA = (n: number) => `${n.toLocaleString("fr-FR")} FCFA`;

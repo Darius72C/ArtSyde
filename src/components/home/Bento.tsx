@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CountUp, FadeUp, Parallax, RevealLines, ScrollScale } from "../Reveal";
 import { TeeIllustration } from "../ProductImage";
+import { DUR, STAGGER } from "@/lib/motion";
 
 /** "Why us" bento grid of rounded tiles. */
 export function Bento() {
@@ -21,13 +22,13 @@ export function Bento() {
               </Parallax>
             </div>
           </ScrollScale>
-          <FadeUp delay={0.08} className="tile bg-bg p-8 md:col-span-2">
-            <p className="display text-[56px] leading-none"><CountUp to={1} duration={0.8} /></p>
+          <FadeUp delay={STAGGER.item} className="tile bg-bg p-8 md:col-span-2">
+            <p className="display text-[56px] leading-none"><CountUp to={1} duration={DUR.slow} /></p>
             <h3 className="mt-3 text-[19px] font-semibold">pièce suffit.</h3>
             <p className="mt-1 text-muted">Pas de minimum de commande en impression DTF.</p>
           </FadeUp>
-          <FadeUp delay={0.16} className="tile bg-bg p-8 md:col-span-2">
-            <p className="display text-[56px] leading-none"><CountUp to={8} duration={1.4} /></p>
+          <FadeUp delay={STAGGER.item * 2} className="tile bg-bg p-8 md:col-span-2">
+            <p className="display text-[56px] leading-none"><CountUp to={8} duration={DUR.hero} /></p>
             <h3 className="mt-3 text-[19px] font-semibold">coloris en stock.</h3>
             <div className="mt-4 flex gap-1.5">
               {["#1C1C1E", "#F4F2EC", "#9EA0A3", "#1F2A44", "#C8102E", "#6B6B47", "#D8C7A5", "#E9A7B8"].map((c) => (
@@ -35,12 +36,12 @@ export function Bento() {
               ))}
             </div>
           </FadeUp>
-          <FadeUp delay={0.08} className="tile bg-bg p-8 md:col-span-3">
+          <FadeUp delay={STAGGER.item} className="tile bg-bg p-8 md:col-span-3">
             <h3 className="text-[19px] font-semibold">Imprimé à la main.</h3>
             <p className="mt-1 max-w-sm text-muted">Chaque t-shirt est imprimé, contrôlé et plié dans notre atelier.</p>
             <p className="display mt-6 text-[40px]">DTF <span className="text-muted">+</span> Sérigraphie</p>
           </FadeUp>
-          <FadeUp delay={0.16} className="tile bg-bg p-8 md:col-span-3">
+          <FadeUp delay={STAGGER.item * 2} className="tile bg-bg p-8 md:col-span-3">
             <h3 className="text-[19px] font-semibold">Livré chez toi.</h3>
             <p className="mt-1 max-w-sm text-muted">Livraison standard, express, ou retrait gratuit à l&apos;atelier.</p>
             <p className="display mt-6 text-[40px]">24–48 h <span className="text-[17px] font-normal text-muted">en express</span></p>

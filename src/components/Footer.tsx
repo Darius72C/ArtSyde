@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { STAGGER } from "@/lib/motion";
+import { FadeUp } from "./Reveal";
 
 const COLS = [
   { t: "Boutique", l: [["Tous les t-shirts", "/#boutique"], ["Nouveautés", "/#nouveautes"], ["Studio 3D", "/studio"], ["Panier", "/panier"]] },
@@ -15,8 +17,8 @@ export function Footer() {
           Les t-shirts sont imprimés dans notre atelier. Les couleurs à l&apos;écran peuvent légèrement différer du produit réel. Les prix sont indiqués en francs CFA.
         </p>
         <div className="grid grid-cols-2 gap-8 py-8 md:grid-cols-4">
-          {COLS.map((c) => (
-            <div key={c.t}>
+          {COLS.map((c, i) => (
+            <FadeUp key={c.t} delay={i * STAGGER.item}>
               <p className="mb-3 font-semibold text-ink">{c.t}</p>
               <ul className="space-y-2.5">
                 {c.l.map(([x, href]) => (
@@ -27,7 +29,7 @@ export function Footer() {
                   </li>
                 ))}
               </ul>
-            </div>
+            </FadeUp>
           ))}
         </div>
         <div className="flex flex-col justify-between gap-2 border-t border-line pt-4 md:flex-row">

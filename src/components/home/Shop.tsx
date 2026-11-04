@@ -8,6 +8,7 @@ import { flyToCart } from "@/lib/flyToCart";
 import { formatFCFA, PRODUCTS, type Product } from "@/lib/products";
 import { ProductImage } from "../ProductImage";
 import { RevealLines, Tilt } from "../Reveal";
+import { DUR, EASE, SPRING, STAGGER, VIEWPORT } from "@/lib/motion";
 
 const TABS = [
   { id: "all", label: "Tout" },
@@ -16,8 +17,6 @@ const TABS = [
   { id: "Promo", label: "Offres" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
-const EASE = [0.22, 1, 0.36, 1] as const;
-
 function Card({ p, i, onAdd }: { p: Product; i: number; onAdd: (p: Product, color: string, from: Element | null) => void }) {
   const [color, setColor] = useState(p.colors[0]);
   const art = useRef<HTMLDivElement>(null);
@@ -26,9 +25,9 @@ function Card({ p, i, onAdd }: { p: Product; i: number; onAdd: (p: Product, colo
       layout
       initial={{ opacity: 0, y: 60, scale: 0.96 }}
       whileInView={{ opacity: 1, y: 0, scale: 1 }}
-      viewport={{ once: true, margin: "-6%" }}
-      exit={{ opacity: 0, scale: 0.9, filter: "blur(4px)", transition: { duration: 0.25 } }}
-      transition={{ duration: 0.9, ease: EASE, delay: (i % 4) * 0.08 }}
+      viewport={VIEWPORT}
+      exit={{ opacity: 0, scale: 0.9, filter: "blur(4px)", transition: { duration: DUR.instant, ease: EASE.in } }}
+      transition={{ duration: DUR.slow, ease: EASE.out, delay: (i % 4) * STAGGER.item }}
       className="group"
     >
       <Tilt className="tile flex h-full flex-col p-5 md:p-6" max={6}>
@@ -44,7 +43,7 @@ function Card({ p, i, onAdd }: { p: Product; i: number; onAdd: (p: Product, colo
             initial={{ opacity: 0, scale: 0.92, rotate: -3 }}
             animate={{ opacity: 1, scale: 1, rotate: 0 }}
             exit={{ opacity: 0, scale: 1.04 }}
-            transition={{ duration: 0.6, ease: EASE }}
+            transition={{ duration: DUR.base, ease: EASE.out }}
           >
             <ProductImage color={color} art={p.art} bg="transparent" className="h-full w-full" />
           </motion.div>
@@ -96,7 +95,7 @@ export function Shop() {
           <div className="flex rounded-full bg-surface p-1" role="tablist">
             {TABS.map((t) => (
               <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)} className="relative rounded-full px-4 py-1.5 text-[14px]">
-                {tab === t.id && <motion.span layoutId="seg" className="absolute inset-0 rounded-full bg-bg shadow-[0_1px_4px_rgba(0,0,0,0.12)]" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
+                {tab === t.id && <motion.span layoutId="seg" className="absolute inset-0 rounded-full bg-bg shadow-[0_1px_4px_rgba(0,0,0,0.12)]" transition={SPRING.snappy} />}
                 <span className={`relative ${tab === t.id ? "font-medium" : "text-muted"}`}>{t.label}</span>
               </button>
             ))}
@@ -118,7 +117,7 @@ export function Shop() {
             initial={{ opacity: 0, y: -20, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -20, scale: 0.96 }}
-            transition={{ type: "spring", stiffness: 380, damping: 30 }}
+            transition={SPRING.snappy}
             className="fixed right-4 top-16 z-50 flex items-center gap-4 rounded-2xl border border-line/60 bg-[var(--nav)] px-5 py-3.5 text-[15px] shadow-[0_10px_40px_rgba(0,0,0,0.15)] backdrop-blur-xl"
           >
             <span className="grid h-6 w-6 place-items-center rounded-full bg-ok text-[13px] text-white">✓</span>

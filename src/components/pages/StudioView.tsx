@@ -7,9 +7,11 @@ import { AnimatePresence, motion } from "motion/react";
 import { gsap } from "@/lib/gsap";
 import { TEE_COLORS } from "@/lib/data";
 import { cart, SIZES } from "@/lib/cart";
-import { formatFCFA } from "@/lib/products";
+import { STUDIO_PRICE, formatFCFA } from "@/lib/products";
 import { teeState } from "../story/teeState";
 import { ColorPicker, nearest } from "../ColorPicker";
+import { fadeUp, RevealLines } from "../Reveal";
+import { DUR, EASE, STAGGER } from "@/lib/motion";
 
 const TeeScene = dynamic(() => import("../story/TeeScene"), {
   ssr: false,
@@ -20,8 +22,7 @@ const TeeScene = dynamic(() => import("../story/TeeScene"), {
 const W = 700;
 const H = 1000;
 const PRINT_WIDTH_CM = 29.7;
-const BASE_PRICE = 8000;
-const BACK_PRICE = 2000;
+const { base: BASE_PRICE, back: BACK_PRICE } = STUDIO_PRICE;
 
 type Img = { src: string; nw: number; nh: number; x: number; y: number; scale: number; rot: number };
 type Txt = { value: string; font: "serif" | "italic" | "sans"; color: string; x: number; y: number; size: number; rot: number };
@@ -31,6 +32,9 @@ type Layer = "image" | "text";
 
 const FONTS = { serif: "Serif", italic: "Italique", sans: "Linéaire" } as const;
 const INK = ["#efe9df", "#1a1a1a", "#8a6a4a", "#c8102e", "#1f2a44", "#d8c7a5", "#6b6b47", "#9ea0a3"];
+
+// The stage and the two tool panels rise into place one after the other (FadeUp's move, on the elements themselves).
+const panelIn = (i: number) => fadeUp(0.15 + i * STAGGER.item);
 
 const DEFAULT_TEXT: Txt = { value: "Atelier", font: "italic", color: "#efe9df", x: 0.5, y: 0.26, size: 0.17, rot: 0 };
 
@@ -222,18 +226,14 @@ export function StudioView() {
       className={`relative pb-2 text-[11px] tracking-[0.2em] uppercase transition-colors ${tab === t ? "" : "text-muted hover:text-ink"}`}
     >
       {t}
-      {tab === t && <motion.span layoutId="tool-line" className="absolute inset-x-0 bottom-0 h-px bg-ink" transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }} />}
+      {tab === t && <motion.span layoutId="tool-line" className="absolute inset-x-0 bottom-0 h-px bg-ink" transition={{ duration: DUR.base, ease: EASE.out }} />}
     </button>
   );
 
   return (
     <div className="mx-auto max-w-[1440px] px-5 pb-16 pt-10 md:px-10">
       <div className="mb-8 flex flex-wrap items-end justify-between gap-6">
-        <div>
-                    <h1 className="display text-5xl md:text-6xl">
-            Studio 3D. <span className="text-muted">Crée le tien.</span>
-          </h1>
-        </div>
+        <RevealLines as="h1" lines={[{ text: "Studio 3D.", muted: "Crée le tien." }]} className="display text-5xl md:text-6xl" />
         <div className="flex items-center gap-6 text-sm">
           <motion.span key={tokens} initial={{ opacity: 0.3 }} animate={{ opacity: 1 }} className="tabular-nums">
             {tokens} crédit{tokens > 1 ? "s" : ""}
@@ -246,7 +246,8 @@ export function StudioView() {
 
       <div className="grid gap-5 lg:grid-cols-[300px_1fr] xl:grid-cols-[320px_1fr_320px]">
         {/* 3D stage */}
-        <section
+        <motion.section
+          {...panelIn(0)}
           ref={stage}
           className="relative order-1 h-[56svh] min-h-[380px] touch-none overflow-hidden rounded-[28px] bg-surface select-none lg:order-2 lg:h-[calc(100svh-200px)]"
           onPointerDown={(e) => (spin.current = e.clientX)}
@@ -268,16 +269,16 @@ export function StudioView() {
             ))}
           </div>
           <p className="eyebrow pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap">Glisse pour tourner</p>
-        </section>
+        </motion.section>
 
         {/* Tools */}
-        <aside className="tile order-2 p-6 lg:order-1 lg:max-h-[calc(100svh-200px)] lg:overflow-auto">
+        <motion.aside {...panelIn(1)} className="tile order-2 p-6 lg:order-1 lg:max-h-[calc(100svh-200px)] lg:overflow-auto">
           <div className="flex gap-6 border-b border-line" role="tablist">
             {(["couleur", "image", "texte"] as const).map(tabBtn)}
           </div>
 
           <AnimatePresence mode="wait">
-            <motion.div key={tab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.4 }} className="mt-8 space-y-6">
+            <motion.div key={tab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: DUR.fast, ease: EASE.out }} className="mt-8 space-y-6">
               {tab === "couleur" && (
                 <>
                   <ColorPicker key={pickerKey} initial={teeHex} presets={TEE_COLORS} onChange={pickColor} />
@@ -384,10 +385,10 @@ export function StudioView() {
               )}
             </motion.div>
           </AnimatePresence>
-        </aside>
+        </motion.aside>
 
         {/* Print preview + order */}
-        <aside className="tile order-3 space-y-8 p-6 lg:col-span-2 xl:col-span-1 xl:max-h-[calc(100svh-200px)] xl:overflow-auto">
+        <motion.aside {...panelIn(2)} className="tile order-3 space-y-8 p-6 lg:col-span-2 xl:col-span-1 xl:max-h-[calc(100svh-200px)] xl:overflow-auto">
           <div>
             <div className="flex items-center justify-between">
               <p className="eyebrow">Zone d&apos;impression · {side === "front" ? "devant" : "dos"}</p>
@@ -432,7 +433,7 @@ export function StudioView() {
               Sauvegarder · 1 crédit
             </button>
           </div>
-        </aside>
+        </motion.aside>
       </div>
 
       <AnimatePresence>
@@ -442,7 +443,7 @@ export function StudioView() {
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 24 }}
-            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: DUR.base, ease: EASE.out }}
             className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-6 bg-ink px-6 py-4 text-sm text-on-ink"
           >
             {toast}
@@ -462,7 +463,7 @@ export function StudioView() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 20 }}
-              transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+              transition={{ duration: DUR.base, ease: EASE.out }}
               onClick={(e) => e.stopPropagation()}
               className="w-full max-w-sm rounded-[28px] bg-bg p-10 text-center"
               role="dialog"

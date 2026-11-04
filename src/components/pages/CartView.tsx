@@ -9,8 +9,7 @@ import { TEE_COLORS } from "@/lib/data";
 const colorName = (hex: string) => TEE_COLORS.find((c) => c.hex.toLowerCase() === hex.toLowerCase())?.name ?? "Couleur libre";
 import { ProductImage } from "../ProductImage";
 import { FadeUp, RevealLines } from "../Reveal";
-
-const EASE = [0.22, 1, 0.36, 1] as const;
+import { DUR, EASE, STAGGER } from "@/lib/motion";
 
 export function Thumb({ item, className = "" }: { item: CartItem; className?: string }) {
   if (item.preview)
@@ -67,8 +66,8 @@ export function CartView() {
                     key={it.key}
                     layout
                     initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0, transition: { duration: 0.9, ease: EASE, delay: i * 0.06 } }}
-                    exit={{ opacity: 0, x: 40, transition: { duration: 0.4 } }}
+                    animate={{ opacity: 1, y: 0, transition: { duration: DUR.slow, ease: EASE.out, delay: i * STAGGER.item } }}
+                    exit={{ opacity: 0, x: 40, transition: { duration: DUR.fast, ease: EASE.in } }}
                     className="flex gap-5 border-b border-line py-6 md:gap-8"
                   >
                     <Thumb item={it} className="aspect-[4/5] w-24 md:w-32" />
@@ -125,7 +124,7 @@ export function CartView() {
                     <RevealLines lines={[{ text: "Tu vas aimer.", muted: "Pour compléter." }]} className="display text-4xl md:text-5xl" />
           <div className="mt-12 grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-4 md:gap-x-6">
             {suggestions.map((p, i) => (
-              <FadeUp key={p.id} delay={i * 0.08} className="group">
+              <FadeUp key={p.id} delay={i * STAGGER.item} className="group">
                 <div className="relative">
                   <ProductImage color={p.colors[0]} art={p.art} bg={p.bg} className="aspect-[4/5] rounded-[22px]" />
                   <button

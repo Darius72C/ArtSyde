@@ -6,6 +6,7 @@ import { Suspense, useEffect, useState } from "react";
 import { AnimatePresence, motion, useAnimationControls } from "motion/react";
 import { useCartCount } from "@/lib/cart";
 import { CART_BUMP } from "@/lib/flyToCart";
+import { DUR, EASE, SPRING } from "@/lib/motion";
 
 const LINKS = [
   { href: "/#boutique", label: "Boutique" },
@@ -14,8 +15,6 @@ const LINKS = [
   { href: "/#equipes", label: "Équipes" },
   { href: "/#aide", label: "Aide" },
 ];
-const EASE = [0.22, 1, 0.36, 1] as const;
-
 export function Header() {
   // usePathname is request data on dynamic routes → stream it; fallback renders the same bar.
   return (
@@ -63,7 +62,7 @@ function Bar({ path }: { path: string | null }) {
   const dark = useDarkUnderNav();
   const bag = useAnimationControls();
   useEffect(() => {
-    const onBump = () => bag.start({ scale: [1, 1.35, 0.9, 1.08, 1], rotate: [0, -12, 8, -4, 0], transition: { duration: 0.7, ease: "easeOut" } });
+    const onBump = () => bag.start({ scale: [1, 1.35, 0.9, 1.08, 1], rotate: [0, -12, 8, -4, 0], transition: { duration: DUR.base, ease: EASE.out } });
     window.addEventListener(CART_BUMP, onBump);
     return () => window.removeEventListener(CART_BUMP, onBump);
   }, [bag]);
@@ -81,7 +80,7 @@ function Bar({ path }: { path: string | null }) {
         <ul className="hidden items-center gap-9 md:flex">
           {LINKS.map((l) => (
             <li key={l.href}>
-              <Link href={l.href} aria-current={path === l.href ? "page" : undefined} className="nav-link">
+              <Link href={l.href} aria-current={path === l.href ? "page" : undefined} className="nav-link nav-underline">
                 {l.label}
               </Link>
             </li>
@@ -105,7 +104,7 @@ function Bar({ path }: { path: string | null }) {
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   exit={{ scale: 0 }}
-                  transition={{ type: "spring", stiffness: 500, damping: 25 }}
+                  transition={SPRING.pop}
                   className="absolute -right-2 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-ink px-1 text-[10px] font-semibold text-on-ink"
                 >
                   {count}
@@ -114,8 +113,8 @@ function Bar({ path }: { path: string | null }) {
             </AnimatePresence>
           </Link>
           <button onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label="Menu" className="relative h-6 w-6 md:hidden">
-            <motion.span className="absolute left-1 right-1 top-[9px] h-px bg-ink" animate={open ? { rotate: 45, y: 3 } : { rotate: 0, y: 0 }} />
-            <motion.span className="absolute left-1 right-1 top-[15px] h-px bg-ink" animate={open ? { rotate: -45, y: -3 } : { rotate: 0, y: 0 }} />
+            <motion.span className="absolute left-1 right-1 top-[9px] h-px bg-ink" animate={open ? { rotate: 45, y: 3 } : { rotate: 0, y: 0 }} transition={SPRING.ui} />
+            <motion.span className="absolute left-1 right-1 top-[15px] h-px bg-ink" animate={open ? { rotate: -45, y: -3 } : { rotate: 0, y: 0 }} transition={SPRING.ui} />
           </button>
         </div>
       </nav>
@@ -126,12 +125,12 @@ function Bar({ path }: { path: string | null }) {
             initial={{ height: 0 }}
             animate={{ height: "100svh" }}
             exit={{ height: 0 }}
-            transition={{ duration: 0.5, ease: EASE }}
+            transition={{ duration: DUR.base, ease: EASE.out }}
             className="overflow-hidden bg-bg md:hidden"
           >
             <ul className="px-10 pt-6">
               {[...LINKS, { href: "/connexion", label: "Compte" }, { href: "/panier", label: "Panier" }].map((l, i) => (
-                <motion.li key={l.href} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 + i * 0.03, duration: 0.4 }}>
+                <motion.li key={l.href} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 + i * 0.03, duration: DUR.fast, ease: EASE.out }}>
                   <Link href={l.href} onClick={() => setOpen(false)} className="display block py-2 text-[28px]">
                     {l.label}
                   </Link>

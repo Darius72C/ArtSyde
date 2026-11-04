@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { motion } from "motion/react";
+import { SPRING } from "@/lib/motion";
 
 // ---- colour maths (HSV <-> hex) ----
 export function hsvToHex(h: number, s: number, v: number) {
@@ -101,6 +102,7 @@ export function ColorPicker({ initial, presets, onChange }: Props) {
           style={{ left: `${hsv.s * 100}%`, top: `${(1 - hsv.v) * 100}%`, background: hex }}
           animate={{ scale: 1 }}
           whileTap={{ scale: 1.3 }}
+          transition={SPRING.pop}
         />
       </div>
 
@@ -163,6 +165,7 @@ export function ColorPicker({ initial, presets, onChange }: Props) {
             <motion.button
               key={c.hex}
               whileTap={{ scale: 0.8 }}
+              transition={SPRING.pop}
               onClick={() => setHex(c.hex)}
               title={c.name}
               aria-label={c.name}

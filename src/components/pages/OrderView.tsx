@@ -1,69 +1,67 @@
 "use client";
 
 import Link from "next/link";
-import { use, useSyncExternalStore } from "react";
 import { motion } from "motion/react";
-import { DELIVERY, getOrder } from "@/lib/orders";
+import { DELIVERY, tracking, type PublicOrder } from "@/lib/orders";
 import { formatFCFA } from "@/lib/products";
 import { Thumb } from "./CartView";
 import { FadeUp } from "../Reveal";
+import { DUR, EASE, STAGGER } from "@/lib/motion";
 
-const TRACK = ["Commande reçue", "En atelier", "Expédiée", "Livrée"];
-const EASE = [0.22, 1, 0.36, 1] as const;
-const noop = () => () => {};
-
-export function OrderView({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
-  // Orders live in localStorage for now → read on the client only.
-  const ready = useSyncExternalStore(noop, () => true, () => false);
-  const order = ready ? getOrder(id) : undefined;
-  const step = 0; // TODO: real status from the API
-
-  if (!ready) return <div className="mx-auto my-32 h-px w-24 animate-pulse bg-ink/40" />;
+export function OrderView({ order }: { order: PublicOrder | null }) {
   if (!order)
     return (
       <div className="mx-auto max-w-[1440px] px-5 py-28 md:px-10">
         <p className="display text-5xl">Commande introuvable.</p>
-        <p className="mt-4 text-muted">Vérifie le numéro, ou connecte-toi pour retrouver tes commandes.</p>
+        <p className="mt-4 text-muted">Vérifie le lien reçu après ta commande, ou connecte-toi pour retrouver tes commandes.</p>
         <Link href="/" className="btn mt-10">Accueil</Link>
       </div>
     );
 
-  const first = order.customer.name.split(" ")[0];
+  const { steps: TRACK, step } = tracking(order.status, order.delivery);
+  const cancelled = step < 0;
+  const first = order.firstName;
+  const heading = cancelled ? [`${first},`, "ta commande est annulée."] : order.status === "DELIVERED" ? [`Merci, ${first}.`, "Bien reçue."] : [`Merci, ${first}.`, "C'est en route."];
+  const lead = cancelled
+    ? `Une question ? On reste joignable au même numéro, ou écris-nous en citant la référence ${order.reference}.`
+    : order.status === "PENDING_PAYMENT"
+      ? `On te contacte au ${order.phone} pour confirmer la commande et le règlement.`
+      : "Ton règlement est bien reçu. Suis l'avancement de ta commande ici.";
 
   return (
     <div className="mx-auto max-w-[1440px] px-5 pb-24 md:px-10">
       <div className="pb-14 pt-14 md:pt-20">
-        <motion.p className="eyebrow" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1 }}>
-          Commande n° {order.id}
+        <motion.p className="eyebrow" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: DUR.reveal, ease: EASE.out }}>
+          Commande n° {order.reference}
         </motion.p>
         <h1 className="display mt-6 text-5xl md:text-8xl">
-          {[`Merci, ${first}.`, <span key="e" className="text-muted">C&apos;est en route.</span>].map((l, i) => (
+          {[heading[0], <span key="e" className="text-muted">{heading[1]}</span>].map((l, i) => (
             <span key={i} className="block overflow-hidden pb-[0.06em]">
-              <motion.span className="block" initial={{ y: "110%" }} animate={{ y: 0 }} transition={{ duration: 1.4, ease: EASE, delay: 0.15 + i * 0.12 }}>
+              <motion.span className="block" initial={{ y: "110%" }} animate={{ y: 0 }} transition={{ duration: DUR.hero, ease: EASE.out, delay: 0.15 + i * STAGGER.line }}>
                 {l}
               </motion.span>
             </span>
           ))}
         </h1>
         <FadeUp delay={0.5}>
-          <p className="mt-6 max-w-lg text-muted">On te contacte au {order.customer.phone} pour confirmer la commande et le règlement.</p>
+          <p className="mt-6 max-w-lg text-muted">{lead}</p>
         </FadeUp>
       </div>
 
       {/* Tracking */}
       <FadeUp delay={0.3} className="tile p-8 md:p-10">
         <p className="text-[21px] font-semibold">Suivi de commande</p>
+        {cancelled && <p className="mt-2 text-sm text-muted">Commande annulée.</p>}
         <ol className="relative mt-10 grid grid-cols-4">
           <span className="absolute left-0 right-0 top-[6px] h-0.5 rounded-full bg-line" />
-          <motion.span className="absolute left-0 top-[6px] h-0.5 origin-left rounded-full bg-accent" initial={{ width: 0 }} animate={{ width: `${(step / (TRACK.length - 1)) * 100}%` }} transition={{ delay: 0.8, duration: 1.2, ease: EASE }} />
+          <motion.span className="absolute left-0 top-[6px] h-0.5 origin-left rounded-full bg-accent" initial={{ width: 0 }} animate={{ width: `${(Math.max(step, 0) / (TRACK.length - 1)) * 100}%` }} transition={{ delay: 0.8, duration: DUR.reveal, ease: EASE.out }} />
           {TRACK.map((t, i) => (
             <li key={t} className="relative">
               <motion.span
                 className={`block h-[14px] w-[14px] rounded-full border-2 ${i <= step ? "border-accent bg-accent" : "border-line bg-bg"}`}
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
-                transition={{ delay: 0.6 + i * 0.12, duration: 0.6, ease: EASE }}
+                transition={{ delay: 0.6 + i * STAGGER.line, duration: DUR.base, ease: EASE.out }}
               />
               <span className={`mt-3 block text-[14px] ${i <= step ? "font-medium" : "text-muted"}`}>{t}</span>
             </li>
@@ -96,14 +94,16 @@ export function OrderView({ params }: { params: Promise<{ id: string }> }) {
           <p className="text-[21px] font-semibold">Livraison</p>
           <p className="mt-4 text-[17px] font-semibold">{DELIVERY[order.delivery].label}</p>
           <p className="text-sm text-muted">{DELIVERY[order.delivery].note}</p>
-          {order.delivery !== "retrait" && (
+          {order.delivery !== "RETRAIT" && (
             <p className="mt-5 text-sm leading-relaxed">
-              {order.customer.address}
+              {order.address}
               <br />
-              {order.customer.city}
+              {order.city}
             </p>
           )}
-          <p className="mt-8 border-t border-line pt-6 text-sm text-muted">Paiement : on te contacte pour le règlement. Le paiement en ligne arrive bientôt.</p>
+          <p className="mt-8 border-t border-line pt-6 text-sm text-muted">
+            {order.status === "PENDING_PAYMENT" ? "Paiement : on te contacte pour le règlement. Le paiement en ligne arrive bientôt." : cancelled ? "Paiement : aucun règlement en attente." : "Paiement : reçu, merci."}
+          </p>
         </FadeUp>
       </div>
 

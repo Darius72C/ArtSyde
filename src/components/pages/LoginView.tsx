@@ -4,16 +4,15 @@ import Link from "next/link";
 import { useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { TeeIllustration } from "../ProductImage";
+import { DUR, EASE, SPRING } from "@/lib/motion";
 
 type Mode = "login" | "signup";
-const EASE = [0.22, 1, 0.36, 1] as const;
-
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
     <label className="block">
       <span className="mb-1.5 block text-[14px] text-muted">{label}</span>
       {/* Red border + a short shake when an error appears. */}
-      <motion.div animate={error ? { x: [0, -8, 7, -5, 3, 0] } : { x: 0 }} transition={{ duration: 0.45 }} className={error ? "[&_.field]:!border-danger" : ""}>
+      <motion.div animate={error ? { x: [0, -8, 7, -5, 3, 0] } : { x: 0 }} transition={{ duration: DUR.fast, ease: EASE.out }} className={error ? "[&_.field]:!border-danger" : ""}>
         {children}
       </motion.div>
       <AnimatePresence>
@@ -65,7 +64,7 @@ export function LoginView() {
         className="relative m-5 hidden overflow-hidden rounded-[28px] bg-surface md:block"
         initial={{ clipPath: "inset(0 100% 0 0)" }}
         animate={{ clipPath: "inset(0 0% 0 0)" }}
-        transition={{ duration: 1.4, ease: [0.65, 0, 0.35, 1] }}
+        transition={{ duration: DUR.hero, ease: EASE.inOut }}
       >
         <TeeIllustration color="#1F2A44" art="script" className="idle-float absolute inset-[14%] h-[62%] w-[72%]" />
         <div className="absolute inset-x-10 bottom-10">
@@ -78,7 +77,7 @@ export function LoginView() {
         <div className="w-full max-w-md">
           <AnimatePresence mode="wait">
             {status === "done" ? (
-              <motion.div key="done" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease: EASE }}>
+              <motion.div key="done" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DUR.slow, ease: EASE.out }}>
                 
                 <h1 className="display mt-5 text-6xl">{mode === "login" ? "Content de te revoir." : "Bienvenue !"}</h1>
                 <p className="mt-5 text-muted">Démo : les comptes seront reliés au serveur prochainement.</p>
@@ -88,20 +87,20 @@ export function LoginView() {
                 </div>
               </motion.div>
             ) : (
-              <motion.div key="form" exit={{ opacity: 0 }} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease: EASE }}>
+              <motion.div key="form" exit={{ opacity: 0 }} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DUR.slow, ease: EASE.out }}>
                 <LayoutGroup>
                   <div className="relative isolate inline-flex rounded-full bg-surface p-1" role="tablist">
                     {(["login", "signup"] as const).map((m) => (
                       <button key={m} role="tab" aria-selected={mode === m} onClick={() => switchMode(m)} className={`relative rounded-full px-4 py-1.5 text-[14px] ${mode === m ? "font-medium" : "text-muted"}`}>
                         {m === "login" ? "Connexion" : "Créer un compte"}
-                        {mode === m && <motion.span layoutId="auth-line" className="absolute inset-0 -z-10 rounded-full bg-bg shadow-[0_1px_4px_rgba(0,0,0,0.12)]" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
+                        {mode === m && <motion.span layoutId="auth-line" className="absolute inset-0 -z-10 rounded-full bg-bg shadow-[0_1px_4px_rgba(0,0,0,0.12)]" transition={SPRING.snappy} />}
                       </button>
                     ))}
                   </div>
                 </LayoutGroup>
 
                 <AnimatePresence mode="wait">
-                  <motion.h1 key={mode} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.6, ease: EASE }} className="display mt-10 text-5xl md:text-6xl">
+                  <motion.h1 key={mode} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: DUR.base, ease: EASE.out }} className="display mt-10 text-5xl md:text-6xl">
                     {mode === "login" ? "Content de te revoir." : "Crée ton compte."}
                   </motion.h1>
                 </AnimatePresence>
@@ -110,7 +109,7 @@ export function LoginView() {
                 <form onSubmit={submit} noValidate className="mt-10 space-y-8">
                   <AnimatePresence initial={false}>
                     {mode === "signup" && (
-                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.6, ease: EASE }} className="overflow-hidden">
+                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: DUR.base, ease: EASE.out }} className="overflow-hidden">
                         <Field label="Prénom" error={errors.name}>
                           <input name="name" autoComplete="given-name" className="field" />
                         </Field>
@@ -138,7 +137,7 @@ export function LoginView() {
                   {mode === "signup" && pw && (
                     <div className="flex items-center gap-2" aria-live="polite">
                       {[0, 1, 2, 3].map((i) => (
-                        <motion.span key={i} className="h-1 flex-1 origin-left rounded-full bg-accent" animate={{ scaleX: i < s ? 1 : 0, opacity: i < s ? 1 : 0.2 }} transition={{ duration: 0.5 }} />
+                        <motion.span key={i} className="h-1 flex-1 origin-left rounded-full bg-accent" animate={{ scaleX: i < s ? 1 : 0, opacity: i < s ? 1 : 0.2 }} transition={{ duration: DUR.base, ease: EASE.out }} />
                       ))}
                       <span className="w-16 text-right text-[13px] text-muted">{["Faible", "Faible", "Moyen", "Bon", "Fort"][s]}</span>
                     </div>

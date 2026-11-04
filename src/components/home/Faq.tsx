@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { RevealLines } from "../Reveal";
+import { DUR, EASE, SPRING, STAGGER, VIEWPORT } from "@/lib/motion";
 
 const FAQ = [
   { q: "Quelles tailles proposez-vous ?", a: "Du S au XXL pour la plupart des modèles. Un guide des tailles est disponible sur chaque fiche produit." },
@@ -26,19 +27,19 @@ export function Faq() {
                 key={f.q}
                 initial={{ opacity: 0, y: 24 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-5%" }}
-                transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: i * 0.07 }}
+                viewport={VIEWPORT}
+                transition={{ duration: DUR.slow, ease: EASE.out, delay: i * STAGGER.item }}
               >
                 <button onClick={() => setOpen(isOpen ? null : i)} aria-expanded={isOpen} className="group flex w-full items-center justify-between gap-6 py-6 text-left">
                   <span className="text-[19px] font-semibold transition-transform duration-500 group-hover:translate-x-1.5 md:text-[21px]">{f.q}</span>
-                  <motion.span animate={{ rotate: isOpen ? 45 : 0 }} transition={{ type: "spring", stiffness: 300, damping: 22 }} className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-xl transition-colors duration-300 ${isOpen ? "bg-accent text-white" : "bg-bg text-muted group-hover:text-ink"}`}>
+                  <motion.span animate={{ rotate: isOpen ? 45 : 0 }} transition={SPRING.ui} className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-xl transition-colors duration-300 ${isOpen ? "bg-accent text-white" : "bg-bg text-muted group-hover:text-ink"}`}>
                     +
                   </motion.span>
                 </button>
                 <AnimatePresence initial={false}>
                   {isOpen && (
-                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }} className="overflow-hidden">
-                      <motion.p initial={{ y: -12 }} animate={{ y: 0 }} exit={{ y: -12 }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }} className="max-w-2xl pb-6 text-[17px] text-muted">
+                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: DUR.base, ease: EASE.out }} className="overflow-hidden">
+                      <motion.p initial={{ y: -12 }} animate={{ y: 0 }} exit={{ y: -12 }} transition={{ duration: DUR.base, ease: EASE.out }} className="max-w-2xl pb-6 text-[17px] text-muted">
                         {f.a}
                       </motion.p>
                     </motion.div>

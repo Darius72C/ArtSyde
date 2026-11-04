@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CountUp, FadeUp, RevealLines, Tilt } from "../Reveal";
+import { STAGGER } from "@/lib/motion";
 
 // Example values — set real packs and prices once the payment provider is chosen.
 const PACKS = [
@@ -19,7 +20,7 @@ export function Credits() {
       </div>
       <div className="mt-12 grid gap-5 md:grid-cols-3">
         {PACKS.map((p, i) => (
-          <FadeUp key={p.name} delay={i * 0.1} className="group">
+          <FadeUp key={p.name} delay={i * STAGGER.item} className="group">
             <Tilt max={5} className={`tile relative flex h-full flex-col items-center p-8 text-center ${p.best ? "ring-2 ring-accent" : ""}`}>
             {p.best && <span className="absolute -top-px left-1/2 -translate-x-1/2 rounded-b-xl bg-accent px-3 py-1 text-[12px] font-medium text-white">Le plus choisi</span>}
             <p className="mt-3 text-[19px] font-semibold">{p.name}</p>

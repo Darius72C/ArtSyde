@@ -1,0 +1,242 @@
+// Schéma de la base ArtSyde (PostgreSQL sur Neon).
+// Les prix sont en francs CFA (XOF), stockés en entiers : le FCFA n'a pas de centimes.
+// Les URL de connexion sont lues dans prisma.config.ts (migrations) et src/lib/db.ts (application).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- Catalogue ----------
+
+model Product {
+  id          String      @id @default(cuid())
+  slug        String      @unique
+  name        String
+  description String      @default("")
+  priceXof    Int
+  oldPriceXof Int? // prix barré pendant une promo
+  tag         ProductTag?
+  // Illustration de la boutique (src/components/ProductImage.tsx), en attendant les vrais visuels.
+  art         String?
+  // Image du design appliquée sur le modèle 3D (URL dans le stockage de fichiers).
+  designUrl   String?
+  // Photos de présentation (mockups). La première sert d'image dans le catalogue.
+  mockups     String[]    @default([])
+  colors      String[] // couleurs de t-shirt disponibles, en hexadécimal
+  sizes       Size[]
+  active      Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  orderItems OrderItem[]
+}
+
+enum ProductTag {
+  NOUVEAU
+  BEST_SELLER
+  PROMO
+}
+
+enum Size {
+  XS
+  S
+  M
+  L
+  XL
+  XXL
+}
+
+// Stock de t-shirts vierges, par couleur et par taille.
+model ColorStock {
+  id        String   @id @default(cuid())
+  colorHex  String // comme TEE_COLORS dans src/lib/data.ts
+  colorName String
+  size      Size
+  quantity  Int      @default(0)
+  lowAt     Int      @default(5) // à ce niveau ou en dessous, le stock est « bas »
+  updatedAt DateTime @updatedAt
+
+  @@unique([colorHex, size])
+}
+
+// ---------- Clients ----------
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String   @unique
+  email     String?  @unique
+  city      String?
+  address   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders  Order[]
+  credits CreditEntry[]
+  designs SavedDesign[]
+}
+
+// ---------- Studio ----------
+
+// Registre des crédits studio : une ligne par mouvement.
+// Le solde d'un client est la somme de `amount`.
+model CreditEntry {
+  id         String       @id @default(cuid())
+  customerId String
+  customer   Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  amount     Int // positif : crédits reçus ; négatif : crédits utilisés
+  reason     CreditReason
+  pack       CreditPack? // pack acheté (reason = PURCHASE)
+  priceXof   Int? // montant payé pour le pack
+  paymentRef String?      @unique
+  designId   String?
+  design     SavedDesign? @relation(fields: [designId], references: [id], onDelete: SetNull)
+  createdAt  DateTime     @default(now())
+
+  @@index([customerId])
+  @@index([createdAt])
+}
+
+enum CreditReason {
+  SIGNUP_BONUS // crédits offerts à l'inscription
+  PURCHASE // achat d'un pack
+  IMAGE_UPLOAD // import d'une image dans le studio
+  DESIGN_SAVE // sauvegarde d'un design
+  HD_PREVIEW // génération de l'aperçu HD
+  REFUND // crédits rendus
+  ADJUSTMENT // correction manuelle
+}
+
+enum CreditPack {
+  DECOUVERTE // 20 crédits
+  CREATEUR // 60 crédits
+  STUDIO // 150 crédits
+}
+
+// Design sauvegardé dans le studio par un client.
+model SavedDesign {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  name       String
+  teeColor   String // hexadécimal
+  // Contenu de chaque face : image (URL, position, échelle, rotation) et texte.
+  front      Json?
+  back       Json?
+  // Capture de l'aperçu 3D.
+  previewUrl String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  credits    CreditEntry[]
+  orderItems OrderItem[]
+
+  @@index([customerId])
+}
+
+// ---------- Designs envoyés avec une commande ----------
+
+model CustomDesign {
+  id          String    @id @default(cuid())
+  // Un article peut porter plusieurs images (calques).
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  // Ordre d'empilement : 0 = calque du dessous.
+  layer       Int
+  // Fichier original, en haute qualité, pour la conception et l'impression.
+  fileUrl     String
+  fileName    String
+  mimeType    String
+  // Position de l'image sur le t-shirt 3D (face, x, y, largeur, rotation).
+  placement   Json
+  notes       String?
+  createdAt   DateTime  @default(now())
+
+  @@index([orderItemId])
+}
+
+// ---------- Commandes ----------
+
+model Order {
+  id        String      @id @default(cuid())
+  // Référence courte lisible, ex. "AS-2611-0042", donnée au client.
+  reference String      @unique
+  status    OrderStatus @default(PENDING_PAYMENT)
+
+  // Client inscrit, s'il y en a un. Les champs ci-dessous gardent ce qui a été saisi à la commande.
+  customerId    String?
+  customer      Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName  String
+  customerPhone String
+  customerEmail String?
+  city          String
+  address       String
+  deliveryNotes String?
+
+  delivery    DeliveryMethod @default(STANDARD)
+  subtotalXof Int
+  deliveryXof Int            @default(0)
+  totalXof    Int
+
+  paymentStatus PaymentStatus @default(UNPAID)
+  paymentMethod String? // ex. "WAVE", "ORANGE_MONEY", "MTN", "MOOV", "CARD"
+  paymentRef    String?       @unique // identifiant de transaction du prestataire
+
+  items     OrderItem[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([customerId])
+}
+
+model OrderItem {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  // Un article est soit un modèle du catalogue, soit un t-shirt créé dans le studio.
+  productId     String?
+  product       Product?       @relation(fields: [productId], references: [id])
+  savedDesignId String?
+  savedDesign   SavedDesign?   @relation(fields: [savedDesignId], references: [id], onDelete: SetNull)
+  customDesigns CustomDesign[]
+  // Capture de l'aperçu 3D, pour l'afficher vite dans le monitoring.
+  previewUrl    String?
+
+  size         Size
+  color        String
+  quantity     Int    @default(1)
+  unitPriceXof Int
+
+  @@index([orderId])
+}
+
+enum DeliveryMethod {
+  STANDARD // 3 à 5 jours ouvrés
+  EXPRESS // 24 à 48 h
+  RETRAIT // retrait à l'atelier
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT // en attente de paiement
+  PAID // payée, à traiter
+  IN_DESIGN // design client en cours de conception
+  IN_PRODUCTION // en impression
+  SHIPPED // en livraison
+  DELIVERED // livrée
+  CANCELLED // annulée
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  FAILED
+  REFUNDED
+}

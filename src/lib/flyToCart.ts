@@ -1,5 +1,7 @@
 "use client";
 
+import { cssEase, DUR, EASE } from "./motion";
+
 /** The header listens for this to make the bag icon bounce. */
 export const CART_BUMP = "cart:bump";
 
@@ -45,7 +47,7 @@ export function flyToCart(source: Element | null) {
       { transform: `translate(${dx * 0.35}px, ${dy * 0.35 - 120}px) scale(0.55) rotate(-8deg)`, opacity: 1, offset: 0.45 },
       { transform: `translate(${dx}px, ${dy}px) scale(0.06) rotate(0deg)`, opacity: 0.3 },
     ],
-    { duration: 850, easing: "cubic-bezier(0.55, 0, 0.3, 1)", fill: "forwards" },
+    { duration: DUR.slow * 1000, easing: cssEase(EASE.inOut), fill: "forwards" },
   );
   anim.onfinish = () => {
     ghost.remove();

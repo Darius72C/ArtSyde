@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { animate, motion, useInView, useMotionValue, useReducedMotion, useScroll, useSpring, useTransform } from "motion/react";
-
-const EASE = [0.22, 1, 0.36, 1] as const;
+import { DUR, EASE, SPRING, STAGGER, VIEWPORT } from "@/lib/motion";
 
 /** A headline line: plain text, or `{ text, muted }` where `muted` is shown in grey after `text`. */
 export type Line = string | { text?: string; muted?: string };
@@ -25,7 +24,7 @@ function Word({ children, className = "" }: { children: ReactNode; className?: s
     <span className="inline-block overflow-hidden pb-[0.12em] -mb-[0.12em] align-bottom">
       <motion.span
         className={`inline-block ${className}`}
-        variants={{ hidden: { y: "105%", rotate: 4 }, show: { y: "0%", rotate: 0, transition: { duration: 1.1, ease: EASE } } }}
+        variants={{ hidden: { y: "105%", rotate: 4 }, show: { y: "0%", rotate: 0, transition: { duration: DUR.reveal, ease: EASE.out } } }}
       >
         {children}
       </motion.span>
@@ -41,11 +40,11 @@ export function RevealLines({ lines, className = "", delay = 0, as = "h2" }: { l
       className={className}
       initial="hidden"
       whileInView="show"
-      viewport={{ once: true, margin: "-8%" }}
-      variants={{ hidden: {}, show: { transition: { staggerChildren: 0.055, delayChildren: delay } } }}
+      viewport={VIEWPORT}
+      variants={{ hidden: {}, show: { transition: { staggerChildren: STAGGER.word, delayChildren: delay } } }}
     >
       {lines.map((l, i) => (
-        <motion.span key={i} className="block" variants={{ hidden: {}, show: { transition: { staggerChildren: 0.055 } } }}>
+        <motion.span key={i} className="block" variants={{ hidden: {}, show: { transition: { staggerChildren: STAGGER.word } } }}>
           {typeof l === "string" ? (
             words(l, `l${i}`)
           ) : (
@@ -61,16 +60,18 @@ export function RevealLines({ lines, className = "", delay = 0, as = "h2" }: { l
   );
 }
 
+/** FadeUp's move as props, for an element that must stay itself (a ref, pointer handlers, grid order). */
+export const fadeUp = (delay = 0) => ({
+  initial: { opacity: 0, y: 40 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: VIEWPORT,
+  transition: { duration: DUR.reveal, ease: EASE.out, delay },
+});
+
 /** Gentle fade-up when the element enters the viewport. */
 export function FadeUp({ children, className = "", delay = 0 }: { children: ReactNode; className?: string; delay?: number }) {
   return (
-    <motion.div
-      className={className}
-      initial={{ opacity: 0, y: 40 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-8%" }}
-      transition={{ duration: 1.1, ease: EASE, delay }}
-    >
+    <motion.div className={className} {...fadeUp(delay)}>
       {children}
     </motion.div>
   );
@@ -83,8 +84,8 @@ export function RevealImage({ children, className = "", delay = 0 }: { children:
       className={`overflow-hidden ${className}`}
       initial={{ opacity: 0, scale: 0.94 }}
       whileInView={{ opacity: 1, scale: 1 }}
-      viewport={{ once: true, margin: "-8%" }}
-      transition={{ duration: 1.3, ease: EASE, delay }}
+      viewport={VIEWPORT}
+      transition={{ duration: DUR.hero, ease: EASE.out, delay }}
     >
       {children}
     </motion.div>
@@ -92,16 +93,16 @@ export function RevealImage({ children, className = "", delay = 0 }: { children:
 }
 
 /** Number that counts up from 0 when it scrolls into view (writes to the DOM, no re-renders). */
-export function CountUp({ to, className = "", duration = 1.6 }: { to: number; className?: string; duration?: number }) {
+export function CountUp({ to, className = "", duration = DUR.grand }: { to: number; className?: string; duration?: number }) {
   const ref = useRef<HTMLSpanElement>(null);
-  const inView = useInView(ref, { once: true, margin: "-10%" });
+  const inView = useInView(ref, VIEWPORT);
   const reduce = useReducedMotion();
   useEffect(() => {
     const el = ref.current;
     if (!inView || !el) return;
     const show = (v: number) => (el.textContent = Math.round(v).toLocaleString("fr-FR"));
     if (reduce) return void show(to);
-    const c = animate(0, to, { duration, ease: [0.16, 1, 0.3, 1], onUpdate: show });
+    const c = animate(0, to, { duration, ease: EASE.expo, onUpdate: show });
     return () => c.stop();
   }, [inView, to, duration, reduce]);
   return (
@@ -116,8 +117,8 @@ export function Tilt({ children, className = "", max = 7 }: { children: ReactNod
   const reduce = useReducedMotion();
   const px = useMotionValue(0.5);
   const py = useMotionValue(0.5);
-  const sx = useSpring(px, { stiffness: 220, damping: 22 });
-  const sy = useSpring(py, { stiffness: 220, damping: 22 });
+  const sx = useSpring(px, SPRING.follow);
+  const sy = useSpring(py, SPRING.follow);
   const rotateY = useTransform(sx, [0, 1], [-max, max]);
   const rotateX = useTransform(sy, [0, 1], [max, -max]);
   const sheen = useTransform([sx, sy] as const, ([x, y]: number[]) => `radial-gradient(420px circle at ${x * 100}% ${y * 100}%, rgba(255,255,255,0.16), transparent 55%)`);
@@ -138,7 +139,7 @@ export function Tilt({ children, className = "", max = 7 }: { children: ReactNod
         py.set(0.5);
       }}
       whileHover={{ scale: 1.015 }}
-      transition={{ type: "spring", stiffness: 260, damping: 24 }}
+      transition={SPRING.ui}
     >
       {children}
       <motion.span aria-hidden className="pointer-events-none absolute inset-0 rounded-[inherit] opacity-0 transition-opacity duration-500 group-hover:opacity-100" style={{ background: sheen }} />

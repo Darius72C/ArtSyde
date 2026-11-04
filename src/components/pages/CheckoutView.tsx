@@ -2,22 +2,23 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { cart, cartSubtotal, useCart } from "@/lib/cart";
-import { DELIVERY, saveOrder } from "@/lib/orders";
+import { DELIVERY, DELIVERY_METHODS, checkFields, orderHref, type CheckoutFields } from "@/lib/orders";
+import { placeOrder } from "@/app/commande/actions";
+import type { DeliveryMethod } from "@/generated/prisma/client";
 import { formatFCFA } from "@/lib/products";
 import { Thumb } from "./CartView";
 import { RevealLines } from "../Reveal";
-
-const EASE = [0.22, 1, 0.36, 1] as const;
+import { DUR, EASE } from "@/lib/motion";
 
 function Field({ name, label, error, ...rest }: { name: string; label: string; error?: string } & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <label className="block">
       <span className="mb-1.5 block text-[14px] text-muted">{label}</span>
       {/* Shakes when an error appears. */}
-      <motion.div animate={error ? { x: [0, -8, 7, -5, 3, 0] } : { x: 0 }} transition={{ duration: 0.45 }}>
+      <motion.div animate={error ? { x: [0, -8, 7, -5, 3, 0] } : { x: 0 }} transition={{ duration: DUR.fast, ease: EASE.out }}>
         <input name={name} className={`field ${error ? "!border-danger" : ""}`} {...rest} />
       </motion.div>
       <AnimatePresence>
@@ -48,37 +49,37 @@ function Steps({ current }: { current: number }) {
 export function CheckoutView() {
   const items = useCart();
   const router = useRouter();
-  const [delivery, setDelivery] = useState<keyof typeof DELIVERY>("standard");
+  const [delivery, setDelivery] = useState<DeliveryMethod>("STANDARD");
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [sending, setSending] = useState(false);
+  const [message, setMessage] = useState<string>();
+  const [pending, startTransition] = useTransition();
+  // Stays true once the order is placed, so the emptied cart does not flash "Rien à commander".
+  const [placed, setPlaced] = useState(false);
+  const sending = pending || placed;
   const subtotal = cartSubtotal(items);
   const shipping = DELIVERY[delivery].price;
 
   function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const f = Object.fromEntries(new FormData(e.currentTarget)) as Record<string, string>;
-    const err: Record<string, string> = {};
-    if ((f.name ?? "").trim().length < 2) err.name = "Indique ton nom complet.";
-    if (!/^\+?[\d\s]{8,}$/.test(f.phone ?? "")) err.phone = "Numéro invalide.";
-    if (f.email && !/^\S+@\S+\.\S+$/.test(f.email)) err.email = "E-mail invalide.";
-    if (delivery !== "retrait" && (f.city ?? "").trim().length < 2) err.city = "Indique ta ville.";
-    if (delivery !== "retrait" && (f.address ?? "").trim().length < 4) err.address = "Indique une adresse ou un repère.";
+    const f = Object.fromEntries(new FormData(e.currentTarget)) as Record<string, string | undefined>;
+    const fields: CheckoutFields = { name: f.name ?? "", phone: f.phone ?? "", email: f.email ?? "", city: f.city ?? "", address: f.address ?? "", notes: f.notes ?? "" };
+    const err = checkFields(fields, delivery);
     setErrors(err);
+    setMessage(undefined);
     if (Object.keys(err).length) return;
-    setSending(true);
-    // TODO: POST /orders to the API, then redirect to the payment provider.
-    const order = saveOrder({
-      items,
-      customer: { name: f.name, phone: f.phone, email: f.email || undefined, city: f.city ?? "", address: f.address ?? "", notes: f.notes || undefined },
-      delivery,
-      subtotal,
-      shipping,
-      total: subtotal + shipping,
-    });
-    setTimeout(() => {
+    const lines = items.map(({ productId, color, size, qty, price, preview }) => ({ productId, color, size, qty, price, preview }));
+    startTransition(async () => {
+      const r = await placeOrder({ fields, delivery, lines }).catch(() => null);
+      if (!r) return setMessage("Connexion perdue. Vérifie ton réseau et réessaie.");
+      if (!r.ok) {
+        setErrors(r.errors);
+        setMessage(r.message);
+        return;
+      }
+      setPlaced(true);
       cart.clear();
-      router.push(`/commande/${order.id}`);
-    }, 900);
+      router.push(orderHref(r.reference, r.key));
+    });
   }
 
   if (items.length === 0 && !sending) {
@@ -113,7 +114,7 @@ export function CheckoutView() {
           <section>
             <p className="border-b border-line pb-4 text-[24px] font-semibold tracking-[-0.02em]">Livraison</p>
             <div className="mt-6" role="radiogroup">
-              {(Object.keys(DELIVERY) as (keyof typeof DELIVERY)[]).map((k) => {
+              {DELIVERY_METHODS.map((k) => {
                 const d = DELIVERY[k];
                 const on = delivery === k;
                 return (
@@ -131,8 +132,8 @@ export function CheckoutView() {
               })}
             </div>
             <AnimatePresence initial={false}>
-              {delivery !== "retrait" && (
-                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.6, ease: EASE }} className="overflow-hidden">
+              {delivery !== "RETRAIT" && (
+                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: DUR.base, ease: EASE.out }} className="overflow-hidden">
                   <div className="grid gap-8 pt-8 sm:grid-cols-2">
                     <Field error={errors.city} name="city" label="Ville ou commune" autoComplete="address-level2" />
                     <Field error={errors.address} name="address" label="Adresse ou repère" autoComplete="street-address" />
@@ -175,6 +176,13 @@ export function CheckoutView() {
             <span className="font-semibold">Total</span>
             <motion.span key={subtotal + shipping} initial={{ opacity: 0.4 }} animate={{ opacity: 1 }} className="display text-3xl tabular-nums">{formatFCFA(subtotal + shipping)}</motion.span>
           </div>
+          <AnimatePresence>
+            {message && (
+              <motion.p role="alert" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: DUR.fast, ease: EASE.out }} className="mt-6 text-sm text-danger">
+                {message}
+              </motion.p>
+            )}
+          </AnimatePresence>
           <button disabled={sending} className="btn mt-8 w-full">
             {sending ? <span className="h-4 w-4 animate-spin rounded-full border border-on-ink border-t-transparent" aria-label="Envoi" /> : "Valider la commande"}
           </button>

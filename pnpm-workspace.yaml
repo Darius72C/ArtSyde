@@ -1,3 +1,9 @@
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver
+
+# Prisma downloads its engines on install; tsx needs esbuild's binary.
+onlyBuiltDependencies:
+  - "@prisma/engines"
+  - esbuild
+  - prisma

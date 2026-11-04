@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import "./globals.css";
 import { SmoothScroll } from "@/components/SmoothScroll";
 import { Magnetic } from "@/components/Magnetic";
+import { MotionProvider } from "@/components/MotionProvider";
 
 const display = Inter_Tight({ variable: "--font-display", subsets: ["latin"], weight: ["500", "600", "700"] });
 const body = Inter({ variable: "--font-body", subsets: ["latin"], weight: ["400", "500", "600"] });
@@ -28,7 +29,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <SmoothScroll />
         </Suspense>
         <Magnetic />
-        {children}
+        <MotionProvider>{children}</MotionProvider>
       </body>
     </html>
   );

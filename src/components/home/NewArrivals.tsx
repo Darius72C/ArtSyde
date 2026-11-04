@@ -9,8 +9,7 @@ import { gsap, useGSAP } from "@/lib/gsap";
 import { formatFCFA, PRODUCTS } from "@/lib/products";
 import { ProductImage } from "../ProductImage";
 import { RevealLines, Tilt } from "../Reveal";
-
-const EASE = [0.22, 1, 0.36, 1] as const;
+import { DUR, EASE, STAGGER, VIEWPORT } from "@/lib/motion";
 
 /**
  * New arrivals. Desktop: the section pins and vertical scrolling drives the rail sideways.
@@ -54,8 +53,8 @@ export function NewArrivals() {
             key={p.id}
             initial={{ opacity: 0, x: 80, rotate: 2 }}
             whileInView={{ opacity: 1, x: 0, rotate: 0 }}
-            viewport={{ once: true, margin: "-5%" }}
-            transition={{ duration: 1.1, ease: EASE, delay: i * 0.07 }}
+            viewport={VIEWPORT}
+            transition={{ duration: DUR.reveal, ease: EASE.out, delay: i * STAGGER.item }}
             className="na-card group w-[78vw] shrink-0 sm:w-[340px] md:w-[400px]"
           >
             <Tilt className="tile flex h-full flex-col p-7">
