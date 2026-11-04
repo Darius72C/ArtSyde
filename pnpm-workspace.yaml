@@ -4,6 +4,7 @@ packages:
 
 onlyBuiltDependencies:
   - "@prisma/client"
+  - esbuild
   - "@prisma/engines"
   - prisma
   - sharp
