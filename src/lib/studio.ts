@@ -20,3 +20,12 @@ export const PRINT_QUALITY: Record<PrintQuality, { label: string; dpi: number; p
   ULTRA_HD: { label: "Ultra HD", dpi: 300, px: pxFor(300), view: 3840, credits: 2 },
 };
 export const PRINT_QUALITIES = Object.keys(PRINT_QUALITY) as PrintQuality[];
+
+/**
+ * Width of the free (Standard) download: a watermarked preview, too small to print even if the watermark
+ * were removed. The Standard print file sent with an order keeps its 150 DPI (PRINT_QUALITY.STANDARD.px).
+ */
+export const STANDARD_PREVIEW_PX = 1200;
+
+/** Width of each downloaded image: the preview in Standard, the full file in HD and Ultra HD. */
+export const downloadWidth = (q: PrintQuality) => (q === "STANDARD" ? { print: STANDARD_PREVIEW_PX, view: STANDARD_PREVIEW_PX } : { print: PRINT_QUALITY[q].px, view: PRINT_QUALITY[q].view });

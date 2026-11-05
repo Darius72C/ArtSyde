@@ -8,8 +8,8 @@ import { deleteObject, keyFromPublicUrl, presign, r2Config } from "@/server/r2";
 import { requireAdmin } from "./auth";
 
 /*
- * The home page's hero cards, from /admin/accueil: one image per place (front, left, right), stored on R2
- * under hero/, and optionally a product the card leads to. Every action checks the admin session itself.
+ * The home page's hero cards, from /admin/accueil: ad visuals, one image per place (front, left, right),
+ * stored on R2 under hero/. Every action checks the admin session itself.
  */
 
 const TYPES = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" } as const;
@@ -53,18 +53,6 @@ export async function setHeroImage(slot: number, imageUrl: string): Promise<{ ok
   await db.heroCard.upsert({ where: { slot }, create: { slot, imageUrl }, update: { imageUrl } });
   updateTag(HERO_TAG);
   if (before && before.imageUrl !== imageUrl) await deleteHeroFile(before.imageUrl);
-  return { ok: true };
-}
-
-/** The product a card leads to (its name and price show on the card), or none: the card leads to the shop. */
-export async function setHeroProduct(slot: number, productId: string | null): Promise<{ ok: boolean; message?: string }> {
-  await requireAdmin();
-  if (!validSlot(slot)) return { ok: false, message: "Carte inconnue." };
-  if (productId && !(await db.product.findUnique({ where: { id: productId }, select: { id: true } }))) return { ok: false, message: "Ce modèle n'existe plus." };
-  const card = await db.heroCard.findUnique({ where: { slot } });
-  if (!card) return { ok: false, message: "Ajoute d'abord une image à cette carte." };
-  await db.heroCard.update({ where: { slot }, data: { productId: productId || null } });
-  updateTag(HERO_TAG);
   return { ok: true };
 }
 

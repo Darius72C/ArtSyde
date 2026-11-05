@@ -75,7 +75,7 @@ model ColorStock {
 model HeroCard {
   slot      Int      @id // 0 = devant, 1 = gauche, 2 = droite
   imageUrl  String // image sur R2 (hero/…)
-  // Modèle vers lequel la carte mène, avec son nom et son prix. Sans modèle : la carte mène à la boutique.
+  // Plus utilisé : les cartes sont des visuels de pub, sans lien vers un modèle.
   productId String?
   product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
   updatedAt DateTime @updatedAt

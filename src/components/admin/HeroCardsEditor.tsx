@@ -3,16 +3,15 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { STAGGER } from "@/lib/motion";
-import { clearHeroCard, presignHeroImage, setHeroImage, setHeroProduct } from "@/server/admin/hero";
+import { clearHeroCard, presignHeroImage, setHeroImage } from "@/server/admin/hero";
 import { FadeUp } from "../Reveal";
 
-export type HeroSlotData = { slot: number; image: string | null; productId: string | null };
-export type HeroProductOption = { id: string; name: string; active: boolean };
+export type HeroSlotData = { slot: number; image: string | null };
 
 const PLACES = ["Devant", "À gauche", "À droite"];
 
-/** One card of the home page's hero: its image (uploaded straight to R2), the product it leads to, remove. */
-function SlotEditor({ data, products, configured, delay }: { data: HeroSlotData; products: HeroProductOption[]; configured: boolean; delay: number }) {
+/** One card of the home page's hero, an ad visual: its image (uploaded straight to R2), or remove it. */
+function SlotEditor({ data, configured, delay }: { data: HeroSlotData; configured: boolean; delay: number }) {
   const router = useRouter();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,11 +35,10 @@ function SlotEditor({ data, products, configured, delay }: { data: HeroSlotData;
     setUploading(false);
   }
 
-  const act = (fn: () => Promise<{ ok: boolean; message?: string } | void>) =>
+  const remove = () =>
     startTransition(async () => {
       setError(null);
-      const r = await fn();
-      if (r && !r.ok) setError(r.message ?? "Action impossible.");
+      await clearHeroCard(data.slot);
       router.refresh();
     });
 
@@ -65,26 +63,8 @@ function SlotEditor({ data, products, configured, delay }: { data: HeroSlotData;
         {uploading ? "Envoi…" : data.image ? "Changer l'image" : "Choisir une image"}
       </label>
 
-      <label className="mt-5 block">
-        <span className="mb-1.5 block text-[14px] text-muted">Mène vers</span>
-        <select
-          value={data.productId ?? ""}
-          disabled={!data.image || busy}
-          onChange={(e) => act(() => setHeroProduct(data.slot, e.target.value || null))}
-          className="field disabled:opacity-50"
-        >
-          <option value="">La boutique (sans nom ni prix)</option>
-          {products.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-              {p.active ? "" : " (masqué)"}
-            </option>
-          ))}
-        </select>
-      </label>
-
       {data.image && (
-        <button type="button" disabled={busy} onClick={() => act(() => clearHeroCard(data.slot))} className="mt-5 self-start text-[15px] text-danger hover:underline">
+        <button type="button" disabled={busy} onClick={remove} className="mt-5 self-start text-[15px] text-danger hover:underline">
           Retirer la carte
         </button>
       )}
@@ -98,16 +78,16 @@ function SlotEditor({ data, products, configured, delay }: { data: HeroSlotData;
 }
 
 /** The three hero cards side by side. */
-export function HeroCardsEditor({ slots, products, configured }: { slots: HeroSlotData[]; products: HeroProductOption[]; configured: boolean }) {
+export function HeroCardsEditor({ slots, configured }: { slots: HeroSlotData[]; configured: boolean }) {
   return (
     <div className="space-y-5">
       {!configured && <p className="text-sm text-new">Le stockage n&apos;est pas encore configuré : ajoute les variables R2_* dans .env (voir .env.example), puis relance pnpm dev.</p>}
       <div className="grid gap-5 md:grid-cols-3">
         {slots.map((s, i) => (
-          <SlotEditor key={s.slot} data={s} products={products} configured={configured} delay={i * STAGGER.item} />
+          <SlotEditor key={s.slot} data={s} configured={configured} delay={i * STAGGER.item} />
         ))}
       </div>
-      <p className="text-sm text-muted">JPG, PNG ou WebP, 20 Mo maximum. Format conseillé : vertical (4:5). Une carte sans image prend la photo d&apos;un des derniers modèles.</p>
+      <p className="text-sm text-muted">JPG, PNG ou WebP, 20 Mo maximum. Format conseillé : vertical (4:5). Ce sont des visuels de pub : ni nom, ni prix, ni lien. Une carte sans image prend la photo d&apos;un des derniers modèles.</p>
     </div>
   );
 }

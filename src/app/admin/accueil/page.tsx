@@ -10,25 +10,20 @@ import { r2Config } from "@/server/r2";
 export const metadata: Metadata = { title: "Accueil" };
 
 async function HeroCards() {
-  const r = await load(() =>
-    Promise.all([
-      db.heroCard.findMany(),
-      db.product.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, name: true, active: true } }),
-    ]),
-  );
+  const r = await load(() => db.heroCard.findMany({ select: { slot: true, imageUrl: true } }));
   if (r.problem) return <DbNotice problem={r.problem} />;
-  const [cards, products] = r.data;
+  const cards = r.data;
   const slots = HERO_SLOTS.map((slot) => {
     const c = cards.find((x) => x.slot === slot);
-    return { slot, image: c?.imageUrl ?? null, productId: c?.productId ?? null };
+    return { slot, image: c?.imageUrl ?? null };
   });
-  return <HeroCardsEditor slots={slots} products={products} configured={r2Config() !== null} />;
+  return <HeroCardsEditor slots={slots} configured={r2Config() !== null} />;
 }
 
 export default function Page() {
   return (
     <AdminPage>
-      <PageTitle eyebrow="Accueil" lines={[{ text: "Les cartes de l'accueil.", muted: "En haut de la page." }]} />
+      <PageTitle eyebrow="Accueil" lines={[{ text: "Les visuels de l'accueil.", muted: "En haut de la page." }]} />
       <Suspense fallback={<Loading />}>
         <HeroCards />
       </Suspense>

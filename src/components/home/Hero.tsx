@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useRef } from "react";
 import { motion, useMotionValue, useReducedMotion, useScroll, useSpring, useTransform, type MotionValue } from "motion/react";
-import { formatFCFA, productHref, type Product } from "@/lib/products";
+import type { Product } from "@/lib/products";
 import type { HeroCardView } from "@/server/hero";
 import { RevealLines } from "../Reveal";
 import { DUR, EASE, SPRING, STAGGER } from "@/lib/motion";
 
 /*
- * The hero's cards (up to three): photos of the newest t-shirts of the collection, the newest in front.
+ * The hero's cards (up to three): ad visuals, not product listings: an image each, no name, price or link
+ * (the buttons above lead to the shop and the studio). The front card is the biggest.
  * x: offset from the centre (% of the stage width), r: tilt (deg), s: scale,
  * depth: how far it follows the mouse (the front one most), d: entrance delay (s).
  */
@@ -19,18 +20,18 @@ const SLOTS = [
   { x: 29, r: 8, s: 0.82, z: 1, depth: 0.5, d: 0.6 },
 ] as const;
 
-/**
- * Real photos only, never the illustrated tee: the photos uploaded from the admin (on R2, a full URL) of the
- * newest products, newest first; a product with several photos can fill more than one card. A local path is
- * skipped, it may point to a file this copy of the site doesn't have. No photo at all: no cards.
- */
-/** What a card shows: a photo, and the product's name and price when it leads to one. */
-type Card = { key: string; photo: string; name?: string; price?: number; href: string };
+/** What a card shows: one image. */
+type Card = { key: string; photo: string };
 
+/**
+ * Stand-ins for empty places: real photos only, never the illustrated tee, the ones uploaded from the admin
+ * (on R2, a full URL) of the newest products, newest first. A local path is skipped, it may point to a file
+ * this copy of the site doesn't have.
+ */
 function newest(products: Product[]): Card[] {
   const recent = [...products].reverse(); // the catalogue is oldest first
   return recent
-    .flatMap((p) => p.photos.filter((url) => /^https?:\/\//.test(url)).map((url) => ({ key: url, photo: url, name: p.name, price: p.price, href: productHref(p) })))
+    .flatMap((p) => p.photos.filter((url) => /^https?:\/\//.test(url)).map((url) => ({ key: url, photo: url })))
     .slice(0, SLOTS.length);
 }
 
@@ -43,7 +44,7 @@ function pickCards(set: HeroCardView[], products: Product[]): Card[] {
   const out: Card[] = [];
   for (let slot = 0; slot < SLOTS.length; slot++) {
     const s = set.find((x) => x.slot === slot);
-    const c = s ? { key: s.image, photo: s.image, name: s.name, price: s.price, href: s.href } : fill.shift();
+    const c = s ? { key: s.image, photo: s.image } : fill.shift();
     if (c) out.push(c);
   }
   return out;
@@ -72,26 +73,10 @@ function HeroCard({ card, slot, spread, px, py, still }: { card: Card; slot: (ty
           transition={{ duration: 6 + slot.z, ease: EASE.inOut, repeat: Infinity, delay: slot.d }}
           style={{ rotateX, rotateY }}
         >
-          <Link
-            href={card.href}
-            aria-label={card.name ?? "La boutique"}
-            tabIndex={slot.z === 3 ? 0 : -1}
-            className="group relative block h-full w-full overflow-hidden rounded-[28px] shadow-[0_30px_80px_-20px_rgba(0,0,0,0.45)] ring-1 ring-ink/10 transition-transform duration-500 hover:-translate-y-2"
-          >
+          <div className="h-full w-full overflow-hidden rounded-[28px] shadow-[0_30px_80px_-20px_rgba(0,0,0,0.45)] ring-1 ring-ink/10">
             {/* eslint-disable-next-line @next/next/no-img-element -- photos live on R2, whose public domain is set per deployment */}
-            <img src={card.photo} alt="" loading="eager" fetchPriority={slot.z === 3 ? "high" : "auto"} decoding="async" className="h-full w-full bg-surface object-cover" />
-            {card.name && (
-              <span className="absolute inset-x-3 bottom-3 flex items-center justify-between gap-3 rounded-2xl border border-line/60 bg-[var(--nav)] px-4 py-2.5 text-left backdrop-blur-xl">
-                <span className="min-w-0">
-                  <span className="block truncate text-[15px] font-semibold text-ink">{card.name}</span>
-                  {card.price !== undefined && <span className="block text-[13px] text-muted tabular-nums">{formatFCFA(card.price)}</span>}
-                </span>
-                <span className="arrow shrink-0 text-link transition-transform duration-500 group-hover:translate-x-1" aria-hidden>
-                  ›
-                </span>
-              </span>
-            )}
-          </Link>
+            <img src={card.photo} alt="" draggable={false} loading="eager" fetchPriority={slot.z === 3 ? "high" : "auto"} decoding="async" className="h-full w-full bg-surface object-cover" />
+          </div>
         </motion.div>
       </motion.div>
     </motion.div>
@@ -152,7 +137,7 @@ export function Hero({ products = [], cards: set = [] }: { products?: Product[];
       </motion.div>
 
       {cards.length > 0 && (
-        <motion.div className="relative mx-auto mt-14 aspect-[4/3] max-w-[980px] sm:aspect-[16/9] md:mt-16" style={{ y: lift, scale: shrink }}>
+        <motion.div className="relative mx-auto mt-14 aspect-[4/3] max-w-[980px] sm:aspect-[16/9] md:mt-16" style={{ y: lift, scale: shrink }} aria-hidden>
           {cards.map((c, i) => (
             <HeroCard key={c.key} card={c} slot={SLOTS[i]} spread={spread} px={px} py={py} still={reduce} />
           ))}

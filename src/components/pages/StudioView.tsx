@@ -12,10 +12,11 @@ import { teeState } from "../story/teeState";
 import { ColorPicker } from "../ColorPicker";
 import { fadeUp, RevealLines } from "../Reveal";
 import { DUR, EASE, STAGGER } from "@/lib/motion";
-import { PRINT_QUALITIES, PRINT_QUALITY, PRINT_WIDTH_CM, type PrintQuality } from "@/lib/studio";
+import { PRINT_QUALITIES, PRINT_QUALITY, PRINT_WIDTH_CM, STANDARD_PREVIEW_PX, downloadWidth, type PrintQuality } from "@/lib/studio";
 import { TEE_ASPECT, TEE_PATH_01, teePath2D } from "../story/teeOutline";
 import { teeSnapshot } from "../story/snapshot";
 import { zipFiles } from "@/lib/zip";
+import { embedTrace, protectImage, stampWatermark } from "@/lib/watermark";
 
 const TeeScene = dynamic(() => import("../story/TeeScene"), {
   ssr: false,
@@ -75,42 +76,6 @@ const noop = () => () => {};
 const WATERMARK = `url("data:image/svg+xml,${encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="220" height="140"><text x="110" y="76" text-anchor="middle" transform="rotate(-24 110 70)" font-family="sans-serif" font-size="15" font-weight="600" letter-spacing="2" fill="rgb(128,128,128)" fill-opacity="0.38">ARTSYDE · APERÇU</text></svg>',
 )}")`;
-
-/**
- * The watermark of a Standard (free) download: "ARTSYDE · STANDARD" repeated diagonally across the whole
- * image. HD and Ultra HD, paid with credits, are clean.
- */
-function stampWatermark(ctx: CanvasRenderingContext2D, w: number, h: number) {
-  const size = Math.max(14, Math.round(w / 34));
-  ctx.save();
-  ctx.font = `600 ${size}px sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillStyle = "rgba(128, 128, 128, 0.42)";
-  const stepX = size * 14;
-  const stepY = size * 7;
-  ctx.translate(w / 2, h / 2);
-  ctx.rotate((-24 * Math.PI) / 180);
-  const reach = Math.hypot(w, h) / 2 + stepX;
-  for (let y = -reach, row = 0; y <= reach; y += stepY, row++) {
-    for (let x = -reach + (row % 2) * (stepX / 2); x <= reach; x += stepX) ctx.fillText("ARTSYDE · STANDARD", x, y);
-  }
-  ctx.restore();
-}
-
-/** A downloaded image with the Standard watermark over it. */
-async function watermarked(blob: Blob): Promise<Blob> {
-  const img = await createImageBitmap(blob);
-  const c = Object.assign(document.createElement("canvas"), { width: img.width, height: img.height });
-  const ctx = c.getContext("2d");
-  if (!ctx) throw new Error("canvas too large");
-  ctx.drawImage(img, 0, 0);
-  img.close();
-  stampWatermark(ctx, c.width, c.height);
-  const out = await new Promise<Blob | null>((r) => c.toBlob(r, "image/png"));
-  if (!out) throw new Error("canvas too large");
-  return out;
-}
 
 function Watermark() {
   return <div className="pointer-events-none absolute inset-0" style={{ backgroundImage: WATERMARK, backgroundSize: "220px 140px" }} aria-hidden />;
@@ -250,7 +215,9 @@ function QualityCompare({ side, center, images, current, onPick }: { side: Side;
           return (
             <div key={k} className="flex justify-between gap-3">
               <dt className="text-muted">{q.label}</dt>
-              <dd className="text-right tabular-nums">{q.px.toLocaleString("fr-FR")} × {Math.round(q.px / TEE_ASPECT).toLocaleString("fr-FR")} px · vue 3D {q.view.toLocaleString("fr-FR")} px</dd>
+              <dd className="text-right tabular-nums">
+                {k === "STANDARD" ? `aperçu ${STANDARD_PREVIEW_PX.toLocaleString("fr-FR")} px, filigrane` : `${q.px.toLocaleString("fr-FR")} × ${Math.round(q.px / TEE_ASPECT).toLocaleString("fr-FR")} px · vue 3D ${q.view.toLocaleString("fr-FR")} px`}
+              </dd>
             </div>
           );
         })}
@@ -494,22 +461,28 @@ export function StudioView() {
     };
     // Everything goes into one .zip, so it downloads at once (browsers block or ask about several downloads).
     const files: { name: string; data: Blob }[] = [];
+    // Standard: a watermarked preview, too small to print. HD and Ultra HD: the full files, clean.
+    // All of them carry an invisible trace (date, quality, a random id): see src/lib/watermark.ts.
+    const free = quality === "STANDARD";
+    const size = downloadWidth(quality);
+    const trace = `${new Date().toISOString().slice(0, 10)}|${quality.toLowerCase()}|${Math.random().toString(36).slice(2, 8)}`;
     try {
       // The tee straight on, front then back, whatever angle it has on screen.
       for (const face of ["front", "back"] as const) {
-        const view = await teeSnapshot.current?.(q.view, face);
+        const view = await teeSnapshot.current?.(size.view, face);
         if (!view) throw new Error("3D view unavailable");
-        files.push({ name: `artsyde-vue-${face === "front" ? "devant" : "dos"}-${tag}.png`, data: quality === "STANDARD" ? await watermarked(view) : view });
+        files.push({ name: `artsyde-vue-${face === "front" ? "devant" : "dos"}-${tag}.png`, data: await protectImage(view, { watermark: free, trace }) });
       }
       for (const id of sides) {
-        const c = Object.assign(document.createElement("canvas"), { width: q.px, height: Math.round(q.px / TEE_ASPECT) });
-        const ctx = c.getContext("2d");
+        const c = Object.assign(document.createElement("canvas"), { width: size.print, height: Math.round(size.print / TEE_ASPECT) });
+        const ctx = c.getContext("2d", { willReadFrequently: true });
         if (!ctx) throw new Error("canvas too large");
         paint(ctx, design[id], c.width, c.height, images.current);
-        if (quality === "STANDARD") stampWatermark(ctx, c.width, c.height); // free download: always watermarked
+        if (free) stampWatermark(ctx, c.width, c.height);
+        embedTrace(ctx, c.width, c.height, trace);
         const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/png"));
         if (!blob) throw new Error("canvas too large");
-        files.push({ name: `artsyde-impression-${id === "front" ? "devant" : "dos"}-${tag}.png`, data: blob });
+        files.push({ name: `artsyde-${free ? "apercu" : "impression"}-${id === "front" ? "devant" : "dos"}-${tag}.png`, data: blob });
       }
       save(await zipFiles(files), `artsyde-${tag}.zip`);
       flash(q.credits ? `Visuel ${q.label} téléchargé · ${creditsLabel(q.credits)} utilisé${q.credits > 1 ? "s" : ""}` : "Visuel téléchargé");
@@ -742,12 +715,15 @@ export function StudioView() {
               {PRINT_QUALITIES.map((k) => (
                 <button key={k} onClick={() => setQuality(k)} aria-pressed={quality === k} className={`rounded-xl border px-2 py-2.5 text-sm transition-colors duration-300 ${quality === k ? "border-accent font-medium shadow-[0_0_0_1px_var(--accent)]" : "border-line hover:border-muted"}`}>
                   {PRINT_QUALITY[k].label}
-                  <span className="block text-[11px] font-normal text-muted">{PRINT_QUALITY[k].credits ? creditsLabel(PRINT_QUALITY[k].credits) : "Gratuit · filigrane"}</span>
+                  <span className="block text-[11px] font-normal text-muted">{PRINT_QUALITY[k].credits ? creditsLabel(PRINT_QUALITY[k].credits) : "Aperçu gratuit"}</span>
                 </button>
               ))}
             </div>
             <p className="mt-3 text-xs text-muted">
-              Le t-shirt en 3D vu de face et de dos ({q.view.toLocaleString("fr-FR")} px), et le fichier d&apos;impression à {q.dpi} DPI ({q.px.toLocaleString("fr-FR")} × {Math.round(q.px / TEE_ASPECT).toLocaleString("fr-FR")} px). C&apos;est aussi la qualité du fichier d&apos;impression envoyé avec ta commande{q.credits ? ` : ${creditsLabel(q.credits)} à l'ajout au panier` : ""}.
+              {quality === "STANDARD"
+                ? `Un aperçu de ${STANDARD_PREVIEW_PX.toLocaleString("fr-FR")} px avec filigrane : le t-shirt en 3D de face et de dos, et ton design. Pour un fichier imprimable, choisis HD ou Ultra HD.`
+                : `Le t-shirt en 3D vu de face et de dos (${q.view.toLocaleString("fr-FR")} px), et le fichier d'impression à ${q.dpi} DPI (${q.px.toLocaleString("fr-FR")} × ${Math.round(q.px / TEE_ASPECT).toLocaleString("fr-FR")} px), sans filigrane.`}{" "}
+              La qualité choisie est aussi celle du fichier d&apos;impression envoyé avec ta commande{q.credits ? ` : ${creditsLabel(q.credits)} à l'ajout au panier` : ""}.
             </p>
             <button type="button" onClick={() => setCompare((v) => !v)} aria-expanded={compare} className="link-line mt-3 !text-[15px]">
               {compare ? "Masquer la comparaison" : "Voir la différence entre les qualités"} <span className="arrow">›</span>
