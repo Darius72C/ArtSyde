@@ -4,9 +4,9 @@ import { FadeUp } from "./Reveal";
 
 const COLS = [
   { t: "Boutique", l: [["Tous les t-shirts", "/#boutique"], ["Nouveautés", "/#nouveautes"], ["Studio 3D", "/studio"], ["Panier", "/panier"]] },
-  { t: "Aide", l: [["Livraison", "/#aide"], ["Guide des tailles", "/#aide"], ["Suivi de commande", "/connexion"], ["Contact", "#"]] },
-  { t: "Compte", l: [["Se connecter", "/connexion"], ["Créer un compte", "/connexion"], ["Crédits studio", "/credits"]] },
-  { t: "ArtSyde", l: [["L'atelier", "#"], ["Équipes et associations", "/#equipes"], ["Mentions légales", "#"], ["Conditions de vente", "#"]] },
+  { t: "Aide", l: [["Livraison", "/livraison"], ["Guide des tailles", "/guide-des-tailles"], ["Suivi de commande", "/suivi"], ["Questions fréquentes", "/#aide"], ["Contact", "/contact"]] },
+  { t: "Compte", l: [["Se connecter", "/connexion"], ["Mon compte", "/compte"], ["Crédits studio", "/credits"]] },
+  { t: "ArtSyde", l: [["L'atelier", "/atelier"], ["Équipes et associations", "/#equipes"], ["Mentions légales", "/mentions-legales"], ["Conditions de vente", "/conditions-de-vente"], ["Conditions d'utilisation", "/conditions-d-utilisation"]] },
 ];
 
 export function Footer() {

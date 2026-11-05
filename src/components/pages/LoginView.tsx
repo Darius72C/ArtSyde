@@ -198,6 +198,13 @@ export function LoginView({ google = false, next = "/compte", failed = false }: 
                   <button disabled={status !== "idle"} className="btn w-full">
                     {status === "loading" ? <span className="h-4 w-4 animate-spin rounded-full border border-on-ink border-t-transparent" aria-label="Chargement" /> : mode === "login" ? "Se connecter" : "Créer mon compte"}
                   </button>
+                  <p className="text-center text-xs text-muted">
+                    En continuant, avec Google ou ton e-mail, tu acceptes nos{" "}
+                    <a href="/conditions-d-utilisation" className="underline underline-offset-2 hover:text-ink">
+                      conditions d&apos;utilisation
+                    </a>
+                    .
+                  </p>
                 </form>
               </motion.div>
             )}

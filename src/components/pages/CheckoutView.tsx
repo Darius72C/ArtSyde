@@ -187,6 +187,13 @@ export function CheckoutView() {
           <button disabled={sending} className="btn mt-8 w-full">
             {sending ? <span className="h-4 w-4 animate-spin rounded-full border border-on-ink border-t-transparent" aria-label="Envoi" /> : "Valider la commande"}
           </button>
+          <p className="mt-4 text-center text-xs text-muted">
+            En validant, tu acceptes nos{" "}
+            <Link href="/conditions-de-vente" className="underline underline-offset-2 hover:text-ink">
+              conditions de vente
+            </Link>
+            .
+          </p>
           <Link href="/panier" className="mt-5 block text-center text-sm text-muted underline-offset-4 hover:text-ink hover:underline">Modifier le panier</Link>
         </aside>
       </form>
