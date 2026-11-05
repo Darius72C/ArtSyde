@@ -8,6 +8,28 @@ import { PRINT_QUALITIES, type PrintQuality } from "@/lib/studio";
 import { available } from "@/lib/stock";
 import { readStockNow } from "@/server/stock";
 import { customerFor } from "@/server/account";
+import { keyFromPublicUrl, r2Config } from "@/server/r2";
+
+/** A studio piece's print files: only links to our own storage (designs/), one per side at most. */
+function printFiles(files: unknown, quality: PrintQuality): Prisma.CustomDesignCreateWithoutOrderItemInput[] {
+  const cfg = r2Config();
+  if (!cfg || !Array.isArray(files)) return [];
+  const out: Prisma.CustomDesignCreateWithoutOrderItemInput[] = [];
+  for (const f of files.slice(0, 2)) {
+    const side = f?.side === "front" || f?.side === "back" ? (f.side as "front" | "back") : null;
+    const url = typeof f?.url === "string" ? f.url : "";
+    if (!side || out.some((o) => (o.placement as { side?: string }).side === side)) continue;
+    if (!keyFromPublicUrl(cfg, url)?.startsWith("designs/")) continue;
+    out.push({
+      layer: side === "front" ? 0 : 1,
+      fileUrl: url,
+      fileName: `${side === "front" ? "devant" : "dos"}-${quality.toLowerCase()}.png`,
+      mimeType: "image/png",
+      placement: { side, quality },
+    });
+  }
+  return out;
+}
 
 /*
  * Places an order from the checkout. Anyone can POST here, so nothing from the browser is
@@ -46,7 +68,7 @@ export async function placeOrder(input: CheckoutInput): Promise<PlaceOrderResult
   }
 
   // Recompute every line from the catalogue.
-  const items: { productId: string | null; size: Size; color: string; quantity: number; unitPriceXof: number; previewUrl: string | null; printQuality: PrintQuality | null }[] = [];
+  const items: { productId: string | null; size: Size; color: string; quantity: number; unitPriceXof: number; previewUrl: string | null; printQuality: PrintQuality | null; customDesigns?: { create: Prisma.CustomDesignCreateWithoutOrderItemInput[] } }[] = [];
   for (const l of lines) {
     const size = Object.values(Size).find((s) => s === l?.size);
     const quantity = Number(l?.qty);
@@ -54,12 +76,14 @@ export async function placeOrder(input: CheckoutInput): Promise<PlaceOrderResult
     if (!size || !Number.isInteger(quantity) || quantity < 1 || quantity > MAX_QTY) return { ok: false, errors: {}, message: CART_CHANGED };
 
     if (l.productId === null) {
-      // Studio piece: front only, or front and back. The design itself is not sent yet.
+      // Studio piece: front only, or front and back, with its print files.
       const price = Number(l.price);
       if (!HEX.test(color) || !STUDIO_PRICES.includes(price)) return { ok: false, errors: {}, message: CART_CHANGED };
       const preview = typeof l.preview === "string" && l.preview.startsWith("data:image/") && l.preview.length <= MAX_PREVIEW ? l.preview : null;
       const printQuality = PRINT_QUALITIES.find((q) => q === l.quality) ?? "STANDARD";
-      items.push({ productId: null, size, color, quantity, unitPriceXof: price, previewUrl: preview, printQuality });
+      // The print files sent from the studio (front, back): the workshop prints from these.
+      const designs = printFiles(l.files, printQuality);
+      items.push({ productId: null, size, color, quantity, unitPriceXof: price, previewUrl: preview, printQuality, ...(designs.length ? { customDesigns: { create: designs } } : {}) });
     } else {
       const p = catalogue.find((x) => x.id === l.productId);
       const known = p?.colors.find((c) => c.toLowerCase() === color.toLowerCase());

@@ -68,7 +68,7 @@ export function CheckoutView() {
     setErrors(err);
     setMessage(undefined);
     if (Object.keys(err).length) return;
-    const lines = items.map(({ productId, color, size, qty, price, preview, quality }) => ({ productId, color, size, qty, price, preview, quality }));
+    const lines = items.map(({ productId, color, size, qty, price, preview, quality, files }) => ({ productId, color, size, qty, price, preview, quality, files }));
     startTransition(async () => {
       const r = await placeOrder({ fields, delivery, lines }).catch(() => null);
       if (!r) return setMessage("Connexion perdue. Vérifie ton réseau et réessaie.");

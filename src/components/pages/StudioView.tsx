@@ -9,6 +9,7 @@ import { TEE_COLORS } from "@/lib/data";
 import { cart, SIZES } from "@/lib/cart";
 import { available, type StockMap } from "@/lib/stock";
 import { getMyCredits, refundCredits, spendCredits, type MyCredits } from "@/server/my-credits";
+import { presignDesignFile } from "@/server/design-upload";
 import { STUDIO_PRICE, formatFCFA } from "@/lib/products";
 import { teeState } from "../story/teeState";
 import { ColorPicker } from "../ColorPicker";
@@ -279,6 +280,7 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
   const [gate, setGate] = useState<"signin" | "empty" | null>(null);
   const [quality, setQuality] = useState<PrintQuality>("STANDARD");
   const [exporting, setExporting] = useState(false);
+  const [adding, setAdding] = useState<string | null>(null); // progress of the print files going to the workshop
   const [compare, setCompare] = useState(false);
   const preview = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
@@ -468,9 +470,37 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
     setDesign((d) => ({ ...d, [side]: { ...d[side], text: { ...(d[side].text ?? { ...DEFAULT_TEXT, value: "" }), color } } }));
 
   // An HD / Ultra HD print file costs its credits once per design added, whatever the quantity.
+  // Adding to the cart sends the print files to the workshop's storage first: each printed side drawn at the
+  // chosen quality, without watermark. The order carries their links; the admin downloads them to print.
   const addToCart = async () => {
     if (!orderable) return flash(teeTracked ? `Épuisé en ${size} dans cette couleur : choisis une autre taille` : "Cette couleur n'est pas en stock : choisis une teinte en stock pour commander");
+    const sides = (["front", "back"] as SideId[]).filter((id) => hasContent(design[id]));
+    if (!sides.length) return flash("Ajoute une image ou un texte avant de commander");
+    if (adding) return;
     if (!(await spend(q.credits, "HD_PREVIEW"))) return;
+    const files: { side: "front" | "back"; url: string }[] = [];
+    try {
+      for (const [i, id] of sides.entries()) {
+        setAdding(`Fichier d'impression ${i + 1} sur ${sides.length}…`);
+        const c = Object.assign(document.createElement("canvas"), { width: q.px, height: Math.round(q.px / TEE_ASPECT) });
+        const ctx = c.getContext("2d");
+        if (!ctx) throw new Error("canvas too large");
+        paint(ctx, design[id], c.width, c.height, images.current);
+        const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/png"));
+        if (!blob) throw new Error("canvas too large");
+        const signed = await presignDesignFile({ side: id, size: blob.size });
+        if (!signed.ok) throw new Error(signed.message);
+        const put = await fetch(signed.uploadUrl, { method: "PUT", headers: { "Content-Type": "image/png" }, body: blob });
+        if (!put.ok) throw new Error(`upload ${put.status}`);
+        files.push({ side: id, url: signed.publicUrl });
+      }
+    } catch (err) {
+      console.error("Print files upload failed", err);
+      setAdding(null);
+      if (q.credits) refundCredits(q.credits).then((r) => r.ok && setCredits((c) => (c?.signedIn ? { ...c, balance: r.balance } : c)));
+      return flash("Le fichier d'impression n'a pas pu être envoyé : vérifie ta connexion et réessaie");
+    }
+    setAdding(null);
     const gl = stage.current?.querySelector("canvas");
     let thumb: string | undefined;
     if (gl) {
@@ -480,7 +510,7 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
       thumb = c.toDataURL("image/png");
     }
     const name = quality === "STANDARD" ? "T-shirt personnalisé" : `T-shirt personnalisé · ${q.label}`;
-    cart.add({ key: `custom-${Date.now()}`, productId: null, name, price, color: teeHex, size, qty, preview: thumb, bg: "#e7e0d3", quality });
+    cart.add({ key: `custom-${Date.now()}`, productId: null, name, price, color: teeHex, size, qty, preview: thumb, bg: "#e7e0d3", quality, files });
     flash(q.credits ? `Ajouté au panier · ${creditsLabel(q.credits)} utilisé${q.credits > 1 ? "s" : ""}` : "Ajouté au panier");
   };
 
@@ -805,7 +835,20 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
               </motion.p>
             </div>
             <p className="mt-2 text-right text-xs text-muted">{hasBack ? `Devant et dos (+${formatFCFA(BACK_PRICE)})` : "Impression devant"}</p>
-            <button onClick={addToCart} disabled={!orderable} className="btn mt-6 w-full">{orderable ? `Ajouter au panier${q.credits ? ` · ${creditsLabel(q.credits)}` : ""}` : teeTracked ? `Épuisé en ${size}` : "Couleur pas en stock"}</button>
+            <button onClick={addToCart} disabled={!orderable || Boolean(adding)} className="btn mt-6 w-full">
+              {adding ? (
+                <>
+                  <span className="h-4 w-4 animate-spin rounded-full border border-on-ink border-t-transparent" aria-hidden />
+                  {adding}
+                </>
+              ) : orderable ? (
+                `Ajouter au panier${q.credits ? ` · ${creditsLabel(q.credits)}` : ""}`
+              ) : teeTracked ? (
+                `Épuisé en ${size}`
+              ) : (
+                "Couleur pas en stock"
+              )}
+            </button>
           </div>
         </motion.aside>
       </div>

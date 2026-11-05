@@ -17,6 +17,7 @@ export type CartItem = {
   photo?: string; // the product's first photo, when it has one
   preview?: string; // small data-URL thumbnail for custom designs
   quality?: PrintQuality; // custom designs: print file quality chosen in the studio
+  files?: { side: "front" | "back"; url: string }[]; // custom designs: the print files, on R2 (sent with the order)
 };
 
 const STORAGE = "cart:v1";

@@ -89,17 +89,20 @@ export async function OrderDetailView({ params }: { params: Promise<{ reference:
                     </div>
                     <p className="whitespace-nowrap text-sm tabular-nums">{formatFCFA(it.unitPriceXof * it.quantity)}</p>
                   </div>
-                  {it.customDesigns.length > 0 && (
-                    <ul className="mt-3 space-y-1 text-sm">
+                  {it.customDesigns.length > 0 ? (
+                    <ul className="mt-3 flex flex-wrap gap-3 text-sm">
                       {it.customDesigns.map((f) => (
                         <li key={f.id}>
-                          <a href={f.fileUrl} target="_blank" rel="noreferrer" className="text-link hover:underline">
-                            Calque {f.layer + 1} · {f.fileName}
+                          {/* The studio's print file, at the quality ordered, without watermark: what the workshop prints. */}
+                          <a href={f.fileUrl} target="_blank" rel="noreferrer" download={`${o.reference}-${f.fileName}`} className="inline-flex items-center gap-2 rounded-full border border-line px-3.5 py-1.5 text-link transition-colors hover:border-accent">
+                            <span aria-hidden>↓</span> Fichier d&apos;impression · {f.layer === 0 ? "Devant" : f.layer === 1 ? "Dos" : `Calque ${f.layer + 1}`}
                           </a>
                           {f.notes && <span className="text-muted"> · {f.notes}</span>}
                         </li>
                       ))}
                     </ul>
+                  ) : (
+                    !it.productId && <p className="mt-3 text-sm text-new">Pas de fichier d&apos;impression avec cette création : contacte le client pour récupérer son design.</p>
                   )}
                 </div>
               </li>
