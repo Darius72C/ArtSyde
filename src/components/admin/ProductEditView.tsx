@@ -45,14 +45,14 @@ export async function ProductEditView({ params, searchParams }: { params: Promis
     <>
       <PageTitle
         eyebrow={isNew ? "Nouveau modèle" : justCreated ? "Modèle créé : ajoute ses photos" : p!.active ? "En ligne dans la boutique" : "Masqué de la boutique"}
-        lines={[isNew ? { text: "Nouveau modèle.", muted: "Les photos viennent après." } : { text: `${p!.name}.`, muted: formatFCFA(p!.priceXof) }]}
+        lines={[isNew ? { text: "Nouveau modèle.", muted: configured ? "Fiche et images." : "Les photos viennent après." } : { text: `${p!.name}.`, muted: formatFCFA(p!.priceXof) }]}
         aside={back}
       />
       <div className="grid items-start gap-5 lg:grid-cols-[1.2fr_1fr]">
         <FadeUp className="tile p-8 md:p-10">
           <p className="text-[21px] font-semibold">Fiche</p>
           <div className="mt-8">
-            <ProductForm product={product} />
+            <ProductForm product={product} uploads={configured} />
           </div>
         </FadeUp>
         <FadeUp delay={STAGGER.item} className="tile p-8 md:p-10">
@@ -69,7 +69,7 @@ export async function ProductEditView({ params, searchParams }: { params: Promis
             ) : (
               <div className="flex items-center gap-5">
                 <ProductImage color="#F4F2EC" bg="var(--bg)" className="aspect-[4/5] w-20 shrink-0" zoom={false} />
-                <p className="text-muted">Crée le modèle d&apos;abord, puis ajoute ses photos ici.</p>
+                <p className="text-muted">{configured ? "Choisis les photos et les mockups dans la fiche : ils sont envoyés à la création. L’impression 3D se règle ensuite ici." : "Crée le modèle d’abord, puis ajoute ses photos ici."}</p>
               </div>
             )}
           </div>

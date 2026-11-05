@@ -16,13 +16,19 @@ import { requireAdmin } from "./auth";
  * on its next request.
  */
 
-export type ProductFormState = { errors?: Partial<Record<"name" | "price" | "oldPrice" | "colors" | "sizes", string>>; message?: string; saved?: boolean };
+export type ProductFormState = {
+  errors?: Partial<Record<"name" | "price" | "oldPrice" | "colors" | "sizes", string>>;
+  message?: string;
+  saved?: boolean;
+  /** The new product's id, when the form still has photos to upload before leaving (`then=upload`). */
+  created?: string;
+};
 
 // Any tee colour the workshop offers, picked with the colour selector: a #rrggbb code each.
 const HEX = /^#[0-9a-f]{6}$/;
 const MAX_COLORS = 24;
 const PHOTO_TYPES = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" } as const;
-const MAX_PHOTO = 8 * 1024 * 1024; // 8 Mo
+const MAX_PHOTO = 20 * 1024 * 1024; // 20 Mo
 const MAX_PHOTOS = 12;
 
 const price = (v: FormDataEntryValue | null) => {
@@ -70,7 +76,11 @@ export async function saveProduct(_prev: ProductFormState, form: FormData): Prom
     return { message: "Le modèle n'a pas pu être enregistré. Réessaie." };
   }
   updateTag(CATALOG_TAG);
-  if (created) redirect(`/admin/produits/${created}?nouveau=1`);
+  if (created) {
+    // Photos picked in the form are uploaded by the browser now that the product exists; it then opens the product.
+    if (form.get("then") === "upload") return { saved: true, created };
+    redirect(`/admin/produits/${created}?nouveau=1`);
+  }
   return { saved: true };
 }
 
@@ -113,7 +123,7 @@ export async function presignPhoto(productId: string, file: { type: string; size
   const ext = PHOTO_TYPES[file?.type as keyof typeof PHOTO_TYPES];
   if (!ext) return { ok: false, message: "Format accepté : JPG, PNG ou WebP." };
   const size = Number(file?.size);
-  if (!Number.isInteger(size) || size <= 0 || size > MAX_PHOTO) return { ok: false, message: "8 Mo maximum par image." };
+  if (!Number.isInteger(size) || size <= 0 || size > MAX_PHOTO) return { ok: false, message: "20 Mo maximum par image." };
   if (kind === "print") {
     if (!(await db.product.findUnique({ where: { id: productId }, select: { id: true } }))) return { ok: false, message: "Ce modèle n'existe plus." };
   } else {

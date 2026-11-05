@@ -1,12 +1,15 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Field } from "../pages/CheckoutView";
 import { ColorPicker } from "../ColorPicker";
 import { TEE_COLORS } from "@/lib/data";
 import { DUR, EASE, SPRING } from "@/lib/motion";
 import { saveProduct, type ProductFormState } from "@/server/admin/products";
+import { uploadMedia } from "./uploadMedia";
 
 export type EditableProduct = { id: string; name: string; priceXof: number; oldPriceXof: number | null; tag: string | null; colors: string[]; sizes: string[]; active: boolean };
 
@@ -32,18 +35,108 @@ function FieldError({ children }: { children?: string }) {
 
 const colorName = (hex: string) => TEE_COLORS.find((c) => c.hex.toLowerCase() === hex)?.name ?? hex.toUpperCase();
 
-/** Name, prices, label, colours, sizes and visibility of one product. Empty `product.id` creates one. */
-export function ProductForm({ product }: { product: EditableProduct }) {
+type Pending = { photos: File[]; flats: File[] };
+const PICK = { photos: { label: "Photos", note: "La première est celle de la boutique." }, flats: { label: "Mockups", note: "Le design posé à plat (onglet Mockup)." } } as const;
+const MAX_FILES = 12;
+const MAX_SIZE = 20 * 1024 * 1024; // same limit as the server (presignPhoto)
+
+/** New product only: photos and mockups picked now, uploaded right after the product is created. */
+function PendingPicker({ kind, files, onChange, disabled }: { kind: keyof Pending; files: File[]; onChange: (f: File[]) => void; disabled: boolean }) {
+  const urls = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files]);
+  useEffect(() => () => urls.forEach((u) => URL.revokeObjectURL(u)), [urls]);
+  const w = PICK[kind];
+  return (
+    <fieldset>
+      <legend className="mb-3 text-[14px] text-muted">
+        {w.label} <span className="text-muted/80">· {w.note}</span>
+      </legend>
+      {files.length > 0 && (
+        <ul className="mb-4 grid grid-cols-4 gap-3 sm:grid-cols-5">
+          {files.map((f, i) => (
+            <li key={urls[i]} className="relative">
+              {/* eslint-disable-next-line @next/next/no-img-element -- a local preview */}
+              <img src={urls[i]} alt={f.name} className="aspect-[4/5] w-full rounded-xl bg-bg object-cover" />
+              <button type="button" onClick={() => onChange(files.filter((_, j) => j !== i))} aria-label={`Retirer ${f.name}`} className="absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-bg/90 text-[13px] text-ink shadow transition-colors hover:text-danger">
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <label className={`btn-outline cursor-pointer ${disabled || files.length >= MAX_FILES ? "pointer-events-none opacity-50" : ""}`}>
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          multiple
+          disabled={disabled}
+          className="sr-only"
+          onChange={(ev) => {
+            const picked = [...(ev.target.files ?? [])].filter((f) => /^image\/(jpeg|png|webp)$/.test(f.type) && f.size <= MAX_SIZE);
+            onChange([...files, ...picked].slice(0, MAX_FILES));
+            ev.target.value = "";
+          }}
+        />
+        {files.length ? `Ajouter d'autres ${w.label.toLowerCase()}` : `Choisir des ${w.label.toLowerCase()}`}
+      </label>
+    </fieldset>
+  );
+}
+
+/**
+ * Name, prices, label, colours, sizes and visibility of one product. Empty `product.id` creates one; then
+ * photos and mockups can be picked in the same form (`uploads`: R2 is configured): they are uploaded once the
+ * product exists, and the admin lands on the product with everything in place.
+ */
+export function ProductForm({ product, uploads = false }: { product: EditableProduct; uploads?: boolean }) {
   const [state, action, pending] = useActionState<ProductFormState, FormData>(saveProduct, {});
   const e = state.errors ?? {};
   const isNew = !product.id;
+  const router = useRouter();
+  const [files, setFiles] = useState<Pending>({ photos: [], flats: [] });
+  const [sending, setSending] = useState<{ done: number; total: number; failed: string[] } | null>(null);
+  const toSend = files.photos.length + files.flats.length;
+
+  // Once the product is created: upload what was picked, one file after the other, then open the product.
+  useEffect(() => {
+    const id = state.created;
+    if (!id) return;
+    let stop = false;
+    (async () => {
+      const queue = [...files.photos.map((f) => ["photos", f] as const), ...files.flats.map((f) => ["flats", f] as const)];
+      const failed: string[] = [];
+      for (const [i, [kind, file]] of queue.entries()) {
+        if (stop) return;
+        setSending({ done: i, total: queue.length, failed });
+        try {
+          await uploadMedia(id, file, kind);
+        } catch (err) {
+          failed.push(`${file.name} : ${err instanceof Error ? err.message : "envoi impossible."}`);
+        }
+      }
+      if (stop) return;
+      setSending({ done: queue.length, total: queue.length, failed });
+      if (!failed.length) router.push(`/admin/produits/${id}?nouveau=1`);
+    })();
+    return () => {
+      stop = true;
+    };
+    // Runs once per created product; the files are the ones picked when it was submitted.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.created]);
   // Colours: any tint, chosen with the same colour selector as the studio. Each one is sent as a hidden "colors" field.
   const [colors, setColors] = useState(() => [...new Set(product.colors.map((c) => c.toLowerCase()))]);
   const [draft, setDraft] = useState(TEE_COLORS[0].hex.toLowerCase());
   const hasDraft = colors.includes(draft);
 
   return (
-    <form action={action} noValidate className="space-y-8">
+    <form
+      action={(fd) => {
+        if (isNew && toSend) fd.set("then", "upload");
+        action(fd);
+      }}
+      noValidate
+      className="space-y-8"
+    >
       <input type="hidden" name="id" value={product.id} />
       <Field name="name" label="Nom du modèle" defaultValue={product.name} error={e.name} maxLength={80} />
       <div className="grid gap-8 sm:grid-cols-2">
@@ -113,23 +206,58 @@ export function ProductForm({ product }: { product: EditableProduct }) {
         <FieldError>{e.sizes}</FieldError>
       </fieldset>
 
+      {isNew && uploads && (
+        <div className="space-y-8 border-t border-line pt-8">
+          <PendingPicker kind="photos" files={files.photos} onChange={(photos) => setFiles((f) => ({ ...f, photos }))} disabled={pending || Boolean(sending)} />
+          <PendingPicker kind="flats" files={files.flats} onChange={(flats) => setFiles((f) => ({ ...f, flats }))} disabled={pending || Boolean(sending)} />
+          <p className="text-sm text-muted">JPG, PNG ou WebP, 20 Mo maximum. Elles sont envoyées à la création du modèle ; l&apos;impression 3D se règle ensuite sur sa page.</p>
+        </div>
+      )}
+
       <label className="flex cursor-pointer items-center gap-3 text-[15px]">
         <input type="checkbox" name="active" defaultChecked={product.active} className="h-5 w-5 accent-[var(--accent)]" />
         En ligne dans la boutique
       </label>
 
       <div className="flex flex-wrap items-center gap-6 border-t border-line pt-8">
-        <button disabled={pending} className="btn">
-          {pending ? <span className="h-4 w-4 animate-spin rounded-full border border-on-ink border-t-transparent" aria-label="Enregistrement" /> : isNew ? "Créer le modèle" : "Enregistrer"}
+        <button disabled={pending || Boolean(sending && !sending.failed.length)} className="btn">
+          {pending || (sending && sending.done < sending.total) ? (
+            <span className="h-4 w-4 animate-spin rounded-full border border-on-ink border-t-transparent" aria-label="Enregistrement" />
+          ) : isNew ? (
+            toSend ? `Créer le modèle avec ${toSend} image${toSend > 1 ? "s" : ""}` : "Créer le modèle"
+          ) : (
+            "Enregistrer"
+          )}
         </button>
+        {sending && (
+          <p role="status" className={`text-sm ${sending.failed.length && sending.done === sending.total ? "text-danger" : "text-muted"}`}>
+            {sending.done < sending.total
+              ? `Modèle créé. Envoi des images… ${sending.done + 1} sur ${sending.total}`
+              : sending.failed.length
+                ? `Modèle créé, mais ${sending.failed.length} image${sending.failed.length > 1 ? "s n'ont" : " n'a"} pas pu être envoyée${sending.failed.length > 1 ? "s" : ""}.`
+                : "Modèle créé avec ses images."}
+          </p>
+        )}
         <AnimatePresence>
-          {(state.saved || state.message) && !pending && (
+          {(state.saved || state.message) && !pending && !sending && (
             <motion.p key={state.message ?? "ok"} role="status" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: DUR.fast, ease: EASE.out }} className={`text-sm ${state.message ? "text-danger" : "text-ok"}`}>
               {state.message ?? "Enregistré. La boutique est à jour."}
             </motion.p>
           )}
         </AnimatePresence>
       </div>
+      {sending && sending.done === sending.total && sending.failed.length > 0 && state.created && (
+        <div role="alert" className="space-y-2 text-sm">
+          {sending.failed.map((f) => (
+            <p key={f} className="text-danger">
+              {f}
+            </p>
+          ))}
+          <Link href={`/admin/produits/${state.created}?nouveau=1`} className="link-line !text-[15px]">
+            Ouvrir le modèle pour réessayer <span className="arrow">›</span>
+          </Link>
+        </div>
+      )}
     </form>
   );
 }

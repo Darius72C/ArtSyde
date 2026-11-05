@@ -130,7 +130,7 @@ export function Print3DEditor({ productId, initial, colors, configured }: { prod
             Retirer l&apos;image
           </button>
         )}
-        <span className="text-sm text-muted">PNG transparent conseillé, 8 Mo maximum.</span>
+        <span className="text-sm text-muted">PNG transparent conseillé, 20 Mo maximum.</span>
       </div>
       {!configured && <p className="text-sm text-new">Le stockage n&apos;est pas encore configuré : ajoute les variables R2_* dans .env (voir .env.example), puis relance pnpm dev.</p>}
 

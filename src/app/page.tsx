@@ -21,7 +21,7 @@ export default async function Home() {
       <PageTransition>
       <div>
       <main>
-        <Hero />
+        <Hero products={products} />
         <ScrollStory />
         <NewArrivals products={products} />
         <Bento />

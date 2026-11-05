@@ -15,6 +15,7 @@ import { DUR, EASE, STAGGER } from "@/lib/motion";
 import { PRINT_QUALITIES, PRINT_QUALITY, PRINT_WIDTH_CM, type PrintQuality } from "@/lib/studio";
 import { TEE_ASPECT, TEE_PATH_01, teePath2D } from "../story/teeOutline";
 import { teeSnapshot } from "../story/snapshot";
+import { zipFiles } from "@/lib/zip";
 
 const TeeScene = dynamic(() => import("../story/TeeScene"), {
   ssr: false,
@@ -333,7 +334,7 @@ export function StudioView() {
     const files = [...(list ?? [])];
     if (!files.length) return;
     if (files.some((f) => !/^image\/(png|jpeg|webp)$/.test(f.type))) return flash("Format accepté : PNG, JPG ou WEBP");
-    if (files.some((f) => f.size > 15 * 1024 * 1024)) return flash("Image trop lourde (15 Mo max)");
+    if (files.some((f) => f.size > 20 * 1024 * 1024)) return flash("Image trop lourde (20 Mo max)");
     const room = MAX_IMAGES - design[side].images.length;
     if (room <= 0) return flash(`${MAX_IMAGES} images maximum par face`);
     const take = files.slice(0, room);
@@ -455,12 +456,14 @@ export function StudioView() {
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 2000);
     };
+    // Everything goes into one .zip, so it downloads at once (browsers block or ask about several downloads).
+    const files: { name: string; data: Blob }[] = [];
     try {
       // The tee straight on, front then back, whatever angle it has on screen.
       for (const face of ["front", "back"] as const) {
         const view = await teeSnapshot.current?.(q.view, face);
         if (!view) throw new Error("3D view unavailable");
-        save(view, `artsyde-vue-${face === "front" ? "devant" : "dos"}-${tag}.png`);
+        files.push({ name: `artsyde-vue-${face === "front" ? "devant" : "dos"}-${tag}.png`, data: view });
       }
       for (const id of sides) {
         const c = Object.assign(document.createElement("canvas"), { width: q.px, height: Math.round(q.px / TEE_ASPECT) });
@@ -469,10 +472,12 @@ export function StudioView() {
         paint(ctx, design[id], c.width, c.height, images.current);
         const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/png"));
         if (!blob) throw new Error("canvas too large");
-        save(blob, `artsyde-${id === "front" ? "devant" : "dos"}-${tag}.png`);
+        files.push({ name: `artsyde-impression-${id === "front" ? "devant" : "dos"}-${tag}.png`, data: blob });
       }
+      save(await zipFiles(files), `artsyde-${tag}.zip`);
       flash(q.credits ? `Visuel ${q.label} téléchargé · ${creditsLabel(q.credits)} utilisé${q.credits > 1 ? "s" : ""}` : "Visuel téléchargé");
-    } catch {
+    } catch (err) {
+      console.error("Studio export failed", err);
       if (q.credits) setTokens((t) => t + q.credits);
       flash(quality === "STANDARD" ? "Trop lourd pour cet appareil : essaie depuis un ordinateur" : "Trop lourd pour cet appareil : choisis une qualité plus basse");
     } finally {

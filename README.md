@@ -127,7 +127,7 @@ Elles sont toutes listées et commentées dans [`.env.example`](.env.example). L
    ]
    ```
 
-Les clés ne quittent jamais le serveur : le navigateur envoie chaque photo directement à R2 avec un lien signé, valable uniquement pour un fichier JPG, PNG ou WebP de 8 Mo maximum.
+Les clés ne quittent jamais le serveur : le navigateur envoie chaque photo directement à R2 avec un lien signé, valable uniquement pour un fichier JPG, PNG ou WebP de 20 Mo maximum.
 
 ## Organisation du code
 
@@ -144,7 +144,7 @@ src/
   components/
     home/                sections de l'accueil
     pages/               vues des pages (studio, panier, commande, crédits…)
-    story/               3D : scène du studio, t-shirts du héros, modèle, silhouette
+    story/               3D : scène du studio, modèle, silhouette
     admin/               écrans de l'admin
     Reveal.tsx           apparitions au défilement (titres, blocs, compteurs…)
     Magnetic.tsx         effets des boutons (attraction, onde au clic)

@@ -105,12 +105,12 @@ export function TeeIllustration({ color, art, className }: { color: string; art?
  * Product visual: the product's photo when it has one (uploaded from the admin), else sand backdrop + tee.
  * `fit="contain"` shows the whole photo (the product page); the default fills the frame and crops it.
  */
-export function ProductImage({ color, art, bg = "var(--sand)", className = "", zoom = true, photo, alt = "", fit = "cover" }: { color: string; art?: Art | string; bg?: string; className?: string; zoom?: boolean; photo?: string; alt?: string; fit?: "cover" | "contain" }) {
+export function ProductImage({ color, art, bg = "var(--sand)", className = "", zoom = true, photo, alt = "", fit = "cover", eager = false }: { color: string; art?: Art | string; bg?: string; className?: string; zoom?: boolean; photo?: string; alt?: string; fit?: "cover" | "contain"; eager?: boolean }) {
   return (
     <div className={`relative overflow-hidden ${className}`} style={{ background: bg }}>
       {photo ? (
         // eslint-disable-next-line @next/next/no-img-element -- photos live on R2, whose public domain is set per deployment
-        <img src={photo} alt={alt} loading="lazy" decoding="async" className={`absolute inset-0 h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"} ${zoom ? "zoom-img" : ""}`} />
+        <img src={photo} alt={alt} loading={eager ? "eager" : "lazy"} fetchPriority={eager ? "high" : undefined} decoding="async" className={`absolute inset-0 h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"} ${zoom ? "zoom-img" : ""}`} />
       ) : (
         <TeeIllustration color={color} art={art} className={`absolute inset-[8%] h-[84%] w-[84%] ${zoom ? "zoom-img" : ""}`} />
       )}

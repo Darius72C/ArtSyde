@@ -24,7 +24,8 @@ export function ScrollStory() {
   useEffect(() => {
     const el = root.current;
     if (!el) return;
-    const io = new IntersectionObserver(([e]) => e.isIntersecting && (setNear(true), io.disconnect()), { rootMargin: "40% 0px" });
+    // Well ahead (one and a half screens), so the model is loaded and compiled before the tee shows.
+    const io = new IntersectionObserver(([e]) => e.isIntersecting && (setNear(true), io.disconnect()), { rootMargin: "150% 0px" });
     io.observe(el);
     return () => io.disconnect();
   }, []);
@@ -45,9 +46,13 @@ export function ScrollStory() {
           scrollTrigger: {
             trigger: root.current,
             start: "top top",
-            end: "+=300%",
+            end: "+=320%",
             pin: true,
-            scrub: 0.8,
+            // No extra lag here: Lenis already smooths the scroll and the 3D tee eases towards its angle.
+            // Stacking a scrub delay on top made the tee trail, then catch up in jolts.
+            scrub: true,
+            anticipatePin: 1, // no jump as the section locks in place when scrolling fast
+            invalidateOnRefresh: true,
             onUpdate: (self) => bars.forEach((b, i) => gsap.set(b, { scaleX: Math.min(1, Math.max(0, self.progress * 3 - i)) })),
           },
         });
@@ -59,8 +64,9 @@ export function ScrollStory() {
           .to(teeState, { design: 1, scale: 1.08, duration: 1 }, 2.8)
           .to(steps[1], { autoAlpha: 0, y: -40, duration: 0.4 }, 4.4)
           .to(steps[2], { autoAlpha: 1, y: 0, duration: 0.4 }, 4.8)
-          .to(teeState, { rotY: -0.2 + Math.PI * 2, scale: 1, duration: 1.8, ease: "power1.inOut" }, 4.6)
-          .to({}, { duration: 0.6 });
+          // The last full turn over a longer stretch of scroll, so it reads as a turn, not a spin.
+          .to(teeState, { rotY: -0.2 + Math.PI * 2, scale: 1, duration: 2.6, ease: "power1.inOut" }, 4.6)
+          .to({}, { duration: 0.4 });
         return () => tl.scrollTrigger?.kill();
       });
       mm.add("(prefers-reduced-motion: reduce)", () => {

@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Environment, Float, Lightformer } from "@react-three/drei";
+import { Environment, Float, Lightformer, Preload } from "@react-three/drei";
 import { TEE_COLORS } from "@/lib/data";
 import { cubicBezier } from "motion/react";
 import { DUR, EASE } from "@/lib/motion";
@@ -76,7 +76,9 @@ function Tee({ front: frontCanvas, back: backCanvas, play }: Props & { play: Pla
       frontTex.needsUpdate = true;
       backTex.needsUpdate = true;
     }
-    const k = 1 - Math.exp(-dt * 6); // frame-rate independent smoothing
+    // Frame-rate independent smoothing. dt is capped: after the scene was paused off screen, the first
+    // frame can carry seconds of delay, which made the tee snap to its angle in one go.
+    const k = 1 - Math.exp(-Math.min(dt, 0.05) * 6);
     // Fit the tee to the visible width and height (world units, with room for the float),
     // so it never overflows nor runs into the copy above it.
     const fit = Math.min(1, (viewport.width * 0.78) / (TEE_WIDTH + 0.4), (viewport.height * 0.86) / (TEE_HEIGHT + 0.2));
@@ -214,6 +216,9 @@ export default function TeeScene(props: Props) {
       {/* The model streams in; the entrance plays once it is there. */}
       <Suspense fallback={null}>
         <Tee {...props} play={play} />
+        {/* Once the model is in: compile its shaders and upload its textures now, not on the first
+            visible frame (that froze the page for a moment as the tee came on screen). */}
+        <Preload all />
       </Suspense>
       {props.preserve && <SnapshotBridge />}
     </Canvas>

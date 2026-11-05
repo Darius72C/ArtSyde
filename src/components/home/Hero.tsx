@@ -1,46 +1,109 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRef } from "react";
-import { motion, useReducedMotion } from "motion/react";
-import { gsap, useGSAP } from "@/lib/gsap";
+import { motion, useMotionValue, useReducedMotion, useScroll, useSpring, useTransform, type MotionValue } from "motion/react";
+import { formatFCFA, productHref, type Product } from "@/lib/products";
+import { ProductImage } from "../ProductImage";
 import { RevealLines } from "../Reveal";
-import { heroState } from "../story/heroState";
-import { DUR, EASE, STAGGER } from "@/lib/motion";
+import { DUR, EASE, SPRING, STAGGER } from "@/lib/motion";
 
-// The three real 3D tees (WebGL, browser only). They fade in once the model has loaded.
-const HeroTees = dynamic(() => import("../story/HeroTees"), { ssr: false, loading: () => null });
+/*
+ * The hero's three cards: the newest t-shirts of the collection, the newest in front.
+ * x: offset from the centre (% of the stage width), r: tilt (deg), s: scale,
+ * depth: how far it follows the mouse (the front one most), d: entrance delay (s).
+ */
+const SLOTS = [
+  { x: 0, r: 0, s: 1, z: 3, depth: 1, d: 0.35 },
+  { x: -29, r: -8, s: 0.82, z: 2, depth: 0.5, d: 0.5 },
+  { x: 29, r: 8, s: 0.82, z: 1, depth: 0.5, d: 0.6 },
+] as const;
 
-export function Hero() {
-  const root = useRef<HTMLElement>(null);
-  const reduce = useReducedMotion();
-  useGSAP(
-    () => {
-      const mm = gsap.matchMedia();
-      mm.add("(prefers-reduced-motion: no-preference)", () => {
-        // On scroll, the side tees tuck in behind the centre one and everything lifts.
-        gsap.fromTo(heroState, { spread: 1 }, { spread: 0.7, ease: "none", scrollTrigger: { trigger: root.current, start: "top top", end: "bottom top", scrub: true } });
-        gsap.to(".hero-stage", { yPercent: -8, scale: 0.96, ease: "none", scrollTrigger: { trigger: root.current, start: "top top", end: "bottom top", scrub: true } });
-      });
-    },
-    { scope: root },
+/**
+ * The newest products first: those with a photo uploaded from the admin (on R2, a full URL) before the
+ * others, whose illustration stands in. A local path may point to a file this copy of the site doesn't have.
+ */
+function newest(products: Product[]) {
+  const recent = [...products].reverse(); // the catalogue is oldest first
+  const uploaded = (p: Product) => Boolean(p.photo && /^https?:\/\//.test(p.photo));
+  return [...recent.filter(uploaded), ...recent.filter((p) => !uploaded(p))].slice(0, SLOTS.length).map((p) => (uploaded(p) ? p : { ...p, photo: undefined }));
+}
+
+function HeroCard({ p, slot, spread, px, py, still }: { p: Product; slot: (typeof SLOTS)[number]; spread: MotionValue<number>; px: MotionValue<number>; py: MotionValue<number>; still: boolean }) {
+  // On scroll the side cards tuck in behind the front one; the mouse moves each by its depth.
+  const left = useTransform(spread, (s) => `${50 + slot.x * s}%`);
+  const x = useTransform(px, (v) => v * 18 * slot.depth);
+  const y = useTransform(py, (v) => v * 10 * slot.depth);
+  const rotateY = useTransform(px, (v) => v * 7 * slot.depth);
+  const rotateX = useTransform(py, (v) => -v * 5 * slot.depth);
+
+  return (
+    <motion.div className="absolute top-1/2 h-[92%] [perspective:1200px]" style={{ left, zIndex: slot.z, x, y, aspectRatio: "4 / 5", translateX: "-50%", translateY: "-50%" }}>
+      <motion.div
+        className="h-full w-full"
+        initial={{ opacity: 0, y: 90, rotate: 0, scale: slot.s * 0.9 }}
+        animate={{ opacity: 1, y: 0, rotate: slot.r, scale: slot.s }}
+        transition={{ duration: DUR.hero, ease: EASE.out, delay: slot.d }}
+      >
+        {/* A slow float, out of step from card to card. */}
+        <motion.div
+          className="h-full w-full"
+          animate={still ? undefined : { y: [0, -10, 0] }}
+          transition={{ duration: 6 + slot.z, ease: EASE.inOut, repeat: Infinity, delay: slot.d }}
+          style={{ rotateX, rotateY }}
+        >
+          <Link
+            href={productHref(p)}
+            tabIndex={slot.z === 3 ? 0 : -1}
+            className="group relative block h-full w-full overflow-hidden rounded-[28px] shadow-[0_30px_80px_-20px_rgba(0,0,0,0.45)] ring-1 ring-ink/10 transition-transform duration-500 hover:-translate-y-2"
+          >
+            <ProductImage color={p.colors[0]} art={p.art} photo={p.photo} alt={p.name} bg={p.bg} className="h-full w-full" eager />
+            <span className="absolute inset-x-3 bottom-3 flex items-center justify-between gap-3 rounded-2xl border border-line/60 bg-[var(--nav)] px-4 py-2.5 text-left backdrop-blur-xl">
+              <span className="min-w-0">
+                <span className="block truncate text-[15px] font-semibold text-ink">{p.name}</span>
+                <span className="block text-[13px] text-muted tabular-nums">{formatFCFA(p.price)}</span>
+              </span>
+              <span className="arrow shrink-0 text-link transition-transform duration-500 group-hover:translate-x-1" aria-hidden>
+                ›
+              </span>
+            </span>
+          </Link>
+        </motion.div>
+      </motion.div>
+    </motion.div>
   );
+}
+
+/** `products` (the catalogue, from the database) give the hero its cards: the newest t-shirts. */
+export function Hero({ products = [] }: { products?: Product[] }) {
+  const root = useRef<HTMLElement>(null);
+  const reduce = Boolean(useReducedMotion());
+  const cards = newest(products);
+
+  // Scroll: from the top of the hero to its end, the fan closes a little and the stage lifts.
+  const { scrollYProgress } = useScroll({ target: root, offset: ["start start", "end start"] });
+  const spread = useTransform(scrollYProgress, [0, 1], [1, reduce ? 1 : 0.72]);
+  const lift = useTransform(scrollYProgress, [0, 1], ["0%", reduce ? "0%" : "-8%"]);
+  const shrink = useTransform(scrollYProgress, [0, 1], [1, reduce ? 1 : 0.96]);
+  const rawX = useMotionValue(0);
+  const rawY = useMotionValue(0);
+  const px = useSpring(rawX, SPRING.follow);
+  const py = useSpring(rawY, SPRING.follow);
 
   return (
     <section
       ref={root}
       className="overflow-hidden px-5 pb-16 pt-14 text-center md:pt-20"
       onPointerMove={(e) => {
-        // The tees follow the mouse in depth (mouse only, off with reduced motion).
+        // The cards follow the mouse in depth (mouse only, off with reduced motion).
         if (reduce || e.pointerType !== "mouse") return;
         const r = e.currentTarget.getBoundingClientRect();
-        heroState.px = ((e.clientX - r.left) / r.width) * 2 - 1;
-        heroState.py = ((e.clientY - r.top) / r.height) * 2 - 1;
+        rawX.set(((e.clientX - r.left) / r.width) * 2 - 1);
+        rawY.set(((e.clientY - r.top) / r.height) * 2 - 1);
       }}
       onPointerLeave={() => {
-        heroState.px = 0;
-        heroState.py = 0;
+        rawX.set(0);
+        rawY.set(0);
       }}
     >
       <motion.p className="eyebrow" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DUR.slow, ease: EASE.out }}>
@@ -64,9 +127,13 @@ export function Hero() {
         </Link>
       </motion.div>
 
-      <div className="hero-stage relative mx-auto mt-14 aspect-[16/9] max-w-[980px] md:mt-16" aria-hidden>
-        <HeroTees />
-      </div>
+      {cards.length > 0 && (
+        <motion.div className="relative mx-auto mt-14 aspect-[4/3] max-w-[980px] sm:aspect-[16/9] md:mt-16" style={{ y: lift, scale: shrink }}>
+          {cards.map((p, i) => (
+            <HeroCard key={p.id} p={p} slot={SLOTS[i]} spread={spread} px={px} py={py} still={reduce} />
+          ))}
+        </motion.div>
+      )}
     </section>
   );
 }

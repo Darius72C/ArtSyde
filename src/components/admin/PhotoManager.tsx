@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { DUR, EASE, SPRING } from "@/lib/motion";
-import { addPhoto, movePhoto, presignPhoto, removePhoto } from "@/server/admin/products";
+import { movePhoto, removePhoto } from "@/server/admin/products";
+import { uploadMedia } from "./uploadMedia";
 
 /** The words of each list: the shop's photos, or the flat mockups (the "Mockup" tab). */
 const WORDS = {
@@ -30,12 +31,7 @@ export function PhotoManager({ productId, photos, configured, name, kind = "phot
     setUploading(files.length);
     for (const file of Array.from(files)) {
       try {
-        const signed = await presignPhoto(productId, { type: file.type, size: file.size }, kind);
-        if (!signed.ok) throw new Error(signed.message);
-        const put = await fetch(signed.uploadUrl, { method: "PUT", headers: { "Content-Type": signed.contentType }, body: file });
-        if (!put.ok) throw new Error(`L'envoi vers le stockage a échoué (${put.status}). Vérifie la règle CORS du bucket.`);
-        const added = await addPhoto(productId, signed.publicUrl, kind);
-        if (!added.ok) throw new Error(added.message);
+        await uploadMedia(productId, file, kind);
       } catch (e) {
         setError(`${file.name} : ${e instanceof Error ? e.message : "envoi impossible."}`);
       }
@@ -85,7 +81,7 @@ export function PhotoManager({ productId, photos, configured, name, kind = "phot
           <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={!configured || uploading > 0} onChange={(e) => upload(e.target.files)} className="sr-only" />
           {uploading ? `Envoi… (${uploading})` : w.add}
         </label>
-        <span className="text-sm text-muted">JPG, PNG ou WebP, 8 Mo maximum. {w.note}</span>
+        <span className="text-sm text-muted">JPG, PNG ou WebP, 20 Mo maximum. {w.note}</span>
       </div>
       {!configured && <p className="mt-4 text-sm text-new">Le stockage n&apos;est pas encore configuré : ajoute les variables R2_* dans .env (voir .env.example), puis relance pnpm dev.</p>}
       {error && (
