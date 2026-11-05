@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageShell } from "@/components/PageShell";
-import { Fact, InfoPage, InfoSection } from "@/components/pages/InfoPage";
-import { COMPANY } from "@/lib/company";
+import { InfoPage, InfoSection } from "@/components/pages/InfoPage";
+import { COMPANY, filled } from "@/lib/company";
 import { DELIVERY, DELIVERY_METHODS } from "@/lib/orders";
 import { formatFCFA } from "@/lib/products";
 
@@ -33,14 +33,16 @@ export default function Page() {
 
         <InfoSection title="Retrait à l'atelier">
           <p>Gratuit. Quand ta commande est prête, son suivi passe à « Prête à l&apos;atelier » et tu peux venir la chercher avec ta référence de commande.</p>
-          <ul>
-            <li>
-              Adresse : <Fact value={COMPANY.address} />, {COMPANY.city}
-            </li>
-            <li>
-              Horaires : <Fact value={COMPANY.hours} />
-            </li>
-          </ul>
+          {(filled(COMPANY.address) || filled(COMPANY.hours)) && (
+            <ul>
+              {filled(COMPANY.address) && (
+                <li>
+                  Adresse : {COMPANY.address}, {COMPANY.city}
+                </li>
+              )}
+              {filled(COMPANY.hours) && <li>Horaires : {COMPANY.hours}</li>}
+            </ul>
+          )}
         </InfoSection>
 
         <InfoSection title="À la réception">

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PageShell } from "@/components/PageShell";
 import { Fact, InfoPage, InfoSection } from "@/components/pages/InfoPage";
-import { COMPANY, LEGAL_UPDATED } from "@/lib/company";
+import { COMPANY, LEGAL_UPDATED, filled } from "@/lib/company";
 import { PAYMENT_METHODS } from "@/lib/credits";
 import { DELIVERY, DELIVERY_METHODS } from "@/lib/orders";
 import { formatFCFA } from "@/lib/products";
@@ -23,7 +23,8 @@ export default function Page() {
       >
         <InfoSection title="1. Le vendeur">
           <p>
-            Les ventes sont conclues avec <Fact value={COMPANY.legalName} />, RCCM <Fact value={COMPANY.rccm} />, dont l&apos;atelier se trouve <Fact value={COMPANY.address} />, {COMPANY.city}, {COMPANY.country}. Contact : <Fact value={COMPANY.email} />.
+            Les ventes sont conclues avec <Fact value={COMPANY.legalName} fallback={COMPANY.brand} />
+            {filled(COMPANY.rccm) && <>, RCCM {COMPANY.rccm}</>}, dont l&apos;atelier se trouve à {filled(COMPANY.address) ? `${COMPANY.address}, ${COMPANY.city}` : COMPANY.city}, {COMPANY.country}. Pour nous joindre : <Fact value={COMPANY.email} fallback={<Link href="/contact">la page Contact</Link>} />.
           </p>
         </InfoSection>
 
@@ -86,7 +87,7 @@ export default function Page() {
 
         <InfoSection title="11. Réclamations et litiges">
           <p>
-            Pour toute réclamation, écris-nous à <Fact value={COMPANY.email} />. Nous cherchons d&apos;abord une solution amiable. Ces conditions sont soumises au droit ivoirien ; à défaut d&apos;accord, le litige relève des tribunaux compétents d&apos;{COMPANY.city}.
+            Pour toute réclamation, écris-nous (<Fact value={COMPANY.email} fallback={<Link href="/contact">page Contact</Link>} />). Nous cherchons d&apos;abord une solution amiable. Ces conditions sont soumises au droit ivoirien ; à défaut d&apos;accord, le litige relève des tribunaux compétents d&apos;{COMPANY.city}.
           </p>
         </InfoSection>
       </InfoPage>

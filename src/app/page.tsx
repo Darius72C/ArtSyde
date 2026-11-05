@@ -1,5 +1,6 @@
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { WhatsAppButton } from "@/components/WhatsAppButton";
 import { PageTransition } from "@/components/PageShell";
 import { Hero } from "@/components/home/Hero";
 import { ScrollStory } from "@/components/home/ScrollStory";
@@ -35,6 +36,7 @@ export default async function Home() {
       <Footer />
       </div>
       </PageTransition>
+      <WhatsAppButton />
     </>
   );
 }

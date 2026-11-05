@@ -18,7 +18,7 @@ export default function Page() {
       >
         <InfoSection title="1. Le site">
           <p>
-            Le site est édité par <Fact value={COMPANY.legalName} /> (voir les <Link href="/mentions-legales">mentions légales</Link>). Il permet de découvrir et commander nos t-shirts, de créer le tien dans le studio 3D et de gérer ton compte. Les achats suivent nos <Link href="/conditions-de-vente">conditions de vente</Link>.
+            Le site est édité par <Fact value={COMPANY.legalName} fallback={COMPANY.brand} /> (voir les <Link href="/mentions-legales">mentions légales</Link>). Il permet de découvrir et commander nos t-shirts, de créer le tien dans le studio 3D et de gérer ton compte. Les achats suivent nos <Link href="/conditions-de-vente">conditions de vente</Link>.
           </p>
         </InfoSection>
 
@@ -60,7 +60,7 @@ export default function Page() {
 
         <InfoSection title="6. Données personnelles">
           <p>
-            Le responsable du traitement est <Fact value={COMPANY.legalName} />. Nous traitons tes données conformément à la loi ivoirienne n° 2013-450 du 19 juin 2013 relative à la protection des données à caractère personnel.
+            Le responsable du traitement est <Fact value={COMPANY.legalName} fallback={COMPANY.brand} />. Nous traitons tes données conformément à la loi ivoirienne n° 2013-450 du 19 juin 2013 relative à la protection des données à caractère personnel.
           </p>
           <ul>
             <li>
@@ -76,7 +76,7 @@ export default function Page() {
               <b>Combien de temps</b> : tant que ton compte est ouvert, puis le temps imposé par nos obligations légales (notamment comptables) pour les commandes.
             </li>
             <li>
-              <b>Tes droits</b> : tu peux demander l&apos;accès à tes données, leur correction ou leur suppression, et t&apos;opposer à un traitement, en écrivant à <Fact value={COMPANY.email} />. Tu peux aussi saisir l&apos;ARTCI, autorité de protection des données en Côte d&apos;Ivoire.
+              <b>Tes droits</b> : tu peux demander l&apos;accès à tes données, leur correction ou leur suppression, et t&apos;opposer à un traitement, en nous écrivant (<Fact value={COMPANY.email} fallback={<Link href="/contact">page Contact</Link>} />). Tu peux aussi saisir l&apos;ARTCI, autorité de protection des données en Côte d&apos;Ivoire.
             </li>
           </ul>
         </InfoSection>

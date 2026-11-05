@@ -15,9 +15,9 @@ export const INFO_PAGES = [
   { href: "/conditions-d-utilisation", label: "Conditions d'utilisation" },
 ] as const;
 
-/** A value from COMPANY, or a visible "à compléter" while it hasn't been filled in. */
-export function Fact({ value }: { value: string }) {
-  return filled(value) ? <>{value}</> : <span className="rounded bg-new/15 px-1.5 text-new">à compléter</span>;
+/** A value from COMPANY, or `fallback` (nothing by default) while it hasn't been filled in. */
+export function Fact({ value, fallback = null }: { value: string; fallback?: ReactNode }) {
+  return filled(value) ? <>{value}</> : <>{fallback}</>;
 }
 
 /** One titled section of an information page. */

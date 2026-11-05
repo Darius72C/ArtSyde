@@ -78,7 +78,10 @@ export function AccountView({ name, email, credits, orders }: { name: string; em
           <Link href="/studio" className="mt-5 block text-center text-sm text-muted underline-offset-4 hover:text-ink hover:underline">
             Ouvrir le studio
           </Link>
-          <button type="button" onClick={signOut} disabled={leaving} className="mt-8 w-full border-t border-line pt-6 text-[15px] text-danger hover:underline disabled:opacity-50">
+          <Link href="/compte/parametres" className="mt-8 block border-t border-line pt-6 text-center text-[15px] text-link hover:underline">
+            Paramètres du compte
+          </Link>
+          <button type="button" onClick={signOut} disabled={leaving} className="mt-4 w-full text-[15px] text-danger hover:underline disabled:opacity-50">
             {leaving ? "Déconnexion…" : "Se déconnecter"}
           </button>
         </FadeUp>

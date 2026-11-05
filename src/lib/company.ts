@@ -20,8 +20,8 @@ export const COMPANY = {
   country: "Côte d'Ivoire",
   email: TODO,
   phone: TODO,
-  /** WhatsApp number in international format without + or spaces (e.g. 2250700000000), or "" for none. */
-  whatsapp: "",
+  /** WhatsApp Business: the shop's chat link (wa.me/message/… or wa.me/<number>), or "" for none. */
+  whatsapp: "https://wa.me/message/X6J6AFAIGRTAC1",
   /** Opening hours of the workshop for pickup. */
   hours: TODO,
   /** Person responsible for the site's content (directeur de la publication). */

@@ -1,6 +1,7 @@
 import { ViewTransition } from "react";
 import { Header } from "./Header";
 import { Footer } from "./Footer";
+import { WhatsAppButton } from "./WhatsAppButton";
 
 /** Animated page body: the old page sinks and fades, the new one rises in (see globals.css). */
 export function PageTransition({ children }: { children: React.ReactNode }) {
@@ -22,6 +23,8 @@ export function PageShell({ children, footer = true }: { children: React.ReactNo
           {footer && <Footer />}
         </div>
       </PageTransition>
+      {/* Full-screen tools (the studio, sign-in) have no footer and no floating button. */}
+      {footer && <WhatsAppButton />}
     </>
   );
 }

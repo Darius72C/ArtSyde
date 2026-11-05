@@ -1,10 +1,11 @@
 import Link from "next/link";
+import { COMPANY } from "@/lib/company";
 import { STAGGER } from "@/lib/motion";
 import { FadeUp } from "./Reveal";
 
 const COLS = [
   { t: "Boutique", l: [["Tous les t-shirts", "/#boutique"], ["Nouveautés", "/#nouveautes"], ["Studio 3D", "/studio"], ["Panier", "/panier"]] },
-  { t: "Aide", l: [["Livraison", "/livraison"], ["Guide des tailles", "/guide-des-tailles"], ["Suivi de commande", "/suivi"], ["Questions fréquentes", "/#aide"], ["Contact", "/contact"]] },
+  { t: "Aide", l: [["Livraison", "/livraison"], ["Guide des tailles", "/guide-des-tailles"], ["Suivi de commande", "/suivi"], ["Questions fréquentes", "/#aide"], ["Contact", "/contact"], ...(COMPANY.whatsapp ? [["WhatsApp", COMPANY.whatsapp]] : [])] },
   { t: "Compte", l: [["Se connecter", "/connexion"], ["Mon compte", "/compte"], ["Crédits studio", "/credits"]] },
   { t: "ArtSyde", l: [["L'atelier", "/atelier"], ["Équipes et associations", "/#equipes"], ["Mentions légales", "/mentions-legales"], ["Conditions de vente", "/conditions-de-vente"], ["Conditions d'utilisation", "/conditions-d-utilisation"]] },
 ];
