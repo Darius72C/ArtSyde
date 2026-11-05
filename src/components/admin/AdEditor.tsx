@@ -73,7 +73,9 @@ export function AdEditor({ initial, configured, onDone }: { initial: AdBanner | 
     <div className="space-y-8 rounded-2xl border border-line p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-[17px] font-semibold">{initial ? ad.title || "Bannière" : "Nouvelle bannière"}</p>
-        <span className={`text-sm ${initial && initial.enabled && initial.image ? "text-ok" : "text-muted"}`}>{!initial ? "Pas encore enregistrée" : initial.enabled && initial.image ? "En ligne" : "Masquée"}</span>
+        <span className={`text-sm ${initial && initial.image && (initial.enabled || initial.email) ? "text-ok" : "text-muted"}`}>
+          {!initial ? "Pas encore enregistrée" : [initial.enabled && initial.image ? "En ligne" : "Masquée sur le site", initial.email && initial.image ? "dans les e-mails" : ""].filter(Boolean).join(" · ")}
+        </span>
       </div>
 
       <label className="block max-w-md">
@@ -101,6 +103,13 @@ export function AdEditor({ initial, configured, onDone }: { initial: AdBanner | 
       <label className="flex cursor-pointer items-center gap-3 text-[15px]">
         <input type="checkbox" checked={ad.enabled} onChange={(e) => set({ enabled: e.target.checked })} className="h-5 w-5 accent-[var(--accent)]" />
         Afficher la bannière sur le site
+      </label>
+      <label className="-mt-4 flex cursor-pointer items-start gap-3 text-[15px]">
+        <input type="checkbox" checked={Boolean(ad.email)} onChange={(e) => set({ email: e.target.checked })} className="mt-0.5 h-5 w-5 accent-[var(--accent)]" />
+        <span>
+          Afficher aussi dans les e-mails
+          <span className="block text-sm text-muted">Sous le contenu des e-mails envoyés aux clients (bienvenue…), avec son lien. Une seule bannière par e-mail : la première de la liste.</span>
+        </span>
       </label>
 
       <div className="flex flex-wrap items-center gap-4">
@@ -145,7 +154,7 @@ export function AdEditor({ initial, configured, onDone }: { initial: AdBanner | 
             </button>
           )
         )}
-        {r && (r.ok || !r.field) && <p role="status" className={`text-sm ${r.ok ? "text-ok" : "text-danger"}`}>{r.ok ? (ad.enabled ? "Enregistré : la bannière est en ligne." : "Enregistré : la bannière est masquée.") : r.message}</p>}
+        {r && (r.ok || !r.field) && <p role="status" className={`text-sm ${r.ok ? "text-ok" : "text-danger"}`}>{r.ok ? (ad.enabled ? "Enregistré : la bannière est en ligne." : ad.email ? "Enregistré : la bannière est dans les e-mails, pas sur le site." : "Enregistré : la bannière est masquée.") : r.message}</p>}
       </div>
     </div>
   );

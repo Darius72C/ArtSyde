@@ -4,8 +4,11 @@ import { useState, useTransition } from "react";
 import { sendTestWelcome, type TestEmailResult } from "@/server/admin/emails";
 import { Field } from "../pages/CheckoutView";
 
-/** The e-mail as received (in a frame, phone or computer width), and sending a test to oneself. */
-export function EmailPreview({ subject, html, configured }: { subject: string; html: string; configured: boolean }) {
+/**
+ * The e-mail as received (in a frame, phone or computer width), and sending a test to oneself.
+ * `test`: what sends it (the welcome e-mail with its saved words by default).
+ */
+export function EmailPreview({ subject, html, configured, test = sendTestWelcome }: { subject: string; html: string; configured: boolean; test?: (to: string) => Promise<TestEmailResult> }) {
   const [width, setWidth] = useState<"desktop" | "mobile">("desktop");
   const [r, setR] = useState<TestEmailResult | null>(null);
   const [pending, start] = useTransition();
@@ -34,7 +37,7 @@ export function EmailPreview({ subject, html, configured }: { subject: string; h
         onSubmit={(e) => {
           e.preventDefault();
           const to = String(new FormData(e.currentTarget).get("to") ?? "");
-          start(async () => setR(await sendTestWelcome(to).catch(() => ({ ok: false, message: "Connexion perdue. Réessaie." }))));
+          start(async () => setR(await test(to).catch(() => ({ ok: false, message: "Connexion perdue. Réessaie." }))));
         }}
         className="flex flex-wrap items-end gap-6 rounded-2xl border border-line p-6"
       >

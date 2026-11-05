@@ -23,6 +23,8 @@ export type WelcomeTexts = {
   step3Text: string;
   helpTitle: string;
   helpText: string;
+  /** The opening photo (R2, uploaded in the editor); empty: the home page's first card. */
+  image: string;
 };
 
 export const WELCOME_KEY = "email.welcome";
@@ -47,6 +49,7 @@ export const DEFAULT_WELCOME: WelcomeTexts = {
   step3Text: "Imprimé dans notre atelier, livré chez toi ou à retirer.",
   helpTitle: "Une question ?",
   helpText: "Une taille, un design, une commande d'équipe : écris-nous, on te répond vite.",
+  image: "",
 };
 
 /** The fields as the admin form shows them, in order, with their label and size. */
@@ -56,6 +59,7 @@ export const WELCOME_FIELDS: { key: keyof WelcomeTexts; label: string; long?: bo
   { key: "eyebrow", label: "Petit titre (orange)", max: 60 },
   { key: "title", label: "Grand titre", max: 80 },
   { key: "intro", label: "Introduction", long: true, max: 400 },
+  { key: "image", label: "Photo d'ouverture", max: 500 },
   { key: "giftBadge", label: "Étiquette du cadeau", max: 40 },
   { key: "giftTitle", label: "Cadeau : titre (après le nombre de crédits)", max: 60 },
   { key: "giftText", label: "Cadeau : texte", long: true, max: 200 },

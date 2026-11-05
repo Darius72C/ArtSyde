@@ -6,7 +6,7 @@ import { after } from "next/server";
 import { db } from "@/server/db";
 import { sendEmail } from "@/server/email/send";
 import { welcomeEmail, welcomeTexts } from "@/server/email/welcome";
-import { emailImage } from "@/server/email/image";
+import { emailAd, emailImage } from "@/server/email/image";
 import { logActivity, logError } from "@/server/log";
 
 /** Studio credits given once to every new account. */
@@ -60,7 +60,7 @@ export const auth = betterAuth({
             await logError("linkCustomer", e, { userId: user.id }); // the account works; the customer is linked on the next visit
           }
           // The welcome e-mail, sent after the response so sign-up isn't slowed down (skipped until Brevo is set up).
-          const send = async () => sendEmail(welcomeEmail({ name: user.name, email: user.email, credits: SIGNUP_CREDITS, image: await emailImage(), texts: await welcomeTexts() }));
+          const send = async () => sendEmail(welcomeEmail({ name: user.name, email: user.email, credits: SIGNUP_CREDITS, image: await emailImage(), texts: await welcomeTexts(), ad: await emailAd() }));
           try {
             after(send);
           } catch {

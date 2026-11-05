@@ -44,6 +44,8 @@ export async function getPublicOrder(reference: string, key: string | undefined)
       };
     }),
     subtotal: o.subtotalXof,
+    promoCode: o.promoCode,
+    discount: o.discountXof,
     shipping: o.deliveryXof,
     total: o.totalXof,
   };

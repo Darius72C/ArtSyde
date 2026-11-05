@@ -19,6 +19,8 @@ export type AdBanner = {
   url?: string;
   /** Text colour over the image: light for a dark image, dark for a light one. */
   tone?: "light" | "dark";
+  /** Also shown in the e-mails sent to customers (under their content), whether or not it's on the site. */
+  email?: boolean;
 };
 
 /** The places a banner can go, as the admin's list shows them. Each one is an <AdSlot> in the site. */
@@ -40,6 +42,9 @@ export const PLACEMENT_KEYS = Object.keys(PLACEMENTS) as Placement[];
 export const ADS_KEY = "ads";
 /** The single home banner of the first version, kept working: shown "après les nouveautés". */
 export const LEGACY_AD_KEY = "ad.home";
+
+/** Whether a banner goes in the e-mails. */
+export const adInEmail = (ad: AdBanner | null | undefined): ad is AdBanner => Boolean(ad?.email && ad.image);
 
 /** Whether a banner is ready to show. */
 export const adVisible = (ad: AdBanner | null | undefined): ad is AdBanner => Boolean(ad?.enabled && ad.image);

@@ -16,6 +16,8 @@ export type Email = {
   text: string;
   /** Brevo tags, to find the e-mail in its logs (e.g. "welcome"). */
   tags?: string[];
+  /** Extra headers (List-Unsubscribe for the newsletters). */
+  headers?: Record<string, string>;
 };
 
 export type SendResult = { ok: true; id?: string } | { ok: false; skipped?: boolean; error?: string };
@@ -43,6 +45,7 @@ export async function sendEmail(email: Email): Promise<SendResult> {
         htmlContent: email.html,
         textContent: email.text,
         tags: email.tags,
+        ...(email.headers ? { headers: email.headers } : {}),
       }),
       signal: AbortSignal.timeout(10_000),
     });

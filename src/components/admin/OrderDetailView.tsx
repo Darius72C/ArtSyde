@@ -110,6 +110,7 @@ export async function OrderDetailView({ params }: { params: Promise<{ reference:
           </ul>
           <dl className="mt-6 space-y-2 text-sm">
             <div className="flex justify-between"><dt className="text-muted">Sous-total</dt><dd className="tabular-nums">{formatFCFA(o.subtotalXof)}</dd></div>
+            {o.discountXof > 0 && <div className="flex justify-between"><dt className="text-muted">Code promo {o.promoCode}</dt><dd className="tabular-nums text-ok">-{formatFCFA(o.discountXof)}</dd></div>}
             <div className="flex justify-between"><dt className="text-muted">{DELIVERY_METHOD[o.delivery].label}</dt><dd className="tabular-nums">{o.deliveryXof ? formatFCFA(o.deliveryXof) : "Offert"}</dd></div>
             <div className="flex items-baseline justify-between border-t border-line pt-4"><dt className="font-semibold">Total</dt><dd className="display text-3xl tabular-nums">{formatFCFA(o.totalXof)}</dd></div>
           </dl>

@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { subscribeNewsletter } from "@/server/newsletter";
 import { AnimatePresence, motion } from "motion/react";
 import { RevealLines } from "../Reveal";
 import { DUR, EASE, SPRING, VIEWPORT } from "@/lib/motion";
 
 export function Newsletter() {
   const [done, setDone] = useState(false);
+  const [error, setError] = useState("");
+  const [pending, setPending] = useState(false);
   return (
     <section className="px-5 py-20 text-center md:py-28">
       <RevealLines lines={["Ne rate aucun drop."]} className="display text-[clamp(2rem,4.5vw,3.25rem)]" />
@@ -28,17 +31,30 @@ export function Newsletter() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={VIEWPORT}
             transition={{ duration: DUR.slow, ease: EASE.out }}
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault();
-              setDone(true); // TODO: send to the newsletter service
+              const email = String(new FormData(e.currentTarget).get("email") ?? "");
+              setPending(true);
+              setError("");
+              const r = await subscribeNewsletter(email).catch(() => ({ ok: false as const, message: "Connexion perdue. Réessaie." }));
+              setPending(false);
+              if (r.ok) setDone(true);
+              else setError(r.message);
             }}
-            className="mx-auto mt-8 flex max-w-md flex-col gap-3 sm:flex-row"
+            className="mx-auto mt-8 flex max-w-md flex-col gap-3 sm:flex-row sm:flex-wrap"
           >
             <label className="flex-1">
               <span className="sr-only">Ton e-mail</span>
-              <input id="newsletter-email" type="email" required placeholder="Ton adresse e-mail" className="field" />
+              <input id="newsletter-email" name="email" type="email" required placeholder="Ton adresse e-mail" aria-invalid={error ? true : undefined} aria-describedby={error ? "newsletter-error" : undefined} className="field" />
             </label>
-            <button className="btn shrink-0">S&apos;inscrire</button>
+            <button disabled={pending} className="btn shrink-0">
+              {pending ? <span className="h-4 w-4 animate-spin rounded-full border border-on-ink border-t-transparent" aria-label="Inscription" /> : "S'inscrire"}
+            </button>
+            {error && (
+              <p id="newsletter-error" role="alert" className="text-sm text-danger sm:basis-full">
+                {error}
+              </p>
+            )}
           </motion.form>
         )}
       </AnimatePresence>

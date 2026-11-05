@@ -2,7 +2,8 @@ import "server-only";
 import { COMPANY } from "@/lib/company";
 import { DEFAULT_WELCOME, WELCOME_KEY, fill, mergeWelcome, type WelcomeTexts } from "@/lib/email-texts";
 import { getSetting } from "@/server/settings";
-import { C, FONT, button, esc, layout, siteUrl } from "./layout";
+import type { AdBanner } from "@/lib/ad";
+import { C, FONT, adHref, button, esc, layout, siteUrl } from "./layout";
 import type { Email } from "./send";
 
 /** The welcome e-mail's words as set in Admin > E-mails (the defaults where a field is empty). */
@@ -14,21 +15,24 @@ export async function welcomeTexts(): Promise<WelcomeTexts> {
  * The welcome e-mail, sent once when an account is created (Google or e-mail).
  * `image`: a photo of the collection for the opening (a public https URL), or none.
  * `texts`: its words (welcomeTexts()); the defaults when not given.
+ * `ad`: the banner set for e-mails (emailAd()), or none.
  */
-export function welcomeEmail({ name, email, credits, image, texts = DEFAULT_WELCOME }: { name: string; email: string; credits: number; image?: string; texts?: WelcomeTexts }): Email {
+export function welcomeEmail({ name, email, credits, image, texts = DEFAULT_WELCOME, ad }: { name: string; email: string; credits: number; image?: string; texts?: WelcomeTexts; ad?: AdBanner }): Email {
   const site = siteUrl();
   const prenom = (name || email.split("@")[0]).trim().split(/\s+/)[0];
   const t = (k: keyof WelcomeTexts) => fill(texts[k], { prenom, credits });
   // Escaped for HTML; a line break typed in the admin stays a line break.
   const h = (k: keyof WelcomeTexts) => esc(t(k)).replace(/\n/g, "<br>");
   const subject = t("subject");
+  // The photo chosen in Admin > E-mails, else the one given (the home page's first card).
+  const photo = /^https:\/\//i.test(texts.image) ? texts.image : image;
 
   const hero = `<p style="margin:0 0 14px;font-size:13px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:${C.orange};">${h("eyebrow")}</p>
 <h1 class="h1" style="margin:0 0 18px;font-size:46px;line-height:48px;font-weight:700;letter-spacing:-1.6px;color:${C.onNight};">${h("title")}</h1>
 <p style="margin:0;font-size:17px;line-height:26px;color:${C.nightMuted};">${h("intro")}</p>
 ${
-  image
-    ? `<a href="${site}/#boutique" style="display:block;margin-top:32px;"><img src="${esc(image)}" width="512" alt="La collection ArtSyde" style="display:block;width:100%;max-width:512px;height:auto;border:0;border-radius:20px;"></a>`
+  photo
+    ? `<a href="${site}/#boutique" style="display:block;margin-top:32px;"><img src="${esc(photo)}" width="512" alt="La collection ArtSyde" style="display:block;width:100%;max-width:512px;height:auto;border:0;border-radius:20px;"></a>`
     : ""
 }`;
 
@@ -90,6 +94,7 @@ ${step(3, h("step3Title"), h("step3Text"), true)}
     `3. ${t("step3Title")} : ${t("step3Text")}`,
     "",
     `${t("helpTitle")} ${t("helpText")}${COMPANY.whatsapp ? ` WhatsApp : ${COMPANY.whatsapp}` : ""}`,
+    ...(ad ? ["", ...[[ad.title, ad.text].filter(Boolean).join(" — "), adHref(ad) ?? ""].filter(Boolean)] : []),
     "",
     `ArtSyde · ${COMPANY.city}, ${COMPANY.country}`,
     "Tu reçois cet e-mail parce que tu viens de créer un compte ArtSyde.",
@@ -98,7 +103,7 @@ ${step(3, h("step3Title"), h("step3Text"), true)}
   return {
     to: { email, name: name || undefined },
     subject,
-    html: layout({ title: subject, preheader: t("preheader"), hero, body, reason: "Tu reçois cet e-mail parce que tu viens de créer un compte ArtSyde." }),
+    html: layout({ title: subject, preheader: t("preheader"), hero, body, reason: "Tu reçois cet e-mail parce que tu viens de créer un compte ArtSyde.", ad }),
     text,
     tags: ["welcome"],
   };

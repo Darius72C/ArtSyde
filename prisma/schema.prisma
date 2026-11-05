@@ -296,6 +296,9 @@ model Order {
   subtotalXof Int
   deliveryXof Int            @default(0)
   totalXof    Int
+  // Code promo utilisé (en majuscules) et la remise qu'il a donnée sur les articles (déjà retirée du total).
+  promoCode   String?
+  discountXof Int            @default(0)
 
   paymentStatus PaymentStatus @default(UNPAID)
   paymentMethod String? // ex. "WAVE", "ORANGE_MONEY", "MTN", "MOOV", "CARD"
@@ -308,6 +311,7 @@ model Order {
   @@index([status])
   @@index([createdAt])
   @@index([customerId])
+  @@index([promoCode])
 }
 
 model OrderItem {
@@ -402,4 +406,42 @@ model SiteSetting {
   key       String   @id
   value     Json
   updatedAt DateTime @updatedAt
+}
+
+// Les inscrits à la newsletter (formulaire « Ne rate aucun drop » de l'accueil). Les e-mails Newsletter,
+// Promotion et Annonce (Admin > E-mails) partent à ceux qui ne se sont pas désabonnés.
+model Subscriber {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  name           String?
+  // D'où vient l'inscription : "accueil", "admin"…
+  source         String    @default("accueil")
+  // Le jeton secret du lien « Se désabonner » de chaque e-mail.
+  token          String    @unique
+  createdAt      DateTime  @default(now())
+  unsubscribedAt DateTime?
+
+  @@index([unsubscribedAt])
+}
+
+// Les codes promo créés dans Admin > Codes promo, saisis au paiement. La remise porte sur les articles,
+// pas sur la livraison : un pourcentage (percent) ou un montant fixe (amountXof), l'un ou l'autre.
+model PromoCode {
+  id             String    @id @default(cuid())
+  // En majuscules, sans espace : "ARTSYDE20".
+  code           String    @unique
+  percent        Int?
+  amountXof      Int?
+  // Montant minimum des articles pour que le code marche (0 : aucun).
+  minSubtotalXof Int       @default(0)
+  // Nombre de commandes au plus (null : illimité). Les commandes annulées ne comptent pas.
+  maxUses        Int?
+  // Une seule commande par numéro de téléphone.
+  onePerCustomer Boolean   @default(false)
+  startsAt       DateTime?
+  endsAt         DateTime?
+  active         Boolean   @default(true)
+  // Pour l'admin : « Newsletter de novembre »…
+  note           String?
+  createdAt      DateTime  @default(now())
 }

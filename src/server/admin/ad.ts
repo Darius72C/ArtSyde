@@ -75,10 +75,11 @@ export async function saveBanner(input: AdBanner): Promise<AdSaveResult> {
     button: clip(input?.button, 30) || undefined,
     url: clip(input?.url, 500) || undefined,
     tone: input?.tone === "dark" ? "dark" : "light",
+    email: Boolean(input?.email) || undefined,
   };
   if (!placement || !(placement in PLACEMENTS)) return { ok: false, field: "placement", message: "Choisis où afficher la bannière." };
   if (ad.image && !ownAdImage(ad.image)) return { ok: false, field: "image", message: "Image refusée : envoie-la depuis ce formulaire." };
-  if (ad.enabled && !ad.image) return { ok: false, field: "image", message: "Ajoute une image pour afficher la bannière." };
+  if ((ad.enabled || ad.email) && !ad.image) return { ok: false, field: "image", message: "Ajoute une image pour afficher la bannière." };
   if (ad.url && !/^(\/(?!\/)|https?:\/\/)/i.test(ad.url)) return { ok: false, field: "url", message: "Une page du site (/studio…) ou une adresse complète (https://…)." };
   if (ad.button && !ad.url) return { ok: false, field: "url", message: "Un bouton a besoin d'un lien." };
 
@@ -91,7 +92,7 @@ export async function saveBanner(input: AdBanner): Promise<AdSaveResult> {
   const id = saved[at >= 0 ? at : saved.length - 1].id!;
 
   const where = PLACEMENTS[placement];
-  await logActivity("ad.saved", `${ad.enabled ? "Bannière en ligne" : "Bannière masquée"} — ${where}${ad.title ? ` : « ${ad.title} »` : ""}`, { url: ad.url, placement }, "admin");
+  await logActivity("ad.saved", `${ad.enabled ? "Bannière en ligne" : "Bannière masquée"}${ad.email ? " (et dans les e-mails)" : ""} — ${where}${ad.title ? ` : « ${ad.title} »` : ""}`, { url: ad.url, placement }, "admin");
   if (before?.image && before.image !== ad.image) await dropImage(before.image);
   return { ok: true, id };
 }

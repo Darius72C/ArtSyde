@@ -1,5 +1,6 @@
 import "server-only";
 import { COMPANY } from "@/lib/company";
+import type { AdBanner } from "@/lib/ad";
 
 /*
  * The shared frame of ArtSyde's e-mails. E-mail clients (Gmail, Outlook, Apple Mail, phones) ignore most
@@ -39,11 +40,32 @@ export function button(href: string, label: string, tone: "accent" | "whatsapp" 
 </td></tr></table>`;
 }
 
+/** A banner's link as a full address (a page of the site gets the site's address in front). */
+export const adHref = (ad: AdBanner) => (ad.url ? (ad.url.startsWith("/") ? `${siteUrl()}${ad.url}` : ad.url) : undefined);
+
+/** The ad banner under the card: its image (linked), then its words and button as a link. */
+function adBlock(ad: AdBanner) {
+  const href = adHref(ad);
+  const img = `<img src="${esc(ad.image)}" width="600" alt="${esc(ad.title || "ArtSyde")}" style="display:block;width:100%;max-width:600px;height:auto;border:0;border-radius:22px;">`;
+  const words = [
+    ad.title ? `<p style="margin:0;font-size:17px;line-height:24px;font-weight:700;color:${C.ink};">${esc(ad.title)}</p>` : "",
+    ad.text ? `<p style="margin:4px 0 0;font-size:15px;line-height:22px;color:${C.muted};">${esc(ad.text)}</p>` : "",
+    href && ad.button ? `<p style="margin:10px 0 0;font-size:15px;line-height:22px;"><a href="${esc(href)}" style="color:${C.link};text-decoration:none;font-weight:600;">${esc(ad.button)} ›</a></p>` : "",
+  ].join("");
+  return `
+    <!-- Banner -->
+    <tr><td style="padding:24px 0 0;font-family:${FONT};text-align:center;">
+      ${href ? `<a href="${esc(href)}" style="display:block;">${img}</a>` : img}
+      ${words ? `<div style="padding:16px 24px 0;">${words}</div>` : ""}
+    </td></tr>`;
+}
+
 /**
  * A complete e-mail. `hero`: the black opening (title, photo); `body`: the white card; `preheader`: the line
- * inboxes show after the subject; `reason`: why the person receives it (bottom of the e-mail).
+ * inboxes show after the subject; `reason`: why the person receives it (bottom of the e-mail); `ad`: the banner
+ * set for e-mails (emailAd()), under the card, or none; `unsubscribe`: the newsletters' "Se désabonner" link.
  */
-export function layout({ title, preheader, hero, body, reason }: { title: string; preheader: string; hero: string; body: string; reason: string }) {
+export function layout({ title, preheader, hero, body, reason, ad, unsubscribe }: { title: string; preheader: string; hero: string; body: string; reason: string; ad?: AdBanner; unsubscribe?: string }) {
   const site = siteUrl();
   const footLink = (href: string, label: string) => `<a href="${href}" style="color:${C.muted};text-decoration:underline;">${label}</a>`;
   return `<!doctype html>
@@ -60,6 +82,7 @@ export function layout({ title, preheader, hero, body, reason }: { title: string
     .h1 { font-size: 36px !important; line-height: 40px !important; }
     .big { font-size: 64px !important; line-height: 64px !important; }
     .outer { padding: 12px 8px !important; }
+    .col { display: block !important; width: 100% !important; }
   }
   a { text-decoration: none; }
 </style>
@@ -87,6 +110,7 @@ ${hero}
     <tr><td class="px" style="background:${C.card};border-radius:0 0 28px 28px;padding:44px;font-family:${FONT};color:${C.ink};">
 ${body}
     </td></tr>
+${ad?.image ? adBlock(ad) : ""}
 
     <!-- Footer -->
     <tr><td class="px" style="padding:32px 44px 8px;font-family:${FONT};font-size:12px;line-height:19px;color:${C.muted};text-align:center;">
@@ -94,7 +118,7 @@ ${body}
       Ton t-shirt. Ton style. · ${COMPANY.city}, ${COMPANY.country}<br><br>
       ${footLink(`${site}/#boutique`, "Boutique")} &nbsp;·&nbsp; ${footLink(`${site}/studio`, "Studio 3D")} &nbsp;·&nbsp; ${footLink(`${site}/compte`, "Mon compte")}${COMPANY.whatsapp ? ` &nbsp;·&nbsp; ${footLink(COMPANY.whatsapp, "WhatsApp")}` : ""}<br><br>
       ${esc(reason)}<br>
-      ${footLink(`${site}/conditions-d-utilisation`, "Conditions d'utilisation")}
+      ${unsubscribe ? `${footLink(esc(unsubscribe), "Se désabonner")} &nbsp;·&nbsp; ` : ""}${footLink(`${site}/conditions-d-utilisation`, "Conditions d'utilisation")}
     </td></tr>
 
   </table>

@@ -13,6 +13,7 @@ import { logActivity, logError } from "@/server/log";
 import { onlinePaymentEnabled } from "@/server/payments/geniuspay";
 import { startOrderPayment } from "@/server/payments/settle";
 import { PAYMENT_METHOD_IDS } from "@/lib/credits";
+import { evaluatePromo } from "@/server/promo-rules";
 
 /** A studio piece's print files: only links to our own storage (designs/), one per side at most. */
 function printFiles(files: unknown, quality: PrintQuality): Prisma.CustomDesignCreateWithoutOrderItemInput[] {
@@ -124,6 +125,20 @@ export async function placeOrder(input: CheckoutInput): Promise<PlaceOrderResult
   const subtotalXof = items.reduce((s, i) => s + i.unitPriceXof * i.quantity, 0);
   const deliveryXof = DELIVERY[delivery].price;
 
+  // A promo code: checked again here, on the real prices and this phone number. Refused: the order waits.
+  let promo: { code: string; discount: number } | null = null;
+  if (typeof input.promo === "string" && input.promo.trim()) {
+    try {
+      const r = await evaluatePromo(input.promo, subtotalXof, fields.phone.replace(/\s+/g, " "));
+      if (!r.ok) return { ok: false, errors: {}, message: `Code promo : ${r.message}`, promoError: r.message };
+      promo = { code: r.code, discount: r.discount };
+    } catch (e) {
+      await logError("placeOrder: promo check", e);
+      return { ok: false, errors: {}, message: "On n'a pas pu vérifier ton code promo. Réessaie dans un instant." };
+    }
+  }
+  const discountXof = promo?.discount ?? 0;
+
   try {
     // Signed in: the order goes on the customer's account (and in "Mes commandes").
     const customerId = await customerFor(fields.phone.replace(/\s+/g, " "));
@@ -140,7 +155,9 @@ export async function placeOrder(input: CheckoutInput): Promise<PlaceOrderResult
       delivery,
       subtotalXof,
       deliveryXof,
-      totalXof: subtotalXof + deliveryXof,
+      promoCode: promo?.code ?? null,
+      discountXof,
+      totalXof: subtotalXof - discountXof + deliveryXof,
       items: {
         create: items,
       },
@@ -150,7 +167,7 @@ export async function placeOrder(input: CheckoutInput): Promise<PlaceOrderResult
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
         const order = await db.order.create({ data: { ...data, reference: await nextReference() }, select: { id: true, reference: true } });
-        await logActivity("order.placed", `Commande ${order.reference} passée par ${fields.name} (${data.totalXof.toLocaleString("fr-FR")} FCFA)`, { reference: order.reference, total: data.totalXof, items: items.length }, customerId ? `client:${customerId}` : "invité");
+        await logActivity("order.placed", `Commande ${order.reference} passée par ${fields.name} (${data.totalXof.toLocaleString("fr-FR")} FCFA)`, { reference: order.reference, total: data.totalXof, items: items.length, ...(promo ? { promo: promo.code, discount: discountXof } : {}) }, customerId ? `client:${customerId}` : "invité");
         // Online payment on: GeniusPay's page to send the customer to (the order is saved whatever happens).
         if (onlinePaymentEnabled()) {
           const method = PAYMENT_METHOD_IDS.find((m) => m === input.method);

@@ -11,6 +11,7 @@ export const ADMIN_LINKS = [
   { href: "/admin/produits", label: "Produits et stock" },
   { href: "/admin/accueil", label: "Accueil" },
   { href: "/admin/emails", label: "E-mails" },
+  { href: "/admin/promos", label: "Codes promo" },
   { href: "/admin/journal", label: "Journal" },
   { href: "/admin/clients", label: "Clients" },
   { href: "/admin/studio", label: "Studio" },

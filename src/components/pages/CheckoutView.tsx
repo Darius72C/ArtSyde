@@ -7,6 +7,8 @@ import { AnimatePresence, motion } from "motion/react";
 import { cart, cartSubtotal, useCart } from "@/lib/cart";
 import { DELIVERY, DELIVERY_METHODS, checkFields, orderHref, type CheckoutFields } from "@/lib/orders";
 import { placeOrder } from "@/server/place-order";
+import { checkPromo } from "@/server/promo";
+import type { PromoCheck } from "@/lib/promos";
 import { PAYMENT_METHODS, PAYMENT_METHOD_IDS, type PaymentMethodId } from "@/lib/credits";
 import type { DeliveryMethod } from "@/generated/prisma/client";
 import { formatFCFA } from "@/lib/products";
@@ -62,6 +64,27 @@ export function CheckoutView({ online = false }: { online?: boolean }) {
   const sending = pending || placed;
   const subtotal = cartSubtotal(items);
   const shipping = DELIVERY[delivery].price;
+  // A promo code: tried with "Appliquer" (an estimate on screen), checked again when the order is placed.
+  const [code, setCode] = useState("");
+  const [promo, setPromo] = useState<Extract<PromoCheck, { ok: true }> | null>(null);
+  const [promoError, setPromoError] = useState<string>();
+  const [checking, startChecking] = useTransition();
+  const discount = promo?.discount ?? 0;
+  const total = subtotal - discount + shipping;
+
+  function applyPromo() {
+    if (!code.trim()) return setPromoError("Entre ton code.");
+    startChecking(async () => {
+      const r = await checkPromo(code, subtotal).catch(() => ({ ok: false as const, message: "Connexion perdue. Réessaie." }));
+      if (r.ok) {
+        setPromo(r);
+        setPromoError(undefined);
+      } else {
+        setPromo(null);
+        setPromoError(r.message);
+      }
+    });
+  }
 
   function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -73,11 +96,16 @@ export function CheckoutView({ online = false }: { online?: boolean }) {
     if (Object.keys(err).length) return;
     const lines = items.map(({ productId, color, size, qty, price, preview, quality, files }) => ({ productId, color, size, qty, price, preview, quality, files }));
     startTransition(async () => {
-      const r = await placeOrder({ fields, delivery, lines, ...(online ? { method } : {}) }).catch(() => null);
+      const r = await placeOrder({ fields, delivery, lines, ...(online ? { method } : {}), ...(promo ? { promo: promo.code } : {}) }).catch(() => null);
       if (!r) return setMessage("Connexion perdue. Vérifie ton réseau et réessaie.");
       if (!r.ok) {
         setErrors(r.errors);
         setMessage(r.message);
+        // The code no longer works (used up, expired…): taken off, the customer sees why and can order without it.
+        if (r.promoError) {
+          setPromo(null);
+          setPromoError(r.promoError);
+        }
         return;
       }
       setPlaced(true);
@@ -200,11 +228,66 @@ export function CheckoutView({ online = false }: { online?: boolean }) {
           </ul>
           <dl className="mt-6 space-y-3 border-t border-line pt-6 text-sm">
             <div className="flex justify-between"><dt className="text-muted">Sous-total</dt><dd className="tabular-nums">{formatFCFA(subtotal)}</dd></div>
+            {promo && (
+              <div className="flex justify-between">
+                <dt className="text-muted">
+                  Code {promo.code} ({promo.label})
+                </dt>
+                <dd className="tabular-nums text-ok">-{formatFCFA(discount)}</dd>
+              </div>
+            )}
             <div className="flex justify-between"><dt className="text-muted">{DELIVERY[delivery].label}</dt><dd className="tabular-nums">{shipping ? formatFCFA(shipping) : "Offert"}</dd></div>
           </dl>
+
+          {/* Promo code: a button, not a form (this whole page is the order's form). */}
+          <div className="mt-6 border-t border-line pt-6">
+            {promo ? (
+              <p className="flex items-center justify-between gap-4 text-sm">
+                <span className="text-ok">Code {promo.code} appliqué.</span>
+                <button type="button" onClick={() => (setPromo(null), setCode(""))} className="text-link hover:underline">
+                  Retirer
+                </button>
+              </p>
+            ) : (
+              <>
+                <label htmlFor="promo" className="mb-1.5 block text-[14px] text-muted">
+                  Code promo
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    id="promo"
+                    value={code}
+                    onChange={(e) => (setCode(e.target.value.toUpperCase()), setPromoError(undefined))}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        applyPromo();
+                      }
+                    }}
+                    autoComplete="off"
+                    autoCapitalize="characters"
+                    spellCheck={false}
+                    maxLength={30}
+                    placeholder="ARTSYDE20"
+                    aria-invalid={promoError ? true : undefined}
+                    aria-describedby={promoError ? "promo-error" : undefined}
+                    className={`field min-w-0 flex-1 uppercase ${promoError ? "!border-danger" : ""}`}
+                  />
+                  <button type="button" onClick={applyPromo} disabled={checking} className="btn-outline shrink-0">
+                    {checking ? <span className="h-4 w-4 animate-spin rounded-full border border-current border-t-transparent" aria-label="Vérification" /> : "Appliquer"}
+                  </button>
+                </div>
+                {promoError && (
+                  <p id="promo-error" role="alert" className="mt-2 text-sm text-danger">
+                    {promoError}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
           <div className="mt-6 flex items-baseline justify-between border-t border-line pt-6">
             <span className="font-semibold">Total</span>
-            <motion.span key={subtotal + shipping} initial={{ opacity: 0.4 }} animate={{ opacity: 1 }} className="display text-3xl tabular-nums">{formatFCFA(subtotal + shipping)}</motion.span>
+            <motion.span key={total} initial={{ opacity: 0.4 }} animate={{ opacity: 1 }} className="display text-3xl tabular-nums">{formatFCFA(total)}</motion.span>
           </div>
           <AnimatePresence>
             {message && (
@@ -214,7 +297,7 @@ export function CheckoutView({ online = false }: { online?: boolean }) {
             )}
           </AnimatePresence>
           <button disabled={sending} className="btn mt-8 w-full">
-            {sending ? <span className="h-4 w-4 animate-spin rounded-full border border-on-ink border-t-transparent" aria-label="Envoi" /> : online ? `Payer ${formatFCFA(subtotal + shipping)}` : "Valider la commande"}
+            {sending ? <span className="h-4 w-4 animate-spin rounded-full border border-on-ink border-t-transparent" aria-label="Envoi" /> : online ? `Payer ${formatFCFA(total)}` : "Valider la commande"}
           </button>
           <p className="mt-4 text-center text-xs text-muted">
             En validant, tu acceptes nos{" "}
