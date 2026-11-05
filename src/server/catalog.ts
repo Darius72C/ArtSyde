@@ -1,6 +1,7 @@
 import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
 import { db } from "@/server/db";
+import { getStock } from "@/server/stock";
 import { PRODUCTS, parsePrint3D, productSlug, type Product, type ProductTagLabel } from "@/lib/products";
 
 /** Cache tag of the shop's catalogue: the admin's product actions expire it. */
@@ -39,10 +40,17 @@ export async function getProduct(slug: string): Promise<Product | undefined> {
   return (await getCatalog()).find((p) => p.slug === slug);
 }
 
-/** Active products, oldest first. If the database cannot be read, the shop shows none rather than crashing (not cached). */
+/**
+ * Active products, oldest first, each with the stock of its colours (cached apart: the stock changes with
+ * every paid order). If the database cannot be read, the shop shows none rather than crashing (not cached).
+ */
 export async function getCatalog(): Promise<Product[]> {
   try {
-    return await readCatalog();
+    const [products, stock] = await Promise.all([readCatalog(), getStock()]);
+    return products.map((p) => {
+      const own = Object.fromEntries(p.colors.map((c) => c.toLowerCase()).filter((c) => stock[c]).map((c) => [c, stock[c]]));
+      return { ...p, stock: own };
+    });
   } catch (e) {
     console.error("Catalogue unavailable", e);
     return [];

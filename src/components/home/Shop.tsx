@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { cart } from "@/lib/cart";
+import { available, defaultSize } from "@/lib/stock";
 import { flyToCart } from "@/lib/flyToCart";
 import { formatFCFA, productHref, type Product } from "@/lib/products";
 import { ProductImage } from "../ProductImage";
@@ -69,9 +70,15 @@ function Card({ p, i, onAdd }: { p: Product; i: number; onAdd: (p: Product, colo
       <p className="mt-1 text-center text-[15px]">
         {formatFCFA(p.price)} {p.oldPrice && <span className="text-muted line-through">{formatFCFA(p.oldPrice)}</span>}
       </p>
-      <button onClick={() => onAdd(p, color, art.current)} className="btn mx-auto mt-4 !px-5 !py-2 !text-[14px]">
-        Ajouter au panier
-      </button>
+      {p.sizes.some((s) => available(p.stock, color, s) > 0) ? (
+        <button onClick={() => onAdd(p, color, art.current)} className="btn mx-auto mt-4 !px-5 !py-2 !text-[14px]">
+          Ajouter au panier
+        </button>
+      ) : (
+        <button disabled className="btn mx-auto mt-4 !px-5 !py-2 !text-[14px]">
+          Épuisé dans cette couleur
+        </button>
+      )}
       </Tilt>
     </motion.article>
   );
@@ -86,7 +93,7 @@ export function Shop({ products }: { products: Product[] }) {
 
   const add = (p: Product, color: string, from: Element | null) => {
     flyToCart(from);
-    cart.add({ productId: p.id, name: p.name, price: p.price, color, size: p.sizes.includes("M") ? "M" : (p.sizes[0] ?? "M"), art: p.art, bg: p.bg, photo: p.photo });
+    cart.add({ productId: p.id, name: p.name, price: p.price, color, size: defaultSize(p.stock, color, p.sizes), art: p.art, bg: p.bg, photo: p.photo });
     setToast(p.name);
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => setToast(null), 2600);

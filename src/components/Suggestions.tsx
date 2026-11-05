@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { cart } from "@/lib/cart";
+import { available, defaultSize } from "@/lib/stock";
 import { formatFCFA, productHref, type Product } from "@/lib/products";
 import { STAGGER } from "@/lib/motion";
 import { ProductImage } from "./ProductImage";
@@ -21,12 +22,14 @@ export function Suggestions({ products }: { products: Product[] }) {
               <Link href={productHref(p)} tabIndex={-1} aria-hidden className="block">
                 <ProductImage color={p.colors[0]} art={p.art} photo={p.photo} alt={p.name} bg={p.bg} className="aspect-[4/5] rounded-[22px]" />
               </Link>
-              <button
-                onClick={() => cart.add({ productId: p.id, name: p.name, price: p.price, color: p.colors[0], size: p.sizes.includes("M") ? "M" : (p.sizes[0] ?? "M"), art: p.art, bg: p.bg, photo: p.photo })}
-                className="btn absolute bottom-4 left-1/2 -translate-x-1/2 !px-4 !py-1.5 !text-[14px] transition md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
-              >
-                Ajouter — M
-              </button>
+              {p.sizes.some((s) => available(p.stock, p.colors[0], s) > 0) && (
+                <button
+                  onClick={() => cart.add({ productId: p.id, name: p.name, price: p.price, color: p.colors[0], size: defaultSize(p.stock, p.colors[0], p.sizes), art: p.art, bg: p.bg, photo: p.photo })}
+                  className="btn absolute bottom-4 left-1/2 -translate-x-1/2 !px-4 !py-1.5 !text-[14px] transition md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
+                >
+                  Ajouter — {defaultSize(p.stock, p.colors[0], p.sizes)}
+                </button>
+              )}
             </div>
             <div className="mt-4 flex justify-between gap-3">
               <Link href={productHref(p)} className="font-semibold underline-offset-4 hover:underline">{p.name}</Link>

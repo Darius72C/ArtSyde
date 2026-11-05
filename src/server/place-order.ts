@@ -5,6 +5,8 @@ import { Prisma, Size } from "@/generated/prisma/client";
 import { DELIVERY, DELIVERY_METHODS, checkFields, orderKey, type CheckoutInput, type PlaceOrderResult } from "@/lib/orders";
 import { STUDIO_PRICE } from "@/lib/products";
 import { PRINT_QUALITIES, type PrintQuality } from "@/lib/studio";
+import { available } from "@/lib/stock";
+import { readStockNow } from "@/server/stock";
 
 /*
  * Places an order from the checkout. Anyone can POST here, so nothing from the browser is
@@ -63,6 +65,31 @@ export async function placeOrder(input: CheckoutInput): Promise<PlaceOrderResult
       if (!p || !known || !p.sizes.includes(size)) return { ok: false, errors: {}, message: CART_CHANGED };
       items.push({ productId: p.id, size, color: known, quantity, unitPriceXof: p.priceXof, previewUrl: null, printQuality: null });
     }
+  }
+
+  // Enough blank t-shirts? Counted per colour and size over the whole cart, against the stock read now.
+  // (Colours not tracked in the stock always pass.) The stock itself moves when the order is marked paid.
+  try {
+    const stock = await readStockNow();
+    const wanted = new Map<string, { color: string; size: Size; qty: number }>();
+    for (const i of items) {
+      const key = `${i.color.toLowerCase()}|${i.size}`;
+      const w = wanted.get(key) ?? { color: i.color, size: i.size, qty: 0 };
+      w.qty += i.quantity;
+      wanted.set(key, w);
+    }
+    for (const w of wanted.values()) {
+      const left = available(stock, w.color, w.size);
+      if (w.qty > left)
+        return {
+          ok: false,
+          errors: {},
+          message: left > 0 ? `Il ne reste que ${left} t-shirt${left > 1 ? "s" : ""} en ${w.size} dans une des couleurs choisies. Ajuste la quantité dans ton panier.` : `Un t-shirt de ton panier est épuisé en ${w.size} dans sa couleur. Choisis une autre taille ou une autre couleur dans ton panier.`,
+        };
+    }
+  } catch (e) {
+    console.error("placeOrder: stock check failed", e);
+    return { ok: false, errors: {}, message: "On n'a pas pu enregistrer ta commande. Réessaie dans un instant." };
   }
 
   const subtotalXof = items.reduce((s, i) => s + i.unitPriceXof * i.quantity, 0);

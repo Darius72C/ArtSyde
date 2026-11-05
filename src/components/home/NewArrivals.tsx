@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRef } from "react";
 import { motion } from "motion/react";
 import { cart } from "@/lib/cart";
+import { available, defaultSize } from "@/lib/stock";
 import { flyToCart } from "@/lib/flyToCart";
 import { gsap, useGSAP } from "@/lib/gsap";
 import { formatFCFA, productHref, type Product } from "@/lib/products";
@@ -73,15 +74,21 @@ export function NewArrivals({ products }: { products: Product[] }) {
                     <span key={c} className="h-3 w-3 rounded-full ring-1 ring-ink/25" style={{ background: c }} />
                   ))}
                 </div>
-                <button
-                  onClick={(e) => {
-                    cart.add({ productId: p.id, name: p.name, price: p.price, color: p.colors[0], size: p.sizes.includes("M") ? "M" : (p.sizes[0] ?? "M"), art: p.art, bg: p.bg, photo: p.photo });
-                    flyToCart(e.currentTarget.closest(".na-card")?.querySelector(".na-art") ?? null);
-                  }}
-                  className="btn !px-4 !py-1.5 !text-[14px]"
-                >
-                  Acheter
-                </button>
+                {p.sizes.some((s) => available(p.stock, p.colors[0], s) > 0) ? (
+                  <button
+                    onClick={(e) => {
+                      cart.add({ productId: p.id, name: p.name, price: p.price, color: p.colors[0], size: defaultSize(p.stock, p.colors[0], p.sizes), art: p.art, bg: p.bg, photo: p.photo });
+                      flyToCart(e.currentTarget.closest(".na-card")?.querySelector(".na-art") ?? null);
+                    }}
+                    className="btn !px-4 !py-1.5 !text-[14px]"
+                  >
+                    Acheter
+                  </button>
+                ) : (
+                  <Link href={productHref(p)} className="link-line !text-[15px]">
+                    Voir les couleurs <span className="arrow">›</span>
+                  </Link>
+                )}
               </div>
             </Tilt>
           </motion.article>

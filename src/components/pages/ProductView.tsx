@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { cart } from "@/lib/cart";
+import { available, defaultSize } from "@/lib/stock";
 import { flyToCart } from "@/lib/flyToCart";
 import { DELIVERY, DELIVERY_METHODS } from "@/lib/orders";
 import { formatFCFA, type Product } from "@/lib/products";
@@ -26,7 +27,7 @@ const ProductTee3D = dynamic(() => import("../ProductTee3D"), { ssr: false, load
 /** A product's own page (/boutique/[slug]). `others` (the suggestions) come from the same catalogue. */
 export function ProductView({ product: p, others }: { product: Product; others: Product[] }) {
   const [color, setColor] = useState(p.colors[0]);
-  const [size, setSize] = useState(p.sizes.includes("M") ? "M" : (p.sizes[0] ?? "M"));
+  const [size, setSize] = useState(() => defaultSize(p.stock, p.colors[0], p.sizes));
   const [qty, setQty] = useState(1);
   const views: View[] = p.flats.length ? ["photos", "mockup", "3d"] : ["photos", "3d"];
   const [view, setView] = useState<View>("photos");
@@ -43,7 +44,13 @@ export function ProductView({ product: p, others }: { product: Product; others: 
     setShown(0);
   };
 
+  // Blank t-shirts left in this colour and size (Infinity when the colour isn't tracked in the stock).
+  const left = available(p.stock, color, size);
+  const soldOut = left <= 0;
+  const maxQty = Math.min(MAX_QTY, left);
+
   function add() {
+    if (soldOut) return;
     flyToCart(art.current);
     cart.add({ productId: p.id, name: p.name, price: p.price, color, size, qty, art: p.art, bg: p.bg, photo: p.photo });
     setAdded(true);
@@ -134,6 +141,9 @@ export function ProductView({ product: p, others }: { product: Product; others: 
                   onClick={() => {
                     setColor(c);
                     setShown(0);
+                    // Keep the size if it's in stock in the new colour, else pick one that is.
+                    if (available(p.stock, c, size) <= 0) setSize(defaultSize(p.stock, c, p.sizes));
+                    setQty((q) => Math.max(1, Math.min(q, MAX_QTY, available(p.stock, c, size))));
                   }}
                   aria-label={`Couleur ${colorLabel(c)}`}
                   aria-pressed={c === color}
@@ -149,8 +159,22 @@ export function ProductView({ product: p, others }: { product: Product; others: 
             <div className="mt-3 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Taille">
               {p.sizes.map((s) => {
                 const on = s === size;
+                const out = available(p.stock, color, s) <= 0;
                 return (
-                  <button type="button" role="radio" aria-checked={on} key={s} onClick={() => setSize(s)} className={`rounded-2xl border py-3 text-[15px] font-semibold transition-colors ${on ? "border-accent shadow-[0_0_0_1px_var(--accent)]" : "border-line hover:border-muted"}`}>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    aria-disabled={out}
+                    aria-label={out ? `${s}, épuisé` : s}
+                    key={s}
+                    onClick={() => {
+                      if (out) return;
+                      setSize(s);
+                      setQty((q) => Math.max(1, Math.min(q, MAX_QTY, available(p.stock, color, s))));
+                    }}
+                    className={`relative rounded-2xl border py-3 text-[15px] font-semibold transition-colors ${out ? "cursor-not-allowed border-line text-muted line-through opacity-60" : on ? "border-accent shadow-[0_0_0_1px_var(--accent)]" : "border-line hover:border-muted"}`}
+                  >
                     {s}
                   </button>
                 );
@@ -165,7 +189,7 @@ export function ProductView({ product: p, others }: { product: Product; others: 
               <motion.span key={qty} initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DUR.instant, ease: EASE.out }} className="w-8 text-center text-sm tabular-nums" aria-live="polite">
                 {qty}
               </motion.span>
-              <button type="button" onClick={() => setQty((q) => Math.min(MAX_QTY, q + 1))} disabled={qty >= MAX_QTY} aria-label="Ajouter un" className="h-9 w-9 text-lg font-extralight transition hover:bg-sand disabled:opacity-40">+</button>
+              <button type="button" onClick={() => setQty((q) => Math.min(maxQty, q + 1))} disabled={qty >= maxQty} aria-label="Ajouter un" className="h-9 w-9 text-lg font-extralight transition hover:bg-sand disabled:opacity-40">+</button>
             </div>
           </div>
 
@@ -174,10 +198,11 @@ export function ProductView({ product: p, others }: { product: Product; others: 
             <motion.span key={p.price * qty} initial={{ opacity: 0.4 }} animate={{ opacity: 1 }} transition={{ duration: DUR.fast, ease: EASE.out }} className="display text-3xl tabular-nums">{formatFCFA(p.price * qty)}</motion.span>
           </div>
 
-          <button type="button" onClick={add} className="btn mt-8 w-full">
+          {left < Infinity && left > 0 && left <= 5 && <p className="mt-4 text-sm font-medium text-new">Plus que {left} en {size} dans cette couleur.</p>}
+          <button type="button" onClick={add} disabled={soldOut} className="btn mt-8 w-full">
             <AnimatePresence mode="wait" initial={false}>
-              <motion.span key={added ? "done" : "add"} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: DUR.instant, ease: EASE.out }}>
-                {added ? "Ajouté au panier ✓" : "Ajouter au panier"}
+              <motion.span key={soldOut ? "out" : added ? "done" : "add"} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: DUR.instant, ease: EASE.out }}>
+                {soldOut ? "Épuisé dans cette couleur" : added ? "Ajouté au panier ✓" : "Ajouter au panier"}
               </motion.span>
             </AnimatePresence>
           </button>

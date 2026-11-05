@@ -1,3 +1,5 @@
+import type { StockMap } from "./stock";
+
 export type Art = "wordmark" | "line" | "sun" | "script" | "crest" | "plain";
 export type ProductTagLabel = "Nouveau" | "Best-seller" | "Promo";
 
@@ -18,6 +20,8 @@ export type Product = {
   flats: string[]; // flat mockups (the "Mockup" tab), in the admin's order
   print3d: Print3D; // the print on the 3D t-shirt (the "3D" tab)
   description: string;
+  /** Blank t-shirts left for this product's colours (src/lib/stock.ts). Colours missing here are not tracked. */
+  stock?: StockMap;
 };
 
 /** One side's print on the 3D t-shirt: centre (x, y) and width (w), in fractions of the print area, like the studio. */

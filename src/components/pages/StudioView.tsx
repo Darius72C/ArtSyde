@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { gsap } from "@/lib/gsap";
 import { TEE_COLORS } from "@/lib/data";
 import { cart, SIZES } from "@/lib/cart";
+import { available, type StockMap } from "@/lib/stock";
 import { STUDIO_PRICE, formatFCFA } from "@/lib/products";
 import { teeState } from "../story/teeState";
 import { ColorPicker } from "../ColorPicker";
@@ -253,7 +254,12 @@ function layerAt(d: Side, px: number, py: number, w: number, h: number): Layer |
   return null;
 }
 
-export function StudioView() {
+/**
+ * `stock`: blank t-shirts left by colour and size. Once the workshop tracks its stock (any line at all),
+ * a studio t-shirt can only be ordered in a colour and size that's in stock; any colour can still be
+ * previewed. With no stock set up yet, every colour can be ordered.
+ */
+export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap; stockColours?: { name: string; hex: string }[] }) {
   const mounted = useSyncExternalStore(noop, () => true, () => false);
   const canvases = mounted ? getCanvases() : null;
   const images = useRef(new Map<string, HTMLImageElement>());
@@ -427,12 +433,17 @@ export function StudioView() {
   const price = BASE_PRICE + (hasBack ? BACK_PRICE : 0);
   const dpi = selImage ? Math.round(selImage.nw / ((selImage.scale * PRINT_WIDTH_CM) / 2.54)) : null;
   const q = PRINT_QUALITY[quality];
+  // Stock of blank t-shirts: only once the workshop tracks it (any line) does it limit what can be ordered.
+  const stockManaged = Object.keys(stock).length > 0;
+  const teeTracked = Boolean(stock[teeHex.toLowerCase()]);
+  const orderable = !stockManaged || available(stock, teeHex, size) > 0;
   const creditsLabel = (n: number) => `${n} crédit${n > 1 ? "s" : ""}`;
   const setInk = (color: string) =>
     setDesign((d) => ({ ...d, [side]: { ...d[side], text: { ...(d[side].text ?? { ...DEFAULT_TEXT, value: "" }), color } } }));
 
   // An HD / Ultra HD print file costs its credits once per design added, whatever the quantity.
   const addToCart = () => {
+    if (!orderable) return flash(teeTracked ? `Épuisé en ${size} dans cette couleur : choisis une autre taille` : "Cette couleur n'est pas en stock : choisis une teinte en stock pour commander");
     if (!spend(q.credits)) return;
     const gl = stage.current?.querySelector("canvas");
     let thumb: string | undefined;
@@ -571,7 +582,8 @@ export function StudioView() {
             <motion.div key={tab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: DUR.fast, ease: EASE.out }} className="mt-8 space-y-6">
               {tab === "couleur" && (
                 <>
-                  <ColorPicker initial={teeHex} presets={TEE_COLORS} presetsLabel="Teintes populaires" onChange={pickColor} />
+                  <ColorPicker initial={teeHex} presets={stockColours.length ? stockColours : TEE_COLORS} presetsLabel={stockColours.length ? "En stock à l'atelier" : "Teintes populaires"} onChange={pickColor} />
+                  {stockManaged && !teeTracked && <p className="text-sm text-new">Cette teinte n&apos;est pas en stock : tu peux la voir en 3D, mais pour commander choisis une teinte en stock.</p>}
                 </>
               )}
 
@@ -737,11 +749,14 @@ export function StudioView() {
           <div className="border-t border-line pt-8">
             <p className="eyebrow">Taille</p>
             <div className="mt-3 grid grid-cols-5 gap-2">
-              {SIZES.map((s) => (
-                <button key={s} onClick={() => setSize(s)} aria-pressed={size === s} className={`rounded-xl border py-2.5 text-sm transition-colors duration-300 ${size === s ? "border-accent font-medium shadow-[0_0_0_1px_var(--accent)]" : "border-line hover:border-muted"}`}>
-                  {s}
-                </button>
-              ))}
+              {SIZES.map((s) => {
+                const out = stockManaged && available(stock, teeHex, s) <= 0;
+                return (
+                  <button key={s} onClick={() => setSize(s)} aria-pressed={size === s} aria-label={out ? `${s}, épuisé dans cette couleur` : s} className={`rounded-xl border py-2.5 text-sm transition-colors duration-300 ${out ? "text-muted line-through" : ""} ${size === s ? "border-accent font-medium shadow-[0_0_0_1px_var(--accent)]" : "border-line hover:border-muted"}`}>
+                    {s}
+                  </button>
+                );
+              })}
             </div>
             <div className="mt-6 flex items-center justify-between">
               <div className="flex items-center rounded-full border border-line">
@@ -754,7 +769,7 @@ export function StudioView() {
               </motion.p>
             </div>
             <p className="mt-2 text-right text-xs text-muted">{hasBack ? `Devant et dos (+${formatFCFA(BACK_PRICE)})` : "Impression devant"}</p>
-            <button onClick={addToCart} className="btn mt-6 w-full">Ajouter au panier{q.credits ? ` · ${creditsLabel(q.credits)}` : ""}</button>
+            <button onClick={addToCart} disabled={!orderable} className="btn mt-6 w-full">{orderable ? `Ajouter au panier${q.credits ? ` · ${creditsLabel(q.credits)}` : ""}` : teeTracked ? `Épuisé en ${size}` : "Couleur pas en stock"}</button>
             <button onClick={() => spend(1) && flash("Design sauvegardé · 1 crédit utilisé")} className="btn-outline mt-3 w-full">
               Sauvegarder · 1 crédit
             </button>

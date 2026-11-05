@@ -5,12 +5,12 @@ import { formatFCFA } from "@/lib/products";
 import { PRODUCT_TAG, SIZE_ORDER, colorName, plural } from "@/lib/admin/labels";
 import { getCatalogue, load } from "@/server/admin/queries";
 import { DbNotice, MoreLink, Panel, Stat, StatusLabel, Swatch, TableScroll, table, td, th } from "./ui";
+import { StockEditor } from "./StockEditor";
 
 export async function ProductsView() {
   const r = await load(getCatalogue);
   if (r.problem) return <DbNotice problem={r.problem} />;
   const { products, studio, colours, lowHex, lowCount, units } = r.data;
-  const sizes = SIZE_ORDER.filter((s) => colours.some((c) => c.sizes.some((x) => x.size === s)));
   const active = products.filter((p) => p.active).length;
 
   return (
@@ -78,56 +78,7 @@ export async function ProductsView() {
       </Panel>
 
       <Panel title="Stock des t-shirts vierges" delay={STAGGER.item}>
-        {colours.length ? (
-          <>
-            <TableScroll>
-              <table className={`${table} min-w-[560px]`}>
-                <thead>
-                  <tr>
-                    <th className={th}>Couleur</th>
-                    {sizes.map((s) => (
-                      <th key={s} className={`${th} text-right`}>
-                        {s}
-                      </th>
-                    ))}
-                    <th className={`${th} text-right`}>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {colours.map((c) => (
-                    <tr key={c.hex}>
-                      <td className={td}>
-                        <span className="flex items-center gap-3">
-                          <Swatch hex={c.hex} />
-                          <span className="font-semibold">{c.name}</span>
-                        </span>
-                      </td>
-                      {sizes.map((s) => {
-                        const line = c.sizes.find((x) => x.size === s);
-                        if (!line) return <td key={s} className={`${td} text-right text-muted`}>—</td>;
-                        const out = line.quantity === 0;
-                        const low = line.quantity <= line.lowAt;
-                        return (
-                          <td key={s} className={`${td} text-right tabular-nums ${out ? "font-medium text-danger" : low ? "font-medium text-new" : ""}`}>
-                            {line.quantity}
-                            {low && <span className="sr-only">{out ? ", épuisé" : ", stock bas"}</span>}
-                          </td>
-                        );
-                      })}
-                      <td className={`${td} text-right font-semibold tabular-nums`}>{c.sizes.reduce((n, x) => n + x.quantity, 0)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </TableScroll>
-            <p className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted">
-              <StatusLabel tone="new">À ou sous le seuil</StatusLabel>
-              <StatusLabel tone="danger">Épuisé</StatusLabel>
-            </p>
-          </>
-        ) : (
-          <p className="text-muted">Pas encore de stock. Le stock de t-shirts vierges, par couleur et par taille, s&apos;affichera ici.</p>
-        )}
+        <StockEditor colours={colours.map((c) => ({ hex: c.hex, name: c.name, sizes: c.sizes.map((x) => ({ id: x.id, size: x.size, quantity: x.quantity, lowAt: x.lowAt })) }))} />
       </Panel>
     </div>
   );

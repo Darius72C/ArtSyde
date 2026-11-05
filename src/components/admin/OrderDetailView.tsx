@@ -7,6 +7,7 @@ import type { DeliveryMethod, OrderStatus } from "@/generated/prisma/client";
 import { DELIVERY_METHOD, ORDER_STATUS, PAYMENT_STATUS, colorName, longDate, paymentMethod, plural, shortDate } from "@/lib/admin/labels";
 import { getOrder, load } from "@/server/admin/queries";
 import { PRINT_QUALITY } from "@/lib/studio";
+import { OrderActions } from "./OrderActions";
 import { Track } from "./Track";
 import { DbNotice, Empty, MoreLink, PageTitle, StatusLabel, Swatch } from "./ui";
 
@@ -66,6 +67,7 @@ export async function OrderDetailView({ params }: { params: Promise<{ reference:
             {o.status === "PENDING_PAYMENT" && <p className="mt-8 text-sm text-muted">En attente du paiement : rien à lancer à l&apos;atelier pour l&apos;instant.</p>}
           </div>
         )}
+        <OrderActions orderId={o.id} status={o.status} hasStudio={hasStudio} pickup={o.delivery === "RETRAIT"} />
       </FadeUp>
 
       <div className="mt-14 grid items-start gap-14 md:grid-cols-[1.4fr_1fr]">

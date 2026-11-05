@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { cart, cartSubtotal, SIZES, useCart, type CartItem } from "@/lib/cart";
+import { available } from "@/lib/stock";
 import { formatFCFA, type Product } from "@/lib/products";
 import { TEE_COLORS } from "@/lib/data";
 
@@ -103,9 +104,16 @@ export function CartView({ products }: { products: Product[] }) {
                         <label className="flex items-center gap-2 text-sm">
                           <span className="text-muted">Taille</span>
                           <select value={it.size} onChange={(e) => cart.setSize(it.key, e.target.value)} className="rounded-lg border border-line bg-bg px-2 py-1 text-sm outline-none focus:border-accent">
-                            {SIZES.map((s) => (
-                              <option key={s}>{s}</option>
-                            ))}
+                            {SIZES.map((s) => {
+                              // Catalogue t-shirts: a size sold out in this colour can't be picked.
+                              const stock = products.find((p) => p.id === it.productId)?.stock;
+                              const out = s !== it.size && available(stock, it.color, s) <= 0;
+                              return (
+                                <option key={s} value={s} disabled={out}>
+                                  {out ? `${s} (épuisé)` : s}
+                                </option>
+                              );
+                            })}
                           </select>
                         </label>
                         <Qty item={it} />
