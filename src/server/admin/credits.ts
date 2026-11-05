@@ -20,22 +20,24 @@ const MAX_ADJUST = 1000;
  */
 export async function adjustCredits(_prev: AdjustCreditsState, form: FormData): Promise<AdjustCreditsState> {
   await requireAdmin();
+  // The customer is found by phone, or by e-mail (an account opened with Google may have no phone yet).
   const phone = String(form.get("phone") ?? "").trim().replace(/\s+/g, " ");
+  const byEmail = phone.includes("@");
   const name = String(form.get("name") ?? "").trim().slice(0, 120);
   const direction = form.get("direction") === "remove" ? -1 : 1;
   const reason = form.get("reason") === "REFUND" && direction > 0 ? "REFUND" : "ADJUSTMENT";
   const n = Number(String(form.get("amount") ?? "").trim());
 
   const errors: AdjustCreditsState["errors"] = {};
-  if (!/^\+?[\d\s]{8,}$/.test(phone)) errors.phone = "Numéro invalide.";
+  if (byEmail ? !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(phone) : !/^\+?[\d\s]{8,}$/.test(phone)) errors.phone = "Numéro ou e-mail invalide.";
   if (!Number.isInteger(n) || n < 1 || n > MAX_ADJUST) errors.amount = `Un nombre entier entre 1 et ${MAX_ADJUST}.`;
   if (Object.keys(errors).length) return { errors };
 
   try {
     const result = await db.$transaction(async (tx) => {
-      let customer = await tx.customer.findUnique({ where: { phone }, select: { id: true, name: true } });
+      let customer = await tx.customer.findUnique({ where: byEmail ? { email: phone.toLowerCase() } : { phone }, select: { id: true, name: true } });
       if (!customer) {
-        if (direction < 0) return { errors: { phone: "Aucun client avec ce numéro." } };
+        if (direction < 0 || byEmail) return { errors: { phone: byEmail ? "Aucun client avec cet e-mail." : "Aucun client avec ce numéro." } };
         if (name.length < 2) return { errors: { name: "Nouveau client : indique son nom." } };
         customer = await tx.customer.create({ data: { name, phone }, select: { id: true, name: true } });
       }

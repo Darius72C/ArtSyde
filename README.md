@@ -108,6 +108,8 @@ Elles sont toutes listées et commentées dans [`.env.example`](.env.example). L
 | `DIRECT_URL` | Connexion Neon directe, utilisée par Prisma pour les migrations |
 | `ADMIN_PASSWORD` | Mot de passe de `/admin`. Le changer déconnecte toutes les sessions admin. |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_URL` | Photos des produits sur Cloudflare R2 (facultatif tant qu'on n'envoie pas de photos) |
+| `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` | Comptes clients : clé secrète des sessions et adresse du site |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Connexion avec Google (sans elles, seul l'e-mail est proposé) |
 
 ### Photos des produits sur Cloudflare R2
 
@@ -176,5 +178,4 @@ Pour changer de modèle, il faut aussi retracer sa silhouette de face dans `src/
 ## Ce qui reste à faire
 
 - **Paiement en ligne** (mobile money ou carte) : les commandes et les achats de crédits sont enregistrés en attente de paiement.
-- **Comptes clients** : le solde de crédits du studio est encore simulé (5 crédits au chargement).
 - **Photos des produits** : l'envoi est prêt, il attend les clés R2.

@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { authClient } from "@/lib/auth-client";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { TeeIllustration } from "../ProductImage";
 import { DUR, EASE, SPRING } from "@/lib/motion";
@@ -35,25 +36,70 @@ function strength(pw: string) {
   return s;
 }
 
-export function LoginView() {
+/** The Google "G", in its colours. */
+function GoogleMark() {
+  return (
+    <svg viewBox="0 0 48 48" className="h-5 w-5" aria-hidden>
+      <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z" />
+      <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
+      <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z" />
+      <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z" />
+    </svg>
+  );
+}
+
+/** Better Auth's error codes, in the shop's voice. */
+const AUTH_ERRORS: Record<string, string> = {
+  INVALID_EMAIL_OR_PASSWORD: "E-mail ou mot de passe incorrect.",
+  USER_ALREADY_EXISTS: "Un compte existe déjà avec cet e-mail : connecte-toi.",
+  USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL: "Un compte existe déjà avec cet e-mail : connecte-toi.",
+  PASSWORD_TOO_SHORT: "8 caractères minimum.",
+  INVALID_EMAIL: "Entre un e-mail valide.",
+};
+
+/**
+ * Sign in or sign up: Google (when `google` is set up), or e-mail and password. Once signed in, `next`
+ * (the page that sent here, e.g. the studio) or the account page.
+ */
+export function LoginView({ google = false, next = "/compte", failed = false }: { google?: boolean; next?: string; failed?: boolean }) {
+  const router = useRouter();
   const [mode, setMode] = useState<Mode>("login");
   const [show, setShow] = useState(false);
   const [pw, setPw] = useState("");
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [status, setStatus] = useState<"idle" | "loading" | "done">("idle");
+  const [errors, setErrors] = useState<Record<string, string>>(failed ? { form: "La connexion avec Google n'a pas abouti. Réessaie." } : {});
+  const [status, setStatus] = useState<"idle" | "loading" | "google">("idle");
 
-  function submit(e: React.FormEvent<HTMLFormElement>) {
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
     const err: Record<string, string> = {};
-    const id = String(f.get("id") ?? "").trim();
-    if (!/^\S+@\S+\.\S+$/.test(id) && !/^\+?[\d\s]{8,}$/.test(id)) err.id = "Entre un e-mail ou un numéro valide.";
+    const email = String(f.get("id") ?? "").trim();
+    const name = String(f.get("name") ?? "").trim();
+    if (!/^\S+@\S+\.\S+$/.test(email)) err.id = "Entre un e-mail valide.";
     if (pw.length < (mode === "signup" ? 8 : 1)) err.pw = mode === "signup" ? "8 caractères minimum." : "Entre ton mot de passe.";
-    if (mode === "signup" && String(f.get("name") ?? "").trim().length < 2) err.name = "Indique ton prénom.";
+    if (mode === "signup" && name.length < 2) err.name = "Indique ton prénom.";
     setErrors(err);
     if (Object.keys(err).length) return;
     setStatus("loading");
-    setTimeout(() => setStatus("done"), 1200); // TODO: call the API (Better Auth)
+    const r = mode === "login" ? await authClient.signIn.email({ email, password: pw }) : await authClient.signUp.email({ email, password: pw, name });
+    if (r.error) {
+      setStatus("idle");
+      const msg = (r.error.code && AUTH_ERRORS[r.error.code]) || "Ça n'a pas marché. Réessaie dans un instant.";
+      setErrors(r.error.code === "PASSWORD_TOO_SHORT" ? { pw: msg } : r.error.code === "INVALID_EMAIL" ? { id: msg } : { form: msg });
+      return;
+    }
+    router.push(next);
+    router.refresh();
+  }
+
+  async function withGoogle() {
+    setStatus("google");
+    setErrors({});
+    const r = await authClient.signIn.social({ provider: "google", callbackURL: next, errorCallbackURL: "/connexion?erreur=google" });
+    if (r?.error) {
+      setStatus("idle");
+      setErrors({ form: "La connexion avec Google n'a pas pu démarrer. Réessaie." });
+    }
   }
   const s = strength(pw);
   const switchMode = (m: Mode) => (setMode(m), setErrors({}));
@@ -76,17 +122,7 @@ export function LoginView() {
       <section className="flex items-center px-5 py-16 md:px-16 lg:px-24">
         <div className="w-full max-w-md">
           <AnimatePresence mode="wait">
-            {status === "done" ? (
-              <motion.div key="done" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DUR.slow, ease: EASE.out }}>
-                
-                <h1 className="display mt-5 text-6xl">{mode === "login" ? "Content de te revoir." : "Bienvenue !"}</h1>
-                <p className="mt-5 text-muted">Démo : les comptes seront reliés au serveur prochainement.</p>
-                <div className="mt-10 flex flex-wrap items-center gap-8">
-                  <Link href="/studio" className="btn">Ouvrir le studio</Link>
-                  <Link href="/#boutique" className="link-line">La boutique <span className="arrow">›</span></Link>
-                </div>
-              </motion.div>
-            ) : (
+            {(
               <motion.div key="form" exit={{ opacity: 0 }} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DUR.slow, ease: EASE.out }}>
                 <LayoutGroup>
                   <div className="relative isolate inline-flex rounded-full bg-surface p-1" role="tablist">
@@ -104,9 +140,19 @@ export function LoginView() {
                     {mode === "login" ? "Content de te revoir." : "Crée ton compte."}
                   </motion.h1>
                 </AnimatePresence>
-                {mode === "signup" && <p className="mt-4 text-sm text-muted">5 crédits studio offerts, suivi de commande, favoris.</p>}
+                {mode === "signup" && <p className="mt-4 text-sm text-muted">5 crédits studio offerts, et le suivi de tes commandes.</p>}
 
-                <form onSubmit={submit} noValidate className="mt-10 space-y-8">
+                {google && (
+                  <>
+                    <button type="button" onClick={withGoogle} disabled={status !== "idle"} className="mt-10 flex w-full items-center justify-center gap-3 rounded-full border border-line bg-bg px-6 py-3 text-[15px] font-medium transition-colors hover:border-muted disabled:opacity-50">
+                      {status === "google" ? <span className="h-4 w-4 animate-spin rounded-full border border-ink border-t-transparent" aria-label="Redirection vers Google" /> : <GoogleMark />}
+                      Continuer avec Google
+                    </button>
+                    <p className="mt-8 flex items-center gap-4 text-[13px] text-muted before:h-px before:flex-1 before:bg-line after:h-px after:flex-1 after:bg-line">ou avec ton e-mail</p>
+                  </>
+                )}
+
+                <form onSubmit={submit} noValidate className={`${google ? "mt-8" : "mt-10"} space-y-8`}>
                   <AnimatePresence initial={false}>
                     {mode === "signup" && (
                       <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: DUR.base, ease: EASE.out }} className="overflow-hidden">
@@ -116,8 +162,8 @@ export function LoginView() {
                       </motion.div>
                     )}
                   </AnimatePresence>
-                  <Field label="E-mail ou téléphone" error={errors.id}>
-                    <input name="id" autoComplete="username" className="field" placeholder="toi@exemple.com" />
+                  <Field label="E-mail" error={errors.id}>
+                    <input name="id" type="email" autoComplete="email" className="field" placeholder="toi@exemple.com" />
                   </Field>
                   <Field label="Mot de passe" error={errors.pw}>
                     <div className="relative">
@@ -142,12 +188,14 @@ export function LoginView() {
                       <span className="w-16 text-right text-[13px] text-muted">{["Faible", "Faible", "Moyen", "Bon", "Fort"][s]}</span>
                     </div>
                   )}
-                  {mode === "login" && (
-                    <a href="#" className="block text-right text-[15px] text-link hover:underline">
-                      Mot de passe oublié ?
-                    </a>
-                  )}
-                  <button disabled={status === "loading"} className="btn w-full">
+                  <AnimatePresence>
+                    {errors.form && (
+                      <motion.p role="alert" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: DUR.fast, ease: EASE.out }} className="text-sm text-danger">
+                        {errors.form}
+                      </motion.p>
+                    )}
+                  </AnimatePresence>
+                  <button disabled={status !== "idle"} className="btn w-full">
                     {status === "loading" ? <span className="h-4 w-4 animate-spin rounded-full border border-on-ink border-t-transparent" aria-label="Chargement" /> : mode === "login" ? "Se connecter" : "Créer mon compte"}
                   </button>
                 </form>

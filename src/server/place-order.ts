@@ -7,6 +7,7 @@ import { STUDIO_PRICE } from "@/lib/products";
 import { PRINT_QUALITIES, type PrintQuality } from "@/lib/studio";
 import { available } from "@/lib/stock";
 import { readStockNow } from "@/server/stock";
+import { customerFor } from "@/server/account";
 
 /*
  * Places an order from the checkout. Anyone can POST here, so nothing from the browser is
@@ -96,7 +97,10 @@ export async function placeOrder(input: CheckoutInput): Promise<PlaceOrderResult
   const deliveryXof = DELIVERY[delivery].price;
 
   try {
+    // Signed in: the order goes on the customer's account (and in "Mes commandes").
+    const customerId = await customerFor(fields.phone.replace(/\s+/g, " "));
     const data = {
+      customerId,
       status: "PENDING_PAYMENT",
       paymentStatus: "UNPAID",
       customerName: fields.name,

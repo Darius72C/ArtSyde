@@ -65,14 +65,18 @@ export async function CustomersView({ searchParams }: { searchParams: Promise<Re
                       </p>
                     </td>
                     <td className={td}>
-                      <a href={`tel:${c.phone.replace(/\s+/g, "")}`} className="whitespace-nowrap tabular-nums text-link hover:underline">
-                        {c.phone}
-                      </a>
+                      {c.phone ? (
+                        <a href={`tel:${c.phone.replace(/\s+/g, "")}`} className="whitespace-nowrap tabular-nums text-link hover:underline">
+                          {c.phone}
+                        </a>
+                      ) : (
+                        <span className="text-muted">Pas de téléphone</span>
+                      )}
                       {c.email && <p className="text-xs text-muted">{c.email}</p>}
                     </td>
                     <td className={`${td} text-right tabular-nums`}>
                       {c.orders ? (
-                        <Link href={`/admin/commandes?q=${encodeURIComponent(c.phone)}`} className="text-link hover:underline">
+                        <Link href={`/admin/commandes?q=${encodeURIComponent(c.phone ?? c.email ?? c.name)}`} className="text-link hover:underline">
                           {c.orders}
                         </Link>
                       ) : (
@@ -82,7 +86,7 @@ export async function CustomersView({ searchParams }: { searchParams: Promise<Re
                     <td className={`${td} whitespace-nowrap text-right tabular-nums`}>{c.spent ? formatFCFA(c.spent) : <span className="text-muted">—</span>}</td>
                     <td className={`${td} whitespace-nowrap text-right tabular-nums`}>
                       {c.credits}{" "}
-                      <Link href={`/admin/clients?client=${encodeURIComponent(c.phone)}#credits`} className="ml-2 text-sm text-link hover:underline" aria-label={`Gérer les crédits de ${c.name}`}>
+                      <Link href={`/admin/clients?client=${encodeURIComponent(c.phone ?? c.email ?? "")}#credits`} className="ml-2 text-sm text-link hover:underline" aria-label={`Gérer les crédits de ${c.name}`}>
                         Gérer
                       </Link>
                     </td>

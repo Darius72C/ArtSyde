@@ -81,17 +81,85 @@ model HeroCard {
   updatedAt DateTime @updatedAt
 }
 
+// ---------- Comptes (Better Auth : connexion Google ou e-mail) ----------
+// Tables utilisées par Better Auth (src/server/auth.ts). Un compte est relié à un client (Customer),
+// qui porte ses commandes et ses crédits.
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sessions Session[]
+  accounts Account[]
+  customer Customer?
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Une façon de se connecter : Google, ou e-mail et mot de passe (providerId "credential").
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+}
+
 // ---------- Clients ----------
 
 model Customer {
   id        String   @id @default(cuid())
   name      String
-  phone     String   @unique
+  // Facultatif : un client qui s'inscrit avec Google n'a pas encore donné son numéro.
+  phone     String?  @unique
   email     String?  @unique
   city      String?
   address   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Son compte sur le site (connexion Google ou e-mail), s'il en a un.
+  userId          String?        @unique
+  user            User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   orders          Order[]
   credits         CreditEntry[]

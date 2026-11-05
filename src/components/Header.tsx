@@ -5,8 +5,27 @@ import { usePathname } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { AnimatePresence, motion, useAnimationControls } from "motion/react";
 import { useCartCount } from "@/lib/cart";
+import { authClient } from "@/lib/auth-client";
 import { CART_BUMP } from "@/lib/flyToCart";
 import { DUR, EASE, SPRING } from "@/lib/motion";
+
+/** The account icon: the account page when signed in (with the first letter of the name), else the sign-in page. */
+function AccountLink() {
+  const { data } = authClient.useSession();
+  const user = data?.user;
+  return (
+    <Link href={user ? "/compte" : "/connexion"} aria-label={user ? `Mon compte, ${user.name}` : "Se connecter"} className="nav-link hidden md:inline">
+      {user ? (
+        <span className="grid h-[22px] w-[22px] place-items-center rounded-full bg-ink text-[11px] font-semibold uppercase text-on-ink">{(user.name || user.email).slice(0, 1)}</span>
+      ) : (
+        <svg viewBox="0 0 24 24" className="h-[17px] w-[17px]" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <circle cx="12" cy="8" r="3.6" />
+          <path d="M4.5 20c1.4-3.6 4.3-5.4 7.5-5.4s6.1 1.8 7.5 5.4" />
+        </svg>
+      )}
+    </Link>
+  );
+}
 
 const LINKS = [
   { href: "/#boutique", label: "Boutique" },
@@ -87,12 +106,7 @@ function Bar({ path }: { path: string | null }) {
           ))}
         </ul>
         <div className="flex items-center gap-5">
-          <Link href="/connexion" aria-label="Mon compte" className="nav-link hidden md:inline">
-            <svg viewBox="0 0 24 24" className="h-[17px] w-[17px]" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <circle cx="12" cy="8" r="3.6" />
-              <path d="M4.5 20c1.4-3.6 4.3-5.4 7.5-5.4s6.1 1.8 7.5 5.4" />
-            </svg>
-          </Link>
+          <AccountLink />
           <Link href="/panier" id="cart-link" aria-label={`Panier, ${count} article${count > 1 ? "s" : ""}`} className="nav-link relative">
             <motion.span animate={bag} className="block">
               <BagIcon />

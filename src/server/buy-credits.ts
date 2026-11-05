@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/server/db";
+import { customerFor } from "@/server/account";
 import { Prisma } from "@/generated/prisma/client";
 import { checkFields } from "@/lib/orders";
 import { CREDIT_PACKS, CREDIT_PACK_IDS, PAYMENT_METHOD_IDS, type BuyCreditsInput, type BuyCreditsResult } from "@/lib/credits";
@@ -29,14 +30,14 @@ export async function buyCredits(input: BuyCreditsInput): Promise<BuyCreditsResu
   const phone = fields.phone.replace(/\s+/g, " ");
 
   try {
-    // A customer already known by this number gets the purchase on their account.
-    const customer = await db.customer.findUnique({ where: { phone }, select: { id: true } });
+    // The signed-in customer, or a customer already known by this number, gets the purchase on their account.
+    const customerId = await customerFor(phone);
     const data = {
       pack,
       credits,
       priceXof,
       paymentMethod: method,
-      customerId: customer?.id ?? null,
+      customerId,
       customerName: fields.name,
       customerPhone: phone,
       customerEmail: fields.email || null,

@@ -8,6 +8,7 @@ import { gsap } from "@/lib/gsap";
 import { TEE_COLORS } from "@/lib/data";
 import { cart, SIZES } from "@/lib/cart";
 import { available, type StockMap } from "@/lib/stock";
+import { getMyCredits, refundCredits, spendCredits, type MyCredits } from "@/server/my-credits";
 import { STUDIO_PRICE, formatFCFA } from "@/lib/products";
 import { teeState } from "../story/teeState";
 import { ColorPicker } from "../ColorPicker";
@@ -268,11 +269,14 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
   const [selected, setSelected] = useState<Layer | null>("text");
   const [tab, setTab] = useState<"couleur" | "image" | "texte">("texte");
   const [teeHex, setTeeHex] = useState<string>(TEE_COLORS[0].hex.toLowerCase());
-  const [tokens, setTokens] = useState(5); // mock balance — will come from the user's account
+  // The signed-in customer's real credits (null while loading). Signed out: free actions only.
+  const [credits, setCredits] = useState<MyCredits | null>(null);
+  const tokens = credits?.signedIn ? credits.balance : 0;
   const [size, setSize] = useState("M");
   const [qty, setQty] = useState(1);
   const [toast, setToast] = useState<string | null>(null);
-  const [noTokens, setNoTokens] = useState(false);
+  // Why a paid action stopped: not signed in, or not enough credits.
+  const [gate, setGate] = useState<"signin" | "empty" | null>(null);
   const [quality, setQuality] = useState<PrintQuality>("STANDARD");
   const [exporting, setExporting] = useState(false);
   const [compare, setCompare] = useState(false);
@@ -309,13 +313,35 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
     setToast(msg);
     setTimeout(() => setToast(null), 2200);
   };
-  const spend = (n: number) => {
-    if (tokens < n) {
-      setNoTokens(true);
+  useEffect(() => {
+    getMyCredits()
+      .then(setCredits)
+      .catch(() => setCredits({ signedIn: false }));
+  }, []);
+
+  /** Spends credits on the server (free when n is 0). False, with the reason shown, if it can't. */
+  const spend = async (n: number, reason: "IMAGE_UPLOAD" | "HD_PREVIEW"): Promise<boolean> => {
+    if (n <= 0) return true;
+    if (!credits?.signedIn) {
+      setGate("signin");
       return false;
     }
-    setTokens((t) => t - n);
-    return true;
+    if (credits.balance < n) {
+      setGate("empty");
+      return false;
+    }
+    const r = await spendCredits(n, reason).catch(() => null);
+    if (r?.ok) {
+      setCredits({ ...credits, balance: r.balance });
+      return true;
+    }
+    if (r?.reason === "signed-out") setGate("signin");
+    else if (r?.reason === "not-enough") {
+      setCredits({ ...credits, balance: r.balance ?? 0 });
+      setGate("empty");
+    }
+    else flash("Les crédits n'ont pas pu être utilisés : réessaie");
+    return false;
   };
 
   /** Changes the text ("text") or one image (by its id) on the current side. */
@@ -339,7 +365,7 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
 
 
   // Adds images to the current side, on top of what is there: 1 credit each. Several can be picked at once.
-  const onUpload = (list: FileList | null) => {
+  const onUpload = async (list: FileList | null) => {
     const files = [...(list ?? [])];
     if (!files.length) return;
     if (files.some((f) => !/^image\/(png|jpeg|webp)$/.test(f.type))) return flash("Format accepté : PNG, JPG ou WEBP");
@@ -347,7 +373,7 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
     const room = MAX_IMAGES - design[side].images.length;
     if (room <= 0) return flash(`${MAX_IMAGES} images maximum par face`);
     const take = files.slice(0, room);
-    if (!spend(take.length)) return;
+    if (!(await spend(take.length, "IMAGE_UPLOAD"))) return;
     const target = side;
     const extra = files.length > take.length ? ` (${MAX_IMAGES} max par face)` : "";
     let loaded = 0;
@@ -442,9 +468,9 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
     setDesign((d) => ({ ...d, [side]: { ...d[side], text: { ...(d[side].text ?? { ...DEFAULT_TEXT, value: "" }), color } } }));
 
   // An HD / Ultra HD print file costs its credits once per design added, whatever the quantity.
-  const addToCart = () => {
+  const addToCart = async () => {
     if (!orderable) return flash(teeTracked ? `Épuisé en ${size} dans cette couleur : choisis une autre taille` : "Cette couleur n'est pas en stock : choisis une teinte en stock pour commander");
-    if (!spend(q.credits)) return;
+    if (!(await spend(q.credits, "HD_PREVIEW"))) return;
     const gl = stage.current?.querySelector("canvas");
     let thumb: string | undefined;
     if (gl) {
@@ -462,7 +488,7 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
   // flat print file of each printed side, all at the chosen quality.
   const exportDesign = async () => {
     const sides = (["front", "back"] as SideId[]).filter((id) => hasContent(design[id]));
-    if (!spend(q.credits)) return;
+    if (!(await spend(q.credits, "HD_PREVIEW"))) return;
     setExporting(true);
     const tag = q.label.toLowerCase().replace(/\s+/g, "-");
     const save = (blob: Blob, name: string) => {
@@ -499,7 +525,7 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
       flash(q.credits ? `Visuel ${q.label} téléchargé · ${creditsLabel(q.credits)} utilisé${q.credits > 1 ? "s" : ""}` : "Visuel téléchargé");
     } catch (err) {
       console.error("Studio export failed", err);
-      if (q.credits) setTokens((t) => t + q.credits);
+      if (q.credits) refundCredits(q.credits).then((r) => r.ok && setCredits((c) => (c?.signedIn ? { ...c, balance: r.balance } : c)));
       flash(quality === "STANDARD" ? "Trop lourd pour cet appareil : essaie depuis un ordinateur" : "Trop lourd pour cet appareil : choisis une qualité plus basse");
     } finally {
       setExporting(false);
@@ -533,12 +559,22 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
       <div className="mb-8 flex flex-wrap items-end justify-between gap-6">
         <RevealLines as="h1" lines={[{ text: "Studio 3D.", muted: "Crée le tien." }]} className="display text-5xl md:text-6xl" />
         <div className="flex items-center gap-6 text-sm">
-          <motion.span key={tokens} initial={{ opacity: 0.3 }} animate={{ opacity: 1 }} className="tabular-nums">
-            {tokens} crédit{tokens > 1 ? "s" : ""}
-          </motion.span>
-          <Link href="/credits" className="link-line">
-            Recharger <span className="arrow">→</span>
-          </Link>
+          {credits === null ? (
+            <span className="h-px w-16 animate-pulse bg-ink/40" aria-label="Chargement des crédits" />
+          ) : credits.signedIn ? (
+            <>
+              <motion.span key={tokens} initial={{ opacity: 0.3 }} animate={{ opacity: 1 }} className="tabular-nums">
+                {tokens} crédit{tokens > 1 ? "s" : ""}
+              </motion.span>
+              <Link href="/credits" className="link-line">
+                Recharger <span className="arrow">→</span>
+              </Link>
+            </>
+          ) : (
+            <Link href="/connexion?suite=/studio" className="link-line">
+              Se connecter · 5 crédits offerts <span className="arrow">→</span>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -770,9 +806,6 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
             </div>
             <p className="mt-2 text-right text-xs text-muted">{hasBack ? `Devant et dos (+${formatFCFA(BACK_PRICE)})` : "Impression devant"}</p>
             <button onClick={addToCart} disabled={!orderable} className="btn mt-6 w-full">{orderable ? `Ajouter au panier${q.credits ? ` · ${creditsLabel(q.credits)}` : ""}` : teeTracked ? `Épuisé en ${size}` : "Couleur pas en stock"}</button>
-            <button onClick={() => spend(1) && flash("Design sauvegardé · 1 crédit utilisé")} className="btn-outline mt-3 w-full">
-              Sauvegarder · 1 crédit
-            </button>
           </div>
         </motion.aside>
       </div>
@@ -798,8 +831,8 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
       </AnimatePresence>
 
       <AnimatePresence>
-        {noTokens && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[80] grid place-items-center bg-ink/50 p-5 backdrop-blur-sm" onClick={() => setNoTokens(false)}>
+        {gate && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[80] grid place-items-center bg-ink/50 p-5 backdrop-blur-sm" onClick={() => setGate(null)}>
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -810,13 +843,27 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
               role="dialog"
               aria-modal
             >
-              <p className="eyebrow">Crédits épuisés</p>
-              <h2 className="display mt-2 text-4xl">Recharge pour continuer.</h2>
-              <p className="mt-4 text-sm text-muted">Les crédits servent à importer une image, sauvegarder un design, télécharger ou commander en HD.</p>
-              <div className="mt-8 flex flex-col items-center gap-4">
-                <Link href="/credits" className="btn">Recharger</Link>
-                <button onClick={() => setNoTokens(false)} className="link-line">Plus tard</button>
-              </div>
+              {gate === "signin" ? (
+                <>
+                  <p className="eyebrow">Crédits studio</p>
+                  <h2 className="display mt-2 text-4xl">Connecte-toi pour continuer.</h2>
+                  <p className="mt-4 text-sm text-muted">Tes crédits sont sur ton compte : 5 crédits offerts à l&apos;inscription. Ton design reste ici pendant que tu te connectes dans cet onglet.</p>
+                  <div className="mt-8 flex flex-col items-center gap-4">
+                    <Link href="/connexion?suite=/studio" className="btn">Se connecter</Link>
+                    <button onClick={() => setGate(null)} className="link-line">Plus tard</button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="eyebrow">Crédits épuisés</p>
+                  <h2 className="display mt-2 text-4xl">Recharge pour continuer.</h2>
+                  <p className="mt-4 text-sm text-muted">Les crédits servent à importer une image, télécharger ou commander en HD.</p>
+                  <div className="mt-8 flex flex-col items-center gap-4">
+                    <Link href="/credits" className="btn">Recharger</Link>
+                    <button onClick={() => setGate(null)} className="link-line">Plus tard</button>
+                  </div>
+                </>
+              )}
             </motion.div>
           </motion.div>
         )}

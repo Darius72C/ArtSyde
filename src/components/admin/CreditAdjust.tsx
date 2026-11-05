@@ -24,7 +24,7 @@ export function CreditAdjust({ phone }: { phone?: string }) {
       <input type="hidden" name="direction" value={direction} />
 
       <div className="grid gap-8 sm:grid-cols-3">
-        <Field key={phone ?? "none"} name="phone" label="Téléphone du client" type="tel" defaultValue={phone} error={e.phone} />
+        <Field key={phone ?? "none"} name="phone" label="Téléphone ou e-mail du client" defaultValue={phone} error={e.phone} />
         <Field name="name" label="Nom (si nouveau client)" error={e.name} maxLength={120} disabled={direction === "remove"} />
         <Field name="amount" label="Nombre de crédits" inputMode="numeric" error={e.amount} />
       </div>
