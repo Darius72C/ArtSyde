@@ -86,7 +86,7 @@ export function ProductView({ product: p, others }: { product: Product; others: 
                 {view === "3d" ? (
                   <ProductTee3D color={color} print={p.print3d} className="h-full w-full" />
                 ) : (
-                  <ProductImage color={color} art={p.art} photo={picture} alt={`${p.name}, ${PICTURE[view]} ${shown + 1}`} bg="transparent" className="h-full w-full" zoom={false} />
+                  <ProductImage color={color} art={p.art} photo={picture} alt={`${p.name}, ${PICTURE[view]} ${shown + 1}`} bg="transparent" className="h-full w-full" zoom={false} fit="contain" />
                 )}
               </motion.div>
             </AnimatePresence>
