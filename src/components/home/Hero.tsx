@@ -9,7 +9,7 @@ import { RevealLines } from "../Reveal";
 import { DUR, EASE, SPRING, STAGGER } from "@/lib/motion";
 
 /*
- * The hero's three cards: the newest t-shirts of the collection, the newest in front.
+ * The hero's cards (up to three): photos of the newest t-shirts of the collection, the newest in front.
  * x: offset from the centre (% of the stage width), r: tilt (deg), s: scale,
  * depth: how far it follows the mouse (the front one most), d: entrance delay (s).
  */
@@ -20,13 +20,15 @@ const SLOTS = [
 ] as const;
 
 /**
- * The newest products first: those with a photo uploaded from the admin (on R2, a full URL) before the
- * others, whose illustration stands in. A local path may point to a file this copy of the site doesn't have.
+ * Real photos only, never the illustrated tee: the photos uploaded from the admin (on R2, a full URL) of the
+ * newest products, newest first; a product with several photos can fill more than one card. A local path is
+ * skipped, it may point to a file this copy of the site doesn't have. No photo at all: no cards.
  */
 function newest(products: Product[]) {
   const recent = [...products].reverse(); // the catalogue is oldest first
-  const uploaded = (p: Product) => Boolean(p.photo && /^https?:\/\//.test(p.photo));
-  return [...recent.filter(uploaded), ...recent.filter((p) => !uploaded(p))].slice(0, SLOTS.length).map((p) => (uploaded(p) ? p : { ...p, photo: undefined }));
+  return recent
+    .flatMap((p) => p.photos.filter((url) => /^https?:\/\//.test(url)).map((url) => ({ ...p, photo: url })))
+    .slice(0, SLOTS.length);
 }
 
 function HeroCard({ p, slot, spread, px, py, still }: { p: Product; slot: (typeof SLOTS)[number]; spread: MotionValue<number>; px: MotionValue<number>; py: MotionValue<number>; still: boolean }) {
@@ -130,7 +132,7 @@ export function Hero({ products = [] }: { products?: Product[] }) {
       {cards.length > 0 && (
         <motion.div className="relative mx-auto mt-14 aspect-[4/3] max-w-[980px] sm:aspect-[16/9] md:mt-16" style={{ y: lift, scale: shrink }}>
           {cards.map((p, i) => (
-            <HeroCard key={p.id} p={p} slot={SLOTS[i]} spread={spread} px={px} py={py} still={reduce} />
+            <HeroCard key={p.photo} p={p} slot={SLOTS[i]} spread={spread} px={px} py={py} still={reduce} />
           ))}
         </motion.div>
       )}
