@@ -39,6 +39,7 @@ model Product {
   updatedAt   DateTime    @updatedAt
 
   orderItems OrderItem[]
+  heroCards  HeroCard[]
 }
 
 enum ProductTag {
@@ -67,6 +68,17 @@ model ColorStock {
   updatedAt DateTime @updatedAt
 
   @@unique([colorHex, size])
+}
+
+// Les cartes du haut de la page d'accueil (jusqu'à 3), choisies dans l'admin (/admin/accueil).
+// Sans carte, l'accueil montre les photos des derniers modèles.
+model HeroCard {
+  slot      Int      @id // 0 = devant, 1 = gauche, 2 = droite
+  imageUrl  String // image sur R2 (hero/…)
+  // Modèle vers lequel la carte mène, avec son nom et son prix. Sans modèle : la carte mène à la boutique.
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  updatedAt DateTime @updatedAt
 }
 
 // ---------- Clients ----------

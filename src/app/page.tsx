@@ -11,17 +11,18 @@ import { Credits } from "@/components/home/Credits";
 import { Faq } from "@/components/home/Faq";
 import { Newsletter } from "@/components/home/Newsletter";
 import { getCatalog } from "@/server/catalog";
+import { getHeroCards } from "@/server/hero";
 
 export default async function Home() {
   // Cached ("use cache", tag "catalog"): saving a product in the admin refreshes it.
-  const products = await getCatalog();
+  const [products, heroCards] = await Promise.all([getCatalog(), getHeroCards()]);
   return (
     <>
       <Header />
       <PageTransition>
       <div>
       <main>
-        <Hero products={products} />
+        <Hero products={products} cards={heroCards} />
         <ScrollStory />
         <NewArrivals products={products} />
         <Bento />

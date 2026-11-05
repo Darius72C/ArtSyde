@@ -76,6 +76,42 @@ const WATERMARK = `url("data:image/svg+xml,${encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="220" height="140"><text x="110" y="76" text-anchor="middle" transform="rotate(-24 110 70)" font-family="sans-serif" font-size="15" font-weight="600" letter-spacing="2" fill="rgb(128,128,128)" fill-opacity="0.38">ARTSYDE · APERÇU</text></svg>',
 )}")`;
 
+/**
+ * The watermark of a Standard (free) download: "ARTSYDE · STANDARD" repeated diagonally across the whole
+ * image. HD and Ultra HD, paid with credits, are clean.
+ */
+function stampWatermark(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  const size = Math.max(14, Math.round(w / 34));
+  ctx.save();
+  ctx.font = `600 ${size}px sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "rgba(128, 128, 128, 0.42)";
+  const stepX = size * 14;
+  const stepY = size * 7;
+  ctx.translate(w / 2, h / 2);
+  ctx.rotate((-24 * Math.PI) / 180);
+  const reach = Math.hypot(w, h) / 2 + stepX;
+  for (let y = -reach, row = 0; y <= reach; y += stepY, row++) {
+    for (let x = -reach + (row % 2) * (stepX / 2); x <= reach; x += stepX) ctx.fillText("ARTSYDE · STANDARD", x, y);
+  }
+  ctx.restore();
+}
+
+/** A downloaded image with the Standard watermark over it. */
+async function watermarked(blob: Blob): Promise<Blob> {
+  const img = await createImageBitmap(blob);
+  const c = Object.assign(document.createElement("canvas"), { width: img.width, height: img.height });
+  const ctx = c.getContext("2d");
+  if (!ctx) throw new Error("canvas too large");
+  ctx.drawImage(img, 0, 0);
+  img.close();
+  stampWatermark(ctx, c.width, c.height);
+  const out = await new Promise<Blob | null>((r) => c.toBlob(r, "image/png"));
+  if (!out) throw new Error("canvas too large");
+  return out;
+}
+
 function Watermark() {
   return <div className="pointer-events-none absolute inset-0" style={{ backgroundImage: WATERMARK, backgroundSize: "220px 140px" }} aria-hidden />;
 }
@@ -463,13 +499,14 @@ export function StudioView() {
       for (const face of ["front", "back"] as const) {
         const view = await teeSnapshot.current?.(q.view, face);
         if (!view) throw new Error("3D view unavailable");
-        files.push({ name: `artsyde-vue-${face === "front" ? "devant" : "dos"}-${tag}.png`, data: view });
+        files.push({ name: `artsyde-vue-${face === "front" ? "devant" : "dos"}-${tag}.png`, data: quality === "STANDARD" ? await watermarked(view) : view });
       }
       for (const id of sides) {
         const c = Object.assign(document.createElement("canvas"), { width: q.px, height: Math.round(q.px / TEE_ASPECT) });
         const ctx = c.getContext("2d");
         if (!ctx) throw new Error("canvas too large");
         paint(ctx, design[id], c.width, c.height, images.current);
+        if (quality === "STANDARD") stampWatermark(ctx, c.width, c.height); // free download: always watermarked
         const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/png"));
         if (!blob) throw new Error("canvas too large");
         files.push({ name: `artsyde-impression-${id === "front" ? "devant" : "dos"}-${tag}.png`, data: blob });
@@ -705,7 +742,7 @@ export function StudioView() {
               {PRINT_QUALITIES.map((k) => (
                 <button key={k} onClick={() => setQuality(k)} aria-pressed={quality === k} className={`rounded-xl border px-2 py-2.5 text-sm transition-colors duration-300 ${quality === k ? "border-accent font-medium shadow-[0_0_0_1px_var(--accent)]" : "border-line hover:border-muted"}`}>
                   {PRINT_QUALITY[k].label}
-                  <span className="block text-[11px] font-normal text-muted">{PRINT_QUALITY[k].credits ? creditsLabel(PRINT_QUALITY[k].credits) : "Gratuit"}</span>
+                  <span className="block text-[11px] font-normal text-muted">{PRINT_QUALITY[k].credits ? creditsLabel(PRINT_QUALITY[k].credits) : "Gratuit · filigrane"}</span>
                 </button>
               ))}
             </div>

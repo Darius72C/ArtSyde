@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRef } from "react";
 import { motion, useMotionValue, useReducedMotion, useScroll, useSpring, useTransform, type MotionValue } from "motion/react";
 import { formatFCFA, productHref, type Product } from "@/lib/products";
-import { ProductImage } from "../ProductImage";
+import type { HeroCardView } from "@/server/hero";
 import { RevealLines } from "../Reveal";
 import { DUR, EASE, SPRING, STAGGER } from "@/lib/motion";
 
@@ -24,14 +24,32 @@ const SLOTS = [
  * newest products, newest first; a product with several photos can fill more than one card. A local path is
  * skipped, it may point to a file this copy of the site doesn't have. No photo at all: no cards.
  */
-function newest(products: Product[]) {
+/** What a card shows: a photo, and the product's name and price when it leads to one. */
+type Card = { key: string; photo: string; name?: string; price?: number; href: string };
+
+function newest(products: Product[]): Card[] {
   const recent = [...products].reverse(); // the catalogue is oldest first
   return recent
-    .flatMap((p) => p.photos.filter((url) => /^https?:\/\//.test(url)).map((url) => ({ ...p, photo: url })))
+    .flatMap((p) => p.photos.filter((url) => /^https?:\/\//.test(url)).map((url) => ({ key: url, photo: url, name: p.name, price: p.price, href: productHref(p) })))
     .slice(0, SLOTS.length);
 }
 
-function HeroCard({ p, slot, spread, px, py, still }: { p: Product; slot: (typeof SLOTS)[number]; spread: MotionValue<number>; px: MotionValue<number>; py: MotionValue<number>; still: boolean }) {
+/**
+ * The cards: the ones set in the admin (/admin/accueil) in their places, and in an empty place the next
+ * photo of the newest products. No card set at all: the newest products' photos.
+ */
+function pickCards(set: HeroCardView[], products: Product[]): Card[] {
+  const fill = newest(products).filter((c) => !set.some((s) => s.image === c.photo));
+  const out: Card[] = [];
+  for (let slot = 0; slot < SLOTS.length; slot++) {
+    const s = set.find((x) => x.slot === slot);
+    const c = s ? { key: s.image, photo: s.image, name: s.name, price: s.price, href: s.href } : fill.shift();
+    if (c) out.push(c);
+  }
+  return out;
+}
+
+function HeroCard({ card, slot, spread, px, py, still }: { card: Card; slot: (typeof SLOTS)[number]; spread: MotionValue<number>; px: MotionValue<number>; py: MotionValue<number>; still: boolean }) {
   // On scroll the side cards tuck in behind the front one; the mouse moves each by its depth.
   const left = useTransform(spread, (s) => `${50 + slot.x * s}%`);
   const x = useTransform(px, (v) => v * 18 * slot.depth);
@@ -55,20 +73,24 @@ function HeroCard({ p, slot, spread, px, py, still }: { p: Product; slot: (typeo
           style={{ rotateX, rotateY }}
         >
           <Link
-            href={productHref(p)}
+            href={card.href}
+            aria-label={card.name ?? "La boutique"}
             tabIndex={slot.z === 3 ? 0 : -1}
             className="group relative block h-full w-full overflow-hidden rounded-[28px] shadow-[0_30px_80px_-20px_rgba(0,0,0,0.45)] ring-1 ring-ink/10 transition-transform duration-500 hover:-translate-y-2"
           >
-            <ProductImage color={p.colors[0]} art={p.art} photo={p.photo} alt={p.name} bg={p.bg} className="h-full w-full" eager />
-            <span className="absolute inset-x-3 bottom-3 flex items-center justify-between gap-3 rounded-2xl border border-line/60 bg-[var(--nav)] px-4 py-2.5 text-left backdrop-blur-xl">
-              <span className="min-w-0">
-                <span className="block truncate text-[15px] font-semibold text-ink">{p.name}</span>
-                <span className="block text-[13px] text-muted tabular-nums">{formatFCFA(p.price)}</span>
+            {/* eslint-disable-next-line @next/next/no-img-element -- photos live on R2, whose public domain is set per deployment */}
+            <img src={card.photo} alt="" loading="eager" fetchPriority={slot.z === 3 ? "high" : "auto"} decoding="async" className="h-full w-full bg-surface object-cover" />
+            {card.name && (
+              <span className="absolute inset-x-3 bottom-3 flex items-center justify-between gap-3 rounded-2xl border border-line/60 bg-[var(--nav)] px-4 py-2.5 text-left backdrop-blur-xl">
+                <span className="min-w-0">
+                  <span className="block truncate text-[15px] font-semibold text-ink">{card.name}</span>
+                  {card.price !== undefined && <span className="block text-[13px] text-muted tabular-nums">{formatFCFA(card.price)}</span>}
+                </span>
+                <span className="arrow shrink-0 text-link transition-transform duration-500 group-hover:translate-x-1" aria-hidden>
+                  ›
+                </span>
               </span>
-              <span className="arrow shrink-0 text-link transition-transform duration-500 group-hover:translate-x-1" aria-hidden>
-                ›
-              </span>
-            </span>
+            )}
           </Link>
         </motion.div>
       </motion.div>
@@ -76,11 +98,11 @@ function HeroCard({ p, slot, spread, px, py, still }: { p: Product; slot: (typeo
   );
 }
 
-/** `products` (the catalogue, from the database) give the hero its cards: the newest t-shirts. */
-export function Hero({ products = [] }: { products?: Product[] }) {
+/** `cards` are the ones set in the admin; `products` (the catalogue) fill the empty places with their newest photos. */
+export function Hero({ products = [], cards: set = [] }: { products?: Product[]; cards?: HeroCardView[] }) {
   const root = useRef<HTMLElement>(null);
   const reduce = Boolean(useReducedMotion());
-  const cards = newest(products);
+  const cards = pickCards(set, products);
 
   // Scroll: from the top of the hero to its end, the fan closes a little and the stage lifts.
   const { scrollYProgress } = useScroll({ target: root, offset: ["start start", "end start"] });
@@ -131,8 +153,8 @@ export function Hero({ products = [] }: { products?: Product[] }) {
 
       {cards.length > 0 && (
         <motion.div className="relative mx-auto mt-14 aspect-[4/3] max-w-[980px] sm:aspect-[16/9] md:mt-16" style={{ y: lift, scale: shrink }}>
-          {cards.map((p, i) => (
-            <HeroCard key={p.photo} p={p} slot={SLOTS[i]} spread={spread} px={px} py={py} still={reduce} />
+          {cards.map((c, i) => (
+            <HeroCard key={c.key} card={c} slot={SLOTS[i]} spread={spread} px={px} py={py} still={reduce} />
           ))}
         </motion.div>
       )}
