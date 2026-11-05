@@ -195,3 +195,29 @@ export async function savePrint3d(productId: string, value: Print3D): Promise<{ 
   }
   return { ok: true };
 }
+
+export type DeleteProductResult = { ok: false; message: string };
+
+/**
+ * Deletes a product and its pictures on R2 (photos, mockups, 3D prints), then goes back to the list.
+ * A product that was already ordered is kept: its order lines would lose which t-shirt they were. Hide it
+ * from the shop instead (uncheck "En ligne dans la boutique").
+ */
+export async function deleteProduct(productId: string): Promise<DeleteProductResult> {
+  await requireAdmin();
+  const p = await db.product.findUnique({ where: { id: productId }, select: { mockups: true, flatMockups: true, print3d: true, _count: { select: { orderItems: true } } } });
+  if (!p) redirect("/admin/produits");
+  if (p._count.orderItems > 0)
+    return { ok: false, message: `Ce modèle a déjà été commandé (${p._count.orderItems} article${p._count.orderItems > 1 ? "s" : ""}) : décoche « En ligne dans la boutique » pour le masquer.` };
+  try {
+    await db.product.delete({ where: { id: productId } });
+  } catch (e) {
+    console.error("deleteProduct failed", e);
+    return { ok: false, message: "Le modèle n'a pas pu être supprimé. Réessaie." };
+  }
+  updateTag(CATALOG_TAG);
+  const print = parsePrint3D(p.print3d);
+  const files = [...p.mockups, ...p.flatMockups, ...PRINT_SIDES.map((s) => print[s]?.url).filter((u): u is string => Boolean(u))];
+  await Promise.all(files.map((url) => deleteFile(productId, url).catch(() => {})));
+  redirect("/admin/produits?supprime=1");
+}

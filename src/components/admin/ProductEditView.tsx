@@ -5,6 +5,7 @@ import { STAGGER } from "@/lib/motion";
 import { load } from "@/server/admin/queries";
 import { FadeUp } from "../Reveal";
 import { ProductImage } from "../ProductImage";
+import { DeleteProduct } from "./DeleteProduct";
 import { MediaTabs } from "./MediaTabs";
 import { PhotoManager } from "./PhotoManager";
 import { Print3DEditor } from "./Print3DEditor";
@@ -54,6 +55,11 @@ export async function ProductEditView({ params, searchParams }: { params: Promis
           <div className="mt-8">
             <ProductForm product={product} uploads={configured} />
           </div>
+          {p && (
+            <div className="mt-8">
+              <DeleteProduct productId={p.id} name={p.name} />
+            </div>
+          )}
         </FadeUp>
         <FadeUp delay={STAGGER.item} className="tile p-8 md:p-10">
           <p className="text-[21px] font-semibold">Images</p>
