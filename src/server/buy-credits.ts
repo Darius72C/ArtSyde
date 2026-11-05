@@ -5,6 +5,9 @@ import { customerFor } from "@/server/account";
 import { Prisma } from "@/generated/prisma/client";
 import { checkFields } from "@/lib/orders";
 import { CREDIT_PACKS, CREDIT_PACK_IDS, PAYMENT_METHOD_IDS, type BuyCreditsInput, type BuyCreditsResult } from "@/lib/credits";
+import { logActivity, logError } from "@/server/log";
+import { onlinePaymentEnabled } from "@/server/payments/geniuspay";
+import { startCreditPayment } from "@/server/payments/settle";
 
 /*
  * Records a credit pack purchase from /credits. Like an order, it waits for payment
@@ -47,6 +50,13 @@ export async function buyCredits(input: BuyCreditsInput): Promise<BuyCreditsResu
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
         const row = await db.creditPurchase.create({ data: { ...data, reference: await nextReference() }, select: { reference: true } });
+        await logActivity("credits.requested", `Achat de crédits ${row.reference} : pack ${pack} (${credits} crédits, ${priceXof.toLocaleString("fr-FR")} FCFA) par ${fields.name}`, { reference: row.reference, pack, credits, price: priceXof }, customerId ? `client:${customerId}` : "invité");
+        // Online payment on: GeniusPay's page to pay on (the purchase is saved whatever happens).
+        if (onlinePaymentEnabled()) {
+          const id = (await db.creditPurchase.findUnique({ where: { reference: row.reference }, select: { id: true } }))!.id;
+          const pay = await startCreditPayment(id, method);
+          return { ok: true, reference: row.reference, ...(pay.ok ? { payUrl: pay.url } : { payError: pay.message }) };
+        }
         return { ok: true, reference: row.reference };
       } catch (e) {
         if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")) throw e;
@@ -54,7 +64,7 @@ export async function buyCredits(input: BuyCreditsInput): Promise<BuyCreditsResu
     }
     throw new Error("Could not pick a free credit purchase reference after 5 attempts.");
   } catch (e) {
-    console.error("buyCredits failed", e);
+    await logError("buyCredits", e);
     return { ok: false, errors: {}, message: "On n'a pas pu enregistrer ta demande. Réessaie dans un instant." };
   }
 }

@@ -2,7 +2,12 @@ import "server-only";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
+import { after } from "next/server";
 import { db } from "@/server/db";
+import { sendEmail } from "@/server/email/send";
+import { welcomeEmail, welcomeTexts } from "@/server/email/welcome";
+import { emailImage } from "@/server/email/image";
+import { logActivity, logError } from "@/server/log";
 
 /** Studio credits given once to every new account. */
 export const SIGNUP_CREDITS = 5;
@@ -50,8 +55,16 @@ export const auth = betterAuth({
         after: async (user) => {
           try {
             await linkCustomer(user);
+            await logActivity("account.created", `Nouveau compte : ${user.name || user.email} (${user.email})`, { userId: user.id }, `compte:${user.id}`);
           } catch (e) {
-            console.error("linkCustomer failed", e); // the account works; the customer is linked on the next visit
+            await logError("linkCustomer", e, { userId: user.id }); // the account works; the customer is linked on the next visit
+          }
+          // The welcome e-mail, sent after the response so sign-up isn't slowed down (skipped until Brevo is set up).
+          const send = async () => sendEmail(welcomeEmail({ name: user.name, email: user.email, credits: SIGNUP_CREDITS, image: await emailImage(), texts: await welcomeTexts() }));
+          try {
+            after(send);
+          } catch {
+            void send(); // outside a request (scripts): send right away
           }
         },
       },

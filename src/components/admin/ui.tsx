@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { CountUp, FadeUp, RevealLines, type Line } from "../Reveal";
-import { PageTransition } from "../PageShell";
+import { PageTransition } from "../PageFrame";
 import { TONE_DOT, type Tone } from "@/lib/admin/labels";
 import type { DbProblem } from "@/server/admin/queries";
 

@@ -29,15 +29,19 @@ export function checkFields(f: CheckoutFields, delivery: DeliveryMethod) {
 
 /** What the browser sends: which items, never what they cost. */
 export type CheckoutLine = Pick<CartItem, "productId" | "color" | "size" | "qty" | "price" | "preview" | "quality" | "files">;
-export type CheckoutInput = { fields: CheckoutFields; delivery: DeliveryMethod; lines: CheckoutLine[] };
+/** `method`: the mobile money chosen for paying online (WAVE, ORANGE_MONEY, MTN, MOOV), when it's on. */
+export type CheckoutInput = { fields: CheckoutFields; delivery: DeliveryMethod; lines: CheckoutLine[]; method?: string };
+/** `payUrl`: GeniusPay's page to pay on (online payment on); `payError`: it couldn't be opened (the order is saved). */
 export type PlaceOrderResult =
-  | { ok: true; reference: string; key: string }
+  | { ok: true; reference: string; key: string; payUrl?: string; payError?: string }
   | { ok: false; errors: Partial<Record<keyof CheckoutFields, string>>; message?: string };
 
 /** The order as the customer sees it on /commande/[reference]. */
 export type PublicOrder = {
   reference: string;
   status: OrderStatus;
+  /** Where the payment stands: UNPAID, PAID, FAILED (online payment that didn't go through), REFUNDED. */
+  payment: "UNPAID" | "PAID" | "FAILED" | "REFUNDED";
   delivery: DeliveryMethod;
   firstName: string;
   phone: string;

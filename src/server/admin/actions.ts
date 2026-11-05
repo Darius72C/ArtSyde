@@ -4,6 +4,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ADMIN_COOKIE, ADMIN_MAX_AGE, ADMIN_SIGN_IN, safeAdminPath, signAdminToken } from "./token";
+import { logActivity } from "@/server/log";
 
 export type SignInState = { error?: string };
 
@@ -17,6 +18,7 @@ export async function signIn(_prev: SignInState, form: FormData): Promise<SignIn
   if (!timingSafeEqual(digest(pw), digest(secret))) {
     // Slows down guessing.
     await new Promise((r) => setTimeout(r, 800));
+    await logActivity("admin.signin_failed", "Tentative de connexion à l'admin : mot de passe incorrect", undefined, "inconnu");
     return { error: "Mot de passe incorrect." };
   }
   (await cookies()).set(ADMIN_COOKIE, await signAdminToken(secret), {
@@ -26,6 +28,7 @@ export async function signIn(_prev: SignInState, form: FormData): Promise<SignIn
     path: "/",
     maxAge: ADMIN_MAX_AGE,
   });
+  await logActivity("admin.signin", "Connexion à l'admin", undefined, "admin");
   redirect(safeAdminPath(form.get("de")));
 }
 

@@ -5,6 +5,7 @@ import { db } from "@/server/db";
 import { Size } from "@/generated/prisma/client";
 import { STOCK_TAG } from "@/server/stock";
 import { requireAdmin } from "./auth";
+import { logActivity } from "@/server/log";
 
 /*
  * Stock of blank t-shirts, by colour and size (ColorStock), from /admin/produits.
@@ -41,6 +42,7 @@ export async function setStockQuantity(id: string, quantity: number): Promise<St
   } catch {
     return { ok: false, message: "Cette ligne de stock n'existe plus." };
   }
+  await logActivity("stock.set", `Stock corrigé à ${q}`, { id, quantity: q }, "admin");
   refresh();
   return { ok: true };
 }
@@ -61,6 +63,7 @@ export async function receiveStock(input: { hex: string; name?: string; size: st
     if (name.length < 2) return { ok: false, message: "Nouvelle couleur : donne-lui un nom." };
     await db.colorStock.create({ data: { colorHex: hex.toLowerCase(), colorName: name, size, quantity: add } });
   }
+  await logActivity("stock.received", `Arrivage : +${add} ${line?.colorName ?? input.name ?? hex} ${size}`, { hex, size, quantity: add }, "admin");
   refresh();
   return { ok: true, message: `+${add} ${size} enregistrés.` };
 }
@@ -88,6 +91,7 @@ export async function addStockColour(input: { hex: string; name: string; sizes: 
   const missing = sizes.filter((s) => !existing.some((e) => e.size === s));
   if (!missing.length) return { ok: false, message: "Cette couleur a déjà ces tailles." };
   await db.colorStock.createMany({ data: missing.map((size) => ({ colorHex: hex, colorName: name, size, quantity: 0 })) });
+  await logActivity("stock.colour_added", `Couleur ${name} ajoutée au stock (${missing.join(", ")})`, { hex, sizes: missing }, "admin");
   refresh();
   return { ok: true, message: `${name} ajoutée.` };
 }
@@ -97,6 +101,7 @@ export async function removeStockColour(hex: string): Promise<StockResult> {
   await requireAdmin();
   if (!HEX.test(hex)) return { ok: false, message: "Couleur inconnue." };
   await db.colorStock.deleteMany({ where: { colorHex: { equals: hex, mode: "insensitive" } } });
+  await logActivity("stock.colour_removed", `Couleur ${hex} retirée du stock`, { hex }, "admin");
   refresh();
   return { ok: true };
 }

@@ -2,9 +2,11 @@
 
 import { revalidatePath, updateTag } from "next/cache";
 import { db } from "@/server/db";
-import { Prisma, type OrderStatus } from "@/generated/prisma/client";
+import type { OrderStatus } from "@/generated/prisma/client";
+import { moveStock, payOrder } from "@/server/payments/settle";
 import { STOCK_TAG } from "@/server/stock";
 import { requireAdmin } from "./auth";
+import { logActivity, logError } from "@/server/log";
 
 /*
  * Moving an order along, from its admin page. Stock of blank t-shirts follows the money:
@@ -14,6 +16,8 @@ import { requireAdmin } from "./auth";
  */
 
 export type OrderActionResult = { ok: true; message?: string; warnings?: string[] } | { ok: false; message: string };
+
+const STEP_LABEL: Partial<Record<OrderStatus, string>> = { IN_DESIGN: "en conception", IN_PRODUCTION: "en impression", SHIPPED: "expédiée / prête", DELIVERED: "livrée" };
 
 /** The workshop's steps once an order is paid, in order. */
 const STEPS: OrderStatus[] = ["PAID", "IN_DESIGN", "IN_PRODUCTION", "SHIPPED", "DELIVERED"];
@@ -26,40 +30,16 @@ function refresh(reference: string) {
   updateTag(STOCK_TAG);
 }
 
-type Tx = Prisma.TransactionClient;
-
-/** Adds `sign × quantity` to each item's colour and size; lines that don't exist are listed, not created. */
-async function moveStock(tx: Tx, items: { color: string; size: string; quantity: number }[], sign: 1 | -1) {
-  const warnings: string[] = [];
-  for (const it of items) {
-    const line = await tx.colorStock.findFirst({ where: { colorHex: { equals: it.color, mode: "insensitive" }, size: it.size as never } });
-    if (!line) {
-      if (sign < 0) warnings.push(`${it.color.toUpperCase()} ${it.size} : couleur ou taille absente du stock, rien n'a été déduit.`);
-      continue;
-    }
-    if (sign < 0 && line.quantity < it.quantity) warnings.push(`${line.colorName} ${it.size} : il en restait ${line.quantity}, il en fallait ${it.quantity}. Le stock passe à ${line.quantity - it.quantity}.`);
-    await tx.colorStock.update({ where: { id: line.id }, data: { quantity: { increment: sign * it.quantity } } });
-  }
-  return warnings;
-}
-
 /** Payment received (mobile money confirmed by hand): the order is paid, its t-shirts leave the stock. */
 export async function markOrderPaid(orderId: string): Promise<OrderActionResult> {
   await requireAdmin();
   try {
-    const r = await db.$transaction(async (tx) => {
-      const o = await tx.order.findUnique({ where: { id: orderId }, select: { reference: true, items: { select: { color: true, size: true, quantity: true } } } });
-      if (!o) return { ok: false as const, message: "Commande introuvable." };
-      const switched = await tx.order.updateMany({ where: { id: orderId, paymentStatus: "UNPAID", status: "PENDING_PAYMENT" }, data: { paymentStatus: "PAID", status: "PAID" } });
-      if (!switched.count) return { ok: false as const, message: "Cette commande n'est plus en attente de paiement." };
-      const warnings = await moveStock(tx, o.items, -1);
-      return { ok: true as const, reference: o.reference, warnings };
-    });
+    const r = await payOrder(orderId, { by: "admin" });
     if (!r.ok) return r;
     refresh(r.reference);
     return { ok: true, message: "Commande payée. Les t-shirts sont sortis du stock.", warnings: r.warnings };
   } catch (e) {
-    console.error("markOrderPaid failed", e);
+    await logError("markOrderPaid", e);
     return { ok: false, message: "Le paiement n'a pas pu être enregistré. Réessaie." };
   }
 }
@@ -72,6 +52,7 @@ export async function setOrderStep(orderId: string, status: OrderStatus): Promis
   if (!o) return { ok: false, message: "Commande introuvable." };
   if (o.paymentStatus !== "PAID" || !STEPS.includes(o.status)) return { ok: false, message: "Marque d'abord la commande comme payée." };
   await db.order.update({ where: { id: orderId }, data: { status } });
+  await logActivity("order.step", `Commande ${o.reference} : ${STEP_LABEL[status] ?? status}`, { reference: o.reference, status }, "admin");
   refresh(o.reference);
   return { ok: true };
 }
@@ -95,10 +76,11 @@ export async function cancelOrder(orderId: string): Promise<OrderActionResult> {
       return { ok: true as const, reference: o.reference, wasPaid };
     });
     if (!r.ok) return r;
+    await logActivity("order.cancelled", `Commande ${r.reference} annulée${r.wasPaid ? " : t-shirts remis en stock" : ""}`, { reference: r.reference, wasPaid: r.wasPaid }, "admin");
     refresh(r.reference);
     return { ok: true, message: r.wasPaid ? "Commande annulée. Les t-shirts sont revenus dans le stock ; pense à rembourser le client." : "Commande annulée." };
   } catch (e) {
-    console.error("cancelOrder failed", e);
+    await logError("cancelOrder", e);
     return { ok: false, message: "La commande n'a pas pu être annulée. Réessaie." };
   }
 }

@@ -6,6 +6,7 @@ import { db } from "@/server/db";
 import { HERO_SLOTS, HERO_TAG } from "@/server/hero";
 import { deleteObject, keyFromPublicUrl, presign, r2Config } from "@/server/r2";
 import { requireAdmin } from "./auth";
+import { logActivity } from "@/server/log";
 
 /*
  * The home page's hero cards, from /admin/accueil: ad visuals, one image per place (front, left, right),
@@ -52,6 +53,7 @@ export async function setHeroImage(slot: number, imageUrl: string): Promise<{ ok
   const before = await db.heroCard.findUnique({ where: { slot } });
   await db.heroCard.upsert({ where: { slot }, create: { slot, imageUrl }, update: { imageUrl } });
   updateTag(HERO_TAG);
+  await logActivity("hero.updated", `Carte d'accueil ${slot + 1} changée`, { slot }, "admin");
   if (before && before.imageUrl !== imageUrl) await deleteHeroFile(before.imageUrl);
   return { ok: true };
 }

@@ -363,3 +363,43 @@ enum PrintQuality {
   HD // 225 DPI
   ULTRA_HD // 300 DPI
 }
+
+// ---------- Journal ----------
+
+// Ce qui se passe sur le site, lisible dans l'admin (/admin/journal) : e-mails envoyés, activité
+// (commandes, paiements, stock, crédits…) et erreurs du serveur. Sert aussi de source aux mises à
+// jour en temps réel (src/app/api/live).
+model LogEntry {
+  id        String   @id @default(cuid())
+  kind      LogKind
+  // Ce qui s'est passé, en code court : "order.placed", "email.sent", "stock.received"…
+  action    String
+  // La phrase lue dans l'admin : « Commande AS-2611-0143 passée (12 000 FCFA) ».
+  message   String
+  // Détails utiles (référence, montant, erreur…), en JSON.
+  meta      Json?
+  // Qui : "admin", "client:<id>", "système".
+  actor     String?
+  // Pour une erreur : "error" ; un avertissement : "warning" ; sinon "info".
+  level     String   @default("info")
+  createdAt DateTime @default(now())
+
+  @@index([kind, createdAt])
+  @@index([createdAt])
+}
+
+enum LogKind {
+  EMAIL
+  ACTIVITY
+  ERROR
+}
+
+// ---------- Réglages du site ----------
+
+// Des réglages modifiés depuis l'admin, sans redéployer : la bannière de pub de l'accueil ("ad.home"),
+// les textes des e-mails ("email.welcome")… Une clé, sa valeur en JSON.
+model SiteSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}

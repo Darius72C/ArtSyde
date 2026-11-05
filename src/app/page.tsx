@@ -13,6 +13,8 @@ import { Faq } from "@/components/home/Faq";
 import { Newsletter } from "@/components/home/Newsletter";
 import { getCatalog } from "@/server/catalog";
 import { getHeroCards } from "@/server/hero";
+import { LiveRefresh } from "@/components/LiveRefresh";
+import { AdSlot } from "@/components/AdSlot";
 
 export default async function Home() {
   // Cached ("use cache", tag "catalog"): saving a product in the admin refreshes it.
@@ -24,15 +26,23 @@ export default async function Home() {
       <div>
       <main>
         <Hero products={products} cards={heroCards} />
+        {/* Banner places (Admin > Accueil > Bannières): each shows nothing unless a banner is set for it. */}
+        <AdSlot placement="home.afterHero" />
         <ScrollStory />
         <NewArrivals products={products} />
+        <AdSlot placement="home.afterNew" />
         <Bento />
+        <AdSlot placement="home.afterWhy" />
         <Shop products={products} />
+        <AdSlot placement="home.afterShop" />
+        <LiveRefresh src="/api/live/stock" events={["stock"]} />
         <Teams />
         <Credits />
+        <AdSlot placement="home.beforeFaq" />
         <Faq />
         <Newsletter />
       </main>
+      <AdSlot placement="all.beforeFooter" />
       <Footer />
       </div>
       </PageTransition>

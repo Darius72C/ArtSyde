@@ -12,18 +12,22 @@ import { formatFCFA } from "@/lib/products";
 import { DUR, EASE, SPRING } from "@/lib/motion";
 import { Field } from "./CheckoutView";
 import { RevealLines } from "../Reveal";
+import { CreditReturn } from "./CreditReturn";
 
 const DEFAULT_PACK: CreditPack = "CREATEUR";
 const packFrom = (v: string | null) => CREDIT_PACK_IDS.find((p) => p === v?.toUpperCase()) ?? DEFAULT_PACK;
 
 /** /credits?pack=studio preselects a pack (links from the home page). */
-export function CreditsViewFromUrl() {
-  return <CreditsView initialPack={packFrom(useSearchParams().get("pack"))} />;
+/** /credits?pack=studio preselects a pack; ?achat=CR-…&paiement=… is the way back from GeniusPay. */
+export function CreditsViewFromUrl({ online = false }: { online?: boolean }) {
+  const sp = useSearchParams();
+  const back = sp.get("achat");
+  return <CreditsView initialPack={packFrom(sp.get("pack"))} online={online} returning={back ? { reference: back, failed: sp.get("paiement") === "echec" } : undefined} />;
 }
 
 const sectionTitle = "border-b border-line pb-4 text-[24px] font-semibold tracking-[-0.02em]";
 
-export function CreditsView({ initialPack = DEFAULT_PACK }: { initialPack?: CreditPack }) {
+export function CreditsView({ initialPack = DEFAULT_PACK, online = false, returning }: { initialPack?: CreditPack; online?: boolean; returning?: { reference: string; failed: boolean } }) {
   const [pack, setPack] = useState<CreditPack>(initialPack);
   const [method, setMethod] = useState<PaymentMethodId>("WAVE");
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -52,6 +56,8 @@ export function CreditsView({ initialPack = DEFAULT_PACK }: { initialPack?: Cred
         setMessage(r.message);
         return;
       }
+      // Online payment: off to GeniusPay's page (it brings the customer back here).
+      if (r.payUrl) return window.location.assign(r.payUrl);
       setDone({ reference: r.reference, phone: fields.phone });
     });
   }
@@ -60,6 +66,7 @@ export function CreditsView({ initialPack = DEFAULT_PACK }: { initialPack?: Cred
     <div className="mx-auto max-w-[1440px] px-5 md:px-10">
       <div className="pb-10 pt-14 md:pt-20">
         <RevealLines as="h1" lines={[{ text: "Recharger", muted: "mes crédits." }]} className="display text-5xl md:text-7xl" />
+        {returning && <div className="mt-10"><CreditReturn reference={returning.reference} failed={returning.failed} /></div>}
         <p className="lead mt-5 max-w-xl">Les crédits servent à importer une image, sauvegarder un design et télécharger ton visuel en HD. Tourner et colorer ton t-shirt reste gratuit.</p>
       </div>
 
@@ -134,8 +141,14 @@ export function CreditsView({ initialPack = DEFAULT_PACK }: { initialPack?: Cred
                     );
                   })}
                 </div>
-                <p className="mt-6 text-[21px] font-semibold">Paiement en ligne bientôt disponible.</p>
-                <p className="mt-2 max-w-lg text-sm text-muted">Ta demande est enregistrée et on t&apos;envoie la demande de paiement sur ton numéro. Tes crédits arrivent dès qu&apos;il est reçu.</p>
+                {online ? (
+                  <p className="mt-6 max-w-lg text-sm text-muted">Tu paies sur la page sécurisée de GeniusPay (carte bancaire aussi possible). Tes crédits arrivent dès que le paiement est confirmé.</p>
+                ) : (
+                  <>
+                    <p className="mt-6 text-[21px] font-semibold">Paiement en ligne bientôt disponible.</p>
+                    <p className="mt-2 max-w-lg text-sm text-muted">Ta demande est enregistrée et on t&apos;envoie la demande de paiement sur ton numéro. Tes crédits arrivent dès qu&apos;il est reçu.</p>
+                  </>
+                )}
               </section>
             </div>
 
@@ -158,7 +171,7 @@ export function CreditsView({ initialPack = DEFAULT_PACK }: { initialPack?: Cred
                 )}
               </AnimatePresence>
               <button disabled={pending} className="btn mt-8 w-full">
-                {pending ? <span className="h-4 w-4 animate-spin rounded-full border border-on-ink border-t-transparent" aria-label="Envoi" /> : "Valider l'achat"}
+                {pending ? <span className="h-4 w-4 animate-spin rounded-full border border-on-ink border-t-transparent" aria-label="Envoi" /> : online ? `Payer ${formatFCFA(p.priceXof)}` : "Valider l'achat"}
               </button>
               <Link href="/studio" className="mt-5 block text-center text-sm text-muted underline-offset-4 hover:text-ink hover:underline">Retour au studio</Link>
             </aside>

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/server/db";
 import { requireAdmin } from "./auth";
+import { logActivity } from "@/server/log";
 
 export type AdjustCreditsState = {
   errors?: Partial<Record<"phone" | "name" | "amount", string>>;
@@ -50,6 +51,7 @@ export async function adjustCredits(_prev: AdjustCreditsState, form: FormData): 
       return { done: `${direction > 0 ? `${what} offert${n > 1 ? "s" : ""} à` : `${what} retiré${n > 1 ? "s" : ""} à`} ${customer.name}. Solde : ${after}.` };
     });
     if (result.done) {
+      await logActivity("credits.adjusted", result.done, { amount: direction * n, reason }, "admin");
       revalidatePath("/admin/clients");
       revalidatePath("/admin/studio");
     }

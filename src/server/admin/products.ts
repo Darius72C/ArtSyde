@@ -9,6 +9,7 @@ import { CATALOG_TAG } from "@/server/catalog";
 import { PRINT_SIDES, parsePrint3D, productSlug, type Print3D } from "@/lib/products";
 import { deleteObject, keyFromPublicUrl, presign, r2Config } from "@/server/r2";
 import { requireAdmin } from "./auth";
+import { logActivity, logError } from "@/server/log";
 
 /*
  * Catalogue edits from /admin/produits. Every action checks the admin session itself
@@ -72,10 +73,11 @@ export async function saveProduct(_prev: ProductFormState, form: FormData): Prom
     }
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025") return { message: "Ce modèle n'existe plus." };
-    console.error("saveProduct failed", e);
+    await logError("saveProduct", e);
     return { message: "Le modèle n'a pas pu être enregistré. Réessaie." };
   }
   updateTag(CATALOG_TAG);
+  await logActivity(created ? "product.created" : "product.updated", `Modèle « ${name} » ${created ? "créé" : "modifié"}`, { id: created ?? id, price: priceXof, active }, "admin");
   if (created) {
     // Photos picked in the form are uploaded by the browser now that the product exists; it then opens the product.
     if (form.get("then") === "upload") return { saved: true, created };
@@ -212,10 +214,11 @@ export async function deleteProduct(productId: string): Promise<DeleteProductRes
   try {
     await db.product.delete({ where: { id: productId } });
   } catch (e) {
-    console.error("deleteProduct failed", e);
+    await logError("deleteProduct", e);
     return { ok: false, message: "Le modèle n'a pas pu être supprimé. Réessaie." };
   }
   updateTag(CATALOG_TAG);
+  await logActivity("product.deleted", "Modèle supprimé", { id: productId }, "admin");
   const print = parsePrint3D(p.print3d);
   const files = [...p.mockups, ...p.flatMockups, ...PRINT_SIDES.map((s) => print[s]?.url).filter((u): u is string => Boolean(u))];
   await Promise.all(files.map((url) => deleteFile(productId, url).catch(() => {})));

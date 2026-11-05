@@ -20,6 +20,7 @@ export async function getPublicOrder(reference: string, key: string | undefined)
   return {
     reference: o.reference,
     status: o.status,
+    payment: o.paymentStatus,
     delivery: o.delivery,
     firstName: o.customerName.split(" ")[0],
     phone: o.customerPhone,

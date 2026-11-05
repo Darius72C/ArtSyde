@@ -1,30 +1,13 @@
-import { ViewTransition } from "react";
-import { Header } from "./Header";
-import { Footer } from "./Footer";
-import { WhatsAppButton } from "./WhatsAppButton";
+import { AdSlot } from "@/components/AdSlot";
+import { PageFrame } from "./PageFrame";
 
-/** Animated page body: the old page sinks and fades, the new one rises in (see globals.css). */
-export function PageTransition({ children }: { children: React.ReactNode }) {
-  return (
-    <ViewTransition enter="page-enter" exit="page-exit" default="none">
-      {children}
-    </ViewTransition>
-  );
-}
+export { PageTransition } from "./PageFrame";
 
-/** Shared frame for every page: header, content, footer. */
+/** Shared frame for every page: header, content, footer, and a banner set for "all pages" (Admin > Accueil > Bannières) above the footer. */
 export function PageShell({ children, footer = true }: { children: React.ReactNode; footer?: boolean }) {
   return (
-    <>
-      <Header />
-      <PageTransition>
-        <div>
-          <main className="min-h-[70svh]">{children}</main>
-          {footer && <Footer />}
-        </div>
-      </PageTransition>
-      {/* Full-screen tools (the studio, sign-in) have no footer and no floating button. */}
-      {footer && <WhatsAppButton />}
-    </>
+    <PageFrame footer={footer} beforeFooter={<AdSlot placement="all.beforeFooter" />}>
+      {children}
+    </PageFrame>
   );
 }

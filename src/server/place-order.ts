@@ -9,6 +9,10 @@ import { available } from "@/lib/stock";
 import { readStockNow } from "@/server/stock";
 import { customerFor } from "@/server/account";
 import { keyFromPublicUrl, r2Config } from "@/server/r2";
+import { logActivity, logError } from "@/server/log";
+import { onlinePaymentEnabled } from "@/server/payments/geniuspay";
+import { startOrderPayment } from "@/server/payments/settle";
+import { PAYMENT_METHOD_IDS } from "@/lib/credits";
 
 /** A studio piece's print files: only links to our own storage (designs/), one per side at most. */
 function printFiles(files: unknown, quality: PrintQuality): Prisma.CustomDesignCreateWithoutOrderItemInput[] {
@@ -63,7 +67,7 @@ export async function placeOrder(input: CheckoutInput): Promise<PlaceOrderResult
   try {
     catalogue = ids.length ? await db.product.findMany({ where: { id: { in: ids }, active: true }, select: { id: true, priceXof: true, colors: true, sizes: true } }) : [];
   } catch (e) {
-    console.error("placeOrder: catalogue read failed", e);
+    await logError("placeOrder: catalogue read", e);
     return { ok: false, errors: {}, message: "On n'a pas pu enregistrer ta commande. Réessaie dans un instant." };
   }
 
@@ -113,7 +117,7 @@ export async function placeOrder(input: CheckoutInput): Promise<PlaceOrderResult
         };
     }
   } catch (e) {
-    console.error("placeOrder: stock check failed", e);
+    await logError("placeOrder: stock check", e);
     return { ok: false, errors: {}, message: "On n'a pas pu enregistrer ta commande. Réessaie dans un instant." };
   }
 
@@ -146,6 +150,13 @@ export async function placeOrder(input: CheckoutInput): Promise<PlaceOrderResult
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
         const order = await db.order.create({ data: { ...data, reference: await nextReference() }, select: { id: true, reference: true } });
+        await logActivity("order.placed", `Commande ${order.reference} passée par ${fields.name} (${data.totalXof.toLocaleString("fr-FR")} FCFA)`, { reference: order.reference, total: data.totalXof, items: items.length }, customerId ? `client:${customerId}` : "invité");
+        // Online payment on: GeniusPay's page to send the customer to (the order is saved whatever happens).
+        if (onlinePaymentEnabled()) {
+          const method = PAYMENT_METHOD_IDS.find((m) => m === input.method);
+          const pay = await startOrderPayment(order.id, method);
+          return { ok: true, reference: order.reference, key: orderKey(order.id), ...(pay.ok ? { payUrl: pay.url } : { payError: pay.message }) };
+        }
         return { ok: true, reference: order.reference, key: orderKey(order.id) };
       } catch (e) {
         if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")) throw e;
@@ -153,7 +164,7 @@ export async function placeOrder(input: CheckoutInput): Promise<PlaceOrderResult
     }
     throw new Error("Could not pick a free order reference after 5 attempts.");
   } catch (e) {
-    console.error("placeOrder failed", e);
+    await logError("placeOrder", e);
     return { ok: false, errors: {}, message: "On n'a pas pu enregistrer ta commande. Réessaie dans un instant." };
   }
 }

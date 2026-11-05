@@ -2,6 +2,7 @@
 
 import { db } from "@/server/db";
 import { creditBalance, getMyCustomer } from "@/server/account";
+import { logError } from "@/server/log";
 
 /*
  * The studio's credits, for the signed-in customer: read, spend, give back. The balance is the sum of the
@@ -36,7 +37,7 @@ export async function spendCredits(amount: number, reason: SpendReason): Promise
       return { ok: true as const, balance: balance - amount };
     });
   } catch (e) {
-    console.error("spendCredits failed", e);
+    await logError("spendCredits", e);
     return { ok: false, reason: "error" };
   }
 }

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/server/auth";
 import { db } from "@/server/db";
 import { getMyCustomer } from "@/server/account";
+import { logActivity, logError } from "@/server/log";
 
 /*
  * The signed-in customer's settings (/compte/parametres): name and phone, and the password
@@ -33,10 +34,11 @@ export async function updateProfile(input: { name: string; phone: string }): Pro
     await auth.api.updateUser({ body: { name }, headers: await headers() });
     await db.customer.update({ where: { id: me.customer.id }, data: { name, phone: phone || null } });
   } catch (e) {
-    console.error("updateProfile failed", e);
+    await logError("updateProfile", e);
     return { ok: false, message: "Tes informations n'ont pas pu être enregistrées. Réessaie." };
   }
   revalidatePath("/compte");
+  await logActivity("account.updated", `Profil mis à jour : ${name}`, { phone: Boolean(phone) }, `client:${me.customer.id}`);
   return { ok: true, message: "Enregistré." };
 }
 
@@ -52,7 +54,7 @@ export async function changeMyPassword(input: { current: string; next: string })
     if (code === "PASSWORD_TOO_SHORT") return { ok: false, field: "next", message: "8 caractères minimum." };
     if (code === "PASSWORD_TOO_LONG") return { ok: false, field: "next", message: "Mot de passe trop long." };
     if (code === "CREDENTIAL_ACCOUNT_NOT_FOUND") return { ok: false, message: "Ton compte n'a pas encore de mot de passe : crée-le d'abord." };
-    console.error("changeMyPassword failed", e);
+    await logError("changeMyPassword", e);
     return { ok: false, message: "Le mot de passe n'a pas pu être changé. Réessaie." };
   }
 }
@@ -68,7 +70,7 @@ export async function setMyPassword(input: { next: string }): Promise<SettingsRe
     const code = codeOf(e);
     if (code === "PASSWORD_ALREADY_SET") return { ok: false, message: "Ton compte a déjà un mot de passe : change-le plutôt." };
     if (code === "PASSWORD_TOO_SHORT") return { ok: false, field: "next", message: "8 caractères minimum." };
-    console.error("setMyPassword failed", e);
+    await logError("setMyPassword", e);
     return { ok: false, message: "Le mot de passe n'a pas pu être créé. Réessaie." };
   }
 }

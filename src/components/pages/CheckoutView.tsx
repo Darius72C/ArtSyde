@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { cart, cartSubtotal, useCart } from "@/lib/cart";
 import { DELIVERY, DELIVERY_METHODS, checkFields, orderHref, type CheckoutFields } from "@/lib/orders";
 import { placeOrder } from "@/server/place-order";
+import { PAYMENT_METHODS, PAYMENT_METHOD_IDS, type PaymentMethodId } from "@/lib/credits";
 import type { DeliveryMethod } from "@/generated/prisma/client";
 import { formatFCFA } from "@/lib/products";
 import { Thumb } from "./CartView";
@@ -47,8 +48,10 @@ function Steps({ current }: { current: number }) {
   );
 }
 
-export function CheckoutView() {
+/** `online`: GeniusPay is set up: the customer pays right after ordering, on its page. */
+export function CheckoutView({ online = false }: { online?: boolean }) {
   const items = useCart();
+  const [method, setMethod] = useState<PaymentMethodId>("WAVE");
   const router = useRouter();
   const [delivery, setDelivery] = useState<DeliveryMethod>("STANDARD");
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -70,7 +73,7 @@ export function CheckoutView() {
     if (Object.keys(err).length) return;
     const lines = items.map(({ productId, color, size, qty, price, preview, quality, files }) => ({ productId, color, size, qty, price, preview, quality, files }));
     startTransition(async () => {
-      const r = await placeOrder({ fields, delivery, lines }).catch(() => null);
+      const r = await placeOrder({ fields, delivery, lines, ...(online ? { method } : {}) }).catch(() => null);
       if (!r) return setMessage("Connexion perdue. Vérifie ton réseau et réessaie.");
       if (!r.ok) {
         setErrors(r.errors);
@@ -79,7 +82,9 @@ export function CheckoutView() {
       }
       setPlaced(true);
       cart.clear();
-      router.push(orderHref(r.reference, r.key));
+      // Online payment: off to GeniusPay's page (it brings the customer back to the order's tracking).
+      if (r.payUrl) return window.location.assign(r.payUrl);
+      router.push(`${orderHref(r.reference, r.key)}${r.payError ? "&paiement=indisponible" : ""}`);
     });
   }
 
@@ -150,8 +155,32 @@ export function CheckoutView() {
 
           <section>
             <p className="border-b border-line pb-4 text-[24px] font-semibold tracking-[-0.02em]">Paiement</p>
-            <p className="mt-6 text-[21px] font-semibold">Paiement en ligne bientôt disponible.</p>
-            <p className="mt-2 max-w-lg text-sm text-muted">Ta commande est enregistrée et on te contacte pour le règlement.</p>
+            {online ? (
+              <>
+                <div className="mt-6" role="radiogroup" aria-label="Moyen de paiement">
+                  {PAYMENT_METHOD_IDS.map((k) => {
+                    const on = method === k;
+                    return (
+                      <button type="button" role="radio" aria-checked={on} key={k} onClick={() => setMethod(k)} className={`mb-3 flex w-full items-center gap-5 rounded-2xl border px-5 py-4 text-left transition-colors ${on ? "border-accent shadow-[0_0_0_1px_var(--accent)]" : "border-line hover:border-muted"}`}>
+                        <span className={`grid h-5 w-5 place-items-center rounded-full border transition ${on ? "border-accent" : "border-line"}`}>
+                          {on && <span className="h-2.5 w-2.5 rounded-full bg-accent" />}
+                        </span>
+                        <span className="flex-1">
+                          <span className="block text-[17px] font-semibold">{PAYMENT_METHODS[k]}</span>
+                          <span className="text-sm text-muted">Mobile money</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-2 max-w-lg text-sm text-muted">Tu paies sur la page sécurisée de GeniusPay (carte bancaire aussi possible), puis tu reviens au suivi de ta commande.</p>
+              </>
+            ) : (
+              <>
+                <p className="mt-6 text-[21px] font-semibold">Paiement en ligne bientôt disponible.</p>
+                <p className="mt-2 max-w-lg text-sm text-muted">Ta commande est enregistrée et on te contacte pour le règlement.</p>
+              </>
+            )}
           </section>
         </div>
 
@@ -185,7 +214,7 @@ export function CheckoutView() {
             )}
           </AnimatePresence>
           <button disabled={sending} className="btn mt-8 w-full">
-            {sending ? <span className="h-4 w-4 animate-spin rounded-full border border-on-ink border-t-transparent" aria-label="Envoi" /> : "Valider la commande"}
+            {sending ? <span className="h-4 w-4 animate-spin rounded-full border border-on-ink border-t-transparent" aria-label="Envoi" /> : online ? `Payer ${formatFCFA(subtotal + shipping)}` : "Valider la commande"}
           </button>
           <p className="mt-4 text-center text-xs text-muted">
             En validant, tu acceptes nos{" "}

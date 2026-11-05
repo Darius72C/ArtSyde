@@ -19,4 +19,5 @@ export const PAYMENT_METHOD_IDS = Object.keys(PAYMENT_METHODS) as PaymentMethodI
 
 export type CreditFields = { name: string; phone: string; email: string };
 export type BuyCreditsInput = { pack: CreditPack; method: PaymentMethodId; fields: CreditFields };
-export type BuyCreditsResult = { ok: true; reference: string } | { ok: false; errors: Partial<Record<keyof CreditFields, string>>; message?: string };
+/** `payUrl`: GeniusPay's page to pay on (online payment on). */
+export type BuyCreditsResult = { ok: true; reference: string; payUrl?: string; payError?: string } | { ok: false; errors: Partial<Record<keyof CreditFields, string>>; message?: string };

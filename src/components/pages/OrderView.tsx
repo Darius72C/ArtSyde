@@ -8,7 +8,8 @@ import { Thumb } from "./CartView";
 import { FadeUp } from "../Reveal";
 import { DUR, EASE, STAGGER } from "@/lib/motion";
 
-export function OrderView({ order }: { order: PublicOrder | null }) {
+/** `payment`: what to show while the order waits for its payment (online payment: OrderPayment), or nothing. */
+export function OrderView({ order, payment }: { order: PublicOrder | null; payment?: React.ReactNode }) {
   if (!order)
     return (
       <div className="mx-auto max-w-[1440px] px-5 py-28 md:px-10">
@@ -25,7 +26,9 @@ export function OrderView({ order }: { order: PublicOrder | null }) {
   const lead = cancelled
     ? `Une question ? On reste joignable au même numéro, ou écris-nous en citant la référence ${order.reference}.`
     : order.status === "PENDING_PAYMENT"
-      ? `On te contacte au ${order.phone} pour confirmer la commande et le règlement.`
+      ? payment
+        ? "Ta commande est enregistrée. Dès qu'elle est payée, on lance l'impression."
+        : `On te contacte au ${order.phone} pour confirmer la commande et le règlement.`
       : "Ton règlement est bien reçu. Suis l'avancement de ta commande ici.";
 
   return (
@@ -46,6 +49,7 @@ export function OrderView({ order }: { order: PublicOrder | null }) {
         <FadeUp delay={0.5}>
           <p className="mt-6 max-w-lg text-muted">{lead}</p>
         </FadeUp>
+        {order.status === "PENDING_PAYMENT" && payment}
       </div>
 
       {/* Tracking */}
@@ -102,7 +106,7 @@ export function OrderView({ order }: { order: PublicOrder | null }) {
             </p>
           )}
           <p className="mt-8 border-t border-line pt-6 text-sm text-muted">
-            {order.status === "PENDING_PAYMENT" ? "Paiement : on te contacte pour le règlement. Le paiement en ligne arrive bientôt." : cancelled ? "Paiement : aucun règlement en attente." : "Paiement : reçu, merci."}
+            {order.status === "PENDING_PAYMENT" ? (payment ? "Paiement : en attente." : "Paiement : on te contacte pour le règlement.") : cancelled ? "Paiement : aucun règlement en attente." : "Paiement : reçu, merci."}
           </p>
         </FadeUp>
       </div>
