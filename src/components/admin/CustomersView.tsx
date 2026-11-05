@@ -4,12 +4,15 @@ import { formatFCFA } from "@/lib/products";
 import { plural, shortDate } from "@/lib/admin/labels";
 import { getCustomers, load } from "@/server/admin/queries";
 import { Search } from "./Search";
+import { CreditAdjust } from "./CreditAdjust";
 import { DbNotice, Empty, MoreLink, Panel, Stat, TableScroll, table, td, th } from "./ui";
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
 export async function CustomersView({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const q = one((await searchParams).q)?.trim() || undefined;
+  const sp = await searchParams;
+  const q = one(sp.q)?.trim() || undefined;
+  const client = one(sp.client)?.trim() || undefined; // a row's "Gérer": prefills the credits form
   const r = await load(() => getCustomers(q));
   if (r.problem) return <DbNotice problem={r.problem} />;
   const { customers, guestOrders } = r.data;
@@ -25,6 +28,13 @@ export async function CustomersView({ searchParams }: { searchParams: Promise<Re
           <Stat label="Commandes sans compte" value={guestOrders} unit={guestOrders > 1 ? "commandes" : "commande"} note="Passées en invité" delay={STAGGER.item * 2} />
         </div>
       )}
+
+      <div id="credits" className="scroll-mt-24">
+        <Panel title="Offrir ou retirer des crédits" action={client && <MoreLink href="/admin/clients">Vider</MoreLink>}>
+          <p className="-mt-2 mb-8 max-w-2xl text-sm text-muted">Pour un cadeau, un geste commercial ou une correction. Le client est retrouvé par son numéro ; s&apos;il n&apos;existe pas encore, il est créé avec le nom indiqué.</p>
+          <CreditAdjust phone={client} />
+        </Panel>
+      </div>
 
       <div className="flex justify-end">
         <Search action="/admin/clients" q={q} placeholder="Nom, téléphone, e-mail, ville" />
@@ -70,7 +80,12 @@ export async function CustomersView({ searchParams }: { searchParams: Promise<Re
                       )}
                     </td>
                     <td className={`${td} whitespace-nowrap text-right tabular-nums`}>{c.spent ? formatFCFA(c.spent) : <span className="text-muted">—</span>}</td>
-                    <td className={`${td} text-right tabular-nums`}>{c.credits}</td>
+                    <td className={`${td} whitespace-nowrap text-right tabular-nums`}>
+                      {c.credits}{" "}
+                      <Link href={`/admin/clients?client=${encodeURIComponent(c.phone)}#credits`} className="ml-2 text-sm text-link hover:underline" aria-label={`Gérer les crédits de ${c.name}`}>
+                        Gérer
+                      </Link>
+                    </td>
                     <td className={`${td} text-right tabular-nums`}>{c.designs || <span className="text-muted">0</span>}</td>
                     <td className={`${td} whitespace-nowrap`}>{c.lastOrder ? shortDate(c.lastOrder) : <span className="text-muted">Jamais</span>}</td>
                   </tr>

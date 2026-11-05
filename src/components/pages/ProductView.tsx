@@ -1,0 +1,230 @@
+"use client";
+
+import Link from "next/link";
+import dynamic from "next/dynamic";
+import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, LayoutGroup, motion } from "motion/react";
+import { cart } from "@/lib/cart";
+import { flyToCart } from "@/lib/flyToCart";
+import { DELIVERY, DELIVERY_METHODS } from "@/lib/orders";
+import { formatFCFA, type Product } from "@/lib/products";
+import { colorLabel } from "@/lib/admin/labels";
+import { DUR, EASE, SPRING } from "@/lib/motion";
+import { ProductImage } from "../ProductImage";
+import { RevealLines } from "../Reveal";
+import { Suggestions } from "../Suggestions";
+
+const sectionTitle = "border-b border-line pb-4 text-[24px] font-semibold tracking-[-0.02em]";
+const MAX_QTY = 20; // same cap as the cart
+
+type View = "photos" | "mockup" | "3d";
+const VIEW_LABEL: Record<View, string> = { photos: "Photos", mockup: "Mockup", "3d": "3D" };
+const PICTURE: Record<View, string> = { photos: "photo", mockup: "mockup", "3d": "vue 3D" };
+// The 3D t-shirt loads only when its tab is opened (three.js stays out of the page's first load).
+const ProductTee3D = dynamic(() => import("../ProductTee3D"), { ssr: false, loading: () => <div className="h-full w-full animate-pulse bg-surface" /> });
+
+/** A product's own page (/boutique/[slug]). `others` (the suggestions) come from the same catalogue. */
+export function ProductView({ product: p, others }: { product: Product; others: Product[] }) {
+  const [color, setColor] = useState(p.colors[0]);
+  const [size, setSize] = useState(p.sizes.includes("M") ? "M" : (p.sizes[0] ?? "M"));
+  const [qty, setQty] = useState(1);
+  const views: View[] = p.flats.length ? ["photos", "mockup", "3d"] : ["photos", "3d"];
+  const [view, setView] = useState<View>("photos");
+  const [shown, setShown] = useState(0); // which picture of the tab is large
+  const [added, setAdded] = useState(false);
+  const art = useRef<HTMLDivElement>(null);
+  const timer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  const pictures = view === "photos" ? p.photos : view === "mockup" ? p.flats : [];
+  const picture = pictures[shown];
+  const show = (v: View) => {
+    setView(v);
+    setShown(0);
+  };
+
+  function add() {
+    flyToCart(art.current);
+    cart.add({ productId: p.id, name: p.name, price: p.price, color, size, qty, art: p.art, bg: p.bg, photo: p.photo });
+    setAdded(true);
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setAdded(false), 2600);
+  }
+
+  return (
+    <div className="mx-auto max-w-[1440px] px-5 md:px-10">
+      <div className="pb-10 pt-14 md:pt-20">
+        <p className="eyebrow mb-5">{p.tag === "Promo" ? "Offre" : (p.tag ?? "T-shirt")}</p>
+        <RevealLines as="h1" lines={[p.name]} className="display text-5xl md:text-7xl" />
+      </div>
+
+      {/* On a phone: pictures, then the purchase panel, then the details. On desktop the panel sits on the right of both. */}
+      {/* Bottom space: the suggestions bring their own; with none, the page keeps the usual pb-24. */}
+      <div className={`grid items-start gap-14 lg:grid-cols-[1fr_400px] lg:gap-x-20 lg:gap-y-16 ${others.length ? "" : "pb-24"}`}>
+        {/* Pictures in tabs: Photos (the admin's photos, or the illustration in the chosen colour), Mockup (flat mockups, when there are some) and 3D. */}
+        <section aria-label="Images" className="lg:col-start-1">
+          <LayoutGroup id="product-views">
+            <div className="mb-4 flex w-fit rounded-full bg-surface p-1" role="tablist" aria-label="Voir le t-shirt">
+              {views.map((v) => (
+                <button key={v} id={`view-${v}`} type="button" role="tab" aria-selected={view === v} aria-controls="product-view" onClick={() => show(v)} className="relative rounded-full px-4 py-1.5 text-[14px]">
+                  {view === v && <motion.span layoutId="seg" className="absolute inset-0 rounded-full bg-bg shadow-[0_1px_4px_rgba(0,0,0,0.12)]" transition={SPRING.snappy} />}
+                  <span className={`relative whitespace-nowrap ${view === v ? "font-medium" : "text-muted"}`}>{VIEW_LABEL[v]}</span>
+                </button>
+              ))}
+            </div>
+          </LayoutGroup>
+          <div ref={art} id="product-view" role="tabpanel" aria-labelledby={`view-${view}`} className="relative aspect-[4/5] overflow-hidden rounded-[22px] md:aspect-[5/4]" style={{ background: p.bg }}>
+            <AnimatePresence initial={false}>
+              <motion.div
+                key={view === "3d" ? "3d" : `${view}-${picture ?? color}`}
+                className="absolute inset-0"
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: DUR.base, ease: EASE.out }}
+              >
+                {view === "3d" ? (
+                  <ProductTee3D color={color} print={p.print3d} className="h-full w-full" />
+                ) : (
+                  <ProductImage color={color} art={p.art} photo={picture} alt={`${p.name}, ${PICTURE[view]} ${shown + 1}`} bg="transparent" className="h-full w-full" zoom={false} />
+                )}
+              </motion.div>
+            </AnimatePresence>
+            {view === "3d" && <p className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-bg/85 px-3 py-1 text-sm text-muted">Fais glisser pour tourner le t-shirt</p>}
+          </div>
+          {pictures.length > 1 && (
+            <div className="mt-4 flex gap-3 overflow-x-auto pb-1">
+              {pictures.map((src, i) => (
+                <button
+                  key={src}
+                  type="button"
+                  onClick={() => setShown(i)}
+                  aria-label={`${PICTURE[view]} ${i + 1} sur ${pictures.length}`}
+                  aria-pressed={i === shown}
+                  className={`shrink-0 overflow-hidden rounded-2xl border transition-colors ${i === shown ? "border-accent shadow-[0_0_0_1px_var(--accent)]" : "border-line hover:border-muted"}`}
+                >
+                  <ProductImage color={color} photo={src} alt="" bg={p.bg} className="aspect-[4/5] w-20" zoom={false} />
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <aside className="tile p-8 lg:sticky lg:top-20 lg:col-start-2 lg:row-span-2 lg:row-start-1">
+          <p className="text-[21px] font-semibold">Ton t-shirt</p>
+          <dl className="mt-6 space-y-3 text-sm">
+            <div className="flex justify-between">
+              <dt className="text-muted">Prix</dt>
+              <dd className="tabular-nums">
+                {p.oldPrice && <span className="mr-2 text-muted line-through">{formatFCFA(p.oldPrice)}</span>}
+                {formatFCFA(p.price)}
+              </dd>
+            </div>
+          </dl>
+
+          <div className="mt-6 border-t border-line pt-6">
+            <p className="text-sm">
+              <span className="text-muted">Couleur</span> · {colorLabel(color)}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-3">
+              {p.colors.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => {
+                    setColor(c);
+                    setShown(0);
+                  }}
+                  aria-label={`Couleur ${colorLabel(c)}`}
+                  aria-pressed={c === color}
+                  className={`h-7 w-7 rounded-full ring-1 ring-offset-2 ring-offset-surface transition duration-300 hover:scale-110 active:scale-90 ${c === color ? "scale-110 ring-ink" : "ring-ink/25 hover:ring-muted"}`}
+                  style={{ background: c }}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <p className="text-sm text-muted">Taille</p>
+            <div className="mt-3 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Taille">
+              {p.sizes.map((s) => {
+                const on = s === size;
+                return (
+                  <button type="button" role="radio" aria-checked={on} key={s} onClick={() => setSize(s)} className={`rounded-2xl border py-3 text-[15px] font-semibold transition-colors ${on ? "border-accent shadow-[0_0_0_1px_var(--accent)]" : "border-line hover:border-muted"}`}>
+                    {s}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="mt-6 flex items-center justify-between">
+            <p className="text-sm text-muted">Quantité</p>
+            <div className="flex items-center rounded-full border border-line">
+              <button type="button" onClick={() => setQty((q) => Math.max(1, q - 1))} disabled={qty <= 1} aria-label="Retirer un" className="h-9 w-9 text-lg font-extralight transition hover:bg-sand disabled:opacity-40">−</button>
+              <motion.span key={qty} initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DUR.instant, ease: EASE.out }} className="w-8 text-center text-sm tabular-nums" aria-live="polite">
+                {qty}
+              </motion.span>
+              <button type="button" onClick={() => setQty((q) => Math.min(MAX_QTY, q + 1))} disabled={qty >= MAX_QTY} aria-label="Ajouter un" className="h-9 w-9 text-lg font-extralight transition hover:bg-sand disabled:opacity-40">+</button>
+            </div>
+          </div>
+
+          <div className="mt-6 flex items-baseline justify-between border-t border-line pt-6">
+            <span className="font-semibold">Total</span>
+            <motion.span key={p.price * qty} initial={{ opacity: 0.4 }} animate={{ opacity: 1 }} transition={{ duration: DUR.fast, ease: EASE.out }} className="display text-3xl tabular-nums">{formatFCFA(p.price * qty)}</motion.span>
+          </div>
+
+          <button type="button" onClick={add} className="btn mt-8 w-full">
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span key={added ? "done" : "add"} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: DUR.instant, ease: EASE.out }}>
+                {added ? "Ajouté au panier ✓" : "Ajouter au panier"}
+              </motion.span>
+            </AnimatePresence>
+          </button>
+          <p role="status" className="sr-only">{added ? `${p.name} ajouté au panier` : ""}</p>
+          {added ? (
+            <Link href="/panier" className="mt-5 block text-center text-sm text-muted underline-offset-4 hover:text-ink hover:underline">Voir mon panier</Link>
+          ) : (
+            <Link href="/#boutique" className="mt-5 block text-center text-sm text-muted underline-offset-4 hover:text-ink hover:underline">Continuer mes achats</Link>
+          )}
+        </aside>
+
+        <div className="space-y-16 lg:col-start-1">
+          <section>
+            <p className={sectionTitle}>Description</p>
+            <p className="mt-6 max-w-2xl leading-relaxed text-muted">
+              {p.description || "Une coupe oversize aux épaules tombantes, dans un coton épais et souple. Imprimé, contrôlé et plié dans notre atelier."}
+            </p>
+          </section>
+
+          <section>
+            <p className={sectionTitle}>Détails</p>
+            <dl className="mt-6 max-w-2xl space-y-3 text-sm">
+              <div className="flex justify-between gap-6"><dt className="text-muted">Coupe</dt><dd className="text-right">Oversize, épaules tombantes</dd></div>
+              <div className="flex justify-between gap-6"><dt className="text-muted">Matière</dt><dd className="text-right">Coton épais et souple</dd></div>
+              <div className="flex justify-between gap-6"><dt className="text-muted">Impression</dt><dd className="text-right">DTF, dans notre atelier</dd></div>
+              <div className="flex justify-between gap-6"><dt className="text-muted">Tailles</dt><dd className="text-right">{p.sizes.join(", ")}</dd></div>
+            </dl>
+          </section>
+
+          <section>
+            <p className={sectionTitle}>Livraison</p>
+            <dl className="mt-6 max-w-2xl space-y-3 text-sm">
+              {DELIVERY_METHODS.map((d) => (
+                <div key={d} className="flex justify-between gap-6">
+                  <dt>
+                    {DELIVERY[d].label}
+                    <span className="block text-muted">{DELIVERY[d].note}</span>
+                  </dt>
+                  <dd className="text-right tabular-nums">{DELIVERY[d].price ? formatFCFA(DELIVERY[d].price) : "Offert"}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        </div>
+      </div>
+
+      <Suggestions products={others} />
+    </div>
+  );
+}

@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/server/db";
 import { Prisma, ProductTag, Size } from "@/generated/prisma/client";
 import { CATALOG_TAG } from "@/server/catalog";
-import { productSlug } from "@/lib/products";
+import { PRINT_SIDES, parsePrint3D, productSlug, type Print3D } from "@/lib/products";
 import { deleteObject, keyFromPublicUrl, presign, r2Config } from "@/server/r2";
 import { requireAdmin } from "./auth";
 
@@ -74,22 +74,53 @@ export async function saveProduct(_prev: ProductFormState, form: FormData): Prom
   return { saved: true };
 }
 
-// ---------- Photos (Cloudflare R2) ----------
+// ---------- Photos, mockups and 3D prints (Cloudflare R2) ----------
+
+/**
+ * A product's pictures, all stored on R2 under products/<id>/:
+ * "photos" (the shop's photos, Product.mockups), "flats" (flat mockups, Product.flatMockups)
+ * and "print" (an image printed on the 3D t-shirt, referenced by Product.print3d).
+ */
+export type MediaKind = "photos" | "flats" | "print";
+type ListKind = Exclude<MediaKind, "print">;
+const COLUMN = { photos: "mockups", flats: "flatMockups" } as const satisfies Record<ListKind, string>;
+const LIMIT_MESSAGE: Record<ListKind, string> = { photos: `${MAX_PHOTOS} photos maximum par modèle.`, flats: `${MAX_PHOTOS} mockups maximum par modèle.` };
+
+async function readList(productId: string, kind: ListKind): Promise<string[] | null> {
+  const p = await db.product.findUnique({ where: { id: productId }, select: { mockups: true, flatMockups: true } });
+  return p ? p[COLUMN[kind]] : null;
+}
+const writeList = (productId: string, kind: ListKind, list: string[]) => db.product.update({ where: { id: productId }, data: { [COLUMN[kind]]: list } });
+
+/** The R2 key of a file of this product, or null if the URL is not one of its files. */
+function ownKey(productId: string, url: string) {
+  const cfg = r2Config();
+  const key = cfg ? keyFromPublicUrl(cfg, url) : null;
+  return cfg && key?.startsWith(`products/${productId}/`) ? { cfg, key } : null;
+}
+async function deleteFile(productId: string, url: string) {
+  const own = ownKey(productId, url);
+  if (own) await deleteObject(own.cfg, own.key);
+}
 
 export type PresignResult = { ok: true; uploadUrl: string; publicUrl: string; contentType: string } | { ok: false; message: string };
 
 /** Step 1 of an upload: checks the file's type and size, then signs a PUT the browser sends straight to R2. */
-export async function presignPhoto(productId: string, file: { type: string; size: number }): Promise<PresignResult> {
+export async function presignPhoto(productId: string, file: { type: string; size: number }, kind: MediaKind = "photos"): Promise<PresignResult> {
   await requireAdmin();
   const cfg = r2Config();
   if (!cfg) return { ok: false, message: "Le stockage des photos n'est pas configuré (variables R2_* dans .env)." };
   const ext = PHOTO_TYPES[file?.type as keyof typeof PHOTO_TYPES];
   if (!ext) return { ok: false, message: "Format accepté : JPG, PNG ou WebP." };
   const size = Number(file?.size);
-  if (!Number.isInteger(size) || size <= 0 || size > MAX_PHOTO) return { ok: false, message: "8 Mo maximum par photo." };
-  const product = await db.product.findUnique({ where: { id: productId }, select: { mockups: true } });
-  if (!product) return { ok: false, message: "Ce modèle n'existe plus." };
-  if (product.mockups.length >= MAX_PHOTOS) return { ok: false, message: `${MAX_PHOTOS} photos maximum par modèle.` };
+  if (!Number.isInteger(size) || size <= 0 || size > MAX_PHOTO) return { ok: false, message: "8 Mo maximum par image." };
+  if (kind === "print") {
+    if (!(await db.product.findUnique({ where: { id: productId }, select: { id: true } }))) return { ok: false, message: "Ce modèle n'existe plus." };
+  } else {
+    const list = await readList(productId, kind);
+    if (!list) return { ok: false, message: "Ce modèle n'existe plus." };
+    if (list.length >= MAX_PHOTOS) return { ok: false, message: LIMIT_MESSAGE[kind] };
+  }
 
   const key = `products/${productId}/${randomUUID()}.${ext}`;
   // Type and length are signed: R2 refuses any other file than the one checked here.
@@ -97,41 +128,60 @@ export async function presignPhoto(productId: string, file: { type: string; size
   return { ok: true, uploadUrl, publicUrl: `${cfg.publicUrl}/${key}`, contentType: file.type };
 }
 
-/** Step 2: once R2 has the file, adds its URL to the product's photos (last). */
-export async function addPhoto(productId: string, publicUrl: string) {
+/** Step 2: once R2 has the file, adds its URL to the product's photos or mockups (last). */
+export async function addPhoto(productId: string, publicUrl: string, kind: ListKind = "photos") {
   await requireAdmin();
-  const cfg = r2Config();
-  const key = cfg ? keyFromPublicUrl(cfg, publicUrl) : null;
-  if (!key?.startsWith(`products/${productId}/`)) return { ok: false as const, message: "Photo refusée." };
-  const p = await db.product.findUnique({ where: { id: productId }, select: { mockups: true } });
-  if (!p) return { ok: false as const, message: "Ce modèle n'existe plus." };
-  if (!p.mockups.includes(publicUrl)) await db.product.update({ where: { id: productId }, data: { mockups: [...p.mockups, publicUrl].slice(0, MAX_PHOTOS) } });
+  if (!ownKey(productId, publicUrl)) return { ok: false as const, message: "Image refusée." };
+  const list = await readList(productId, kind);
+  if (!list) return { ok: false as const, message: "Ce modèle n'existe plus." };
+  if (!list.includes(publicUrl)) await writeList(productId, kind, [...list, publicUrl].slice(0, MAX_PHOTOS));
   updateTag(CATALOG_TAG);
   return { ok: true as const };
 }
 
-/** Moves a photo one place earlier (-1) or later (+1). The first photo is the one the shop shows. */
-export async function movePhoto(productId: string, url: string, by: -1 | 1) {
+/** Moves a photo or mockup one place earlier (-1) or later (+1). The first photo is the one the shop shows. */
+export async function movePhoto(productId: string, url: string, by: -1 | 1, kind: ListKind = "photos") {
   await requireAdmin();
-  const p = await db.product.findUnique({ where: { id: productId }, select: { mockups: true } });
-  if (!p) return;
-  const list = [...p.mockups];
+  const list = await readList(productId, kind);
+  if (!list) return;
   const i = list.indexOf(url);
   const j = i + by;
   if (i < 0 || j < 0 || j >= list.length) return;
   [list[i], list[j]] = [list[j], list[i]];
-  await db.product.update({ where: { id: productId }, data: { mockups: list } });
+  await writeList(productId, kind, list);
   updateTag(CATALOG_TAG);
 }
 
-/** Removes a photo from the product, then deletes the file from R2. */
-export async function removePhoto(productId: string, url: string) {
+/** Removes a photo or mockup from the product, then deletes the file from R2. */
+export async function removePhoto(productId: string, url: string, kind: ListKind = "photos") {
   await requireAdmin();
-  const p = await db.product.findUnique({ where: { id: productId }, select: { mockups: true } });
-  if (!p || !p.mockups.includes(url)) return;
-  await db.product.update({ where: { id: productId }, data: { mockups: p.mockups.filter((m) => m !== url) } });
+  const list = await readList(productId, kind);
+  if (!list || !list.includes(url)) return;
+  await writeList(productId, kind, list.filter((m) => m !== url));
   updateTag(CATALOG_TAG);
-  const cfg = r2Config();
-  const key = cfg ? keyFromPublicUrl(cfg, url) : null;
-  if (cfg && key?.startsWith(`products/${productId}/`)) await deleteObject(cfg, key);
+  await deleteFile(productId, url);
+}
+
+/**
+ * Saves the print on the 3D t-shirt (front and back). Only images uploaded to this product are
+ * accepted; an image that is no longer used is deleted from R2.
+ */
+export async function savePrint3d(productId: string, value: Print3D): Promise<{ ok: true } | { ok: false; message: string }> {
+  await requireAdmin();
+  const next = parsePrint3D(value);
+  for (const side of PRINT_SIDES) {
+    const s = next[side];
+    if (s && !ownKey(productId, s.url)) return { ok: false, message: "Image refusée." };
+  }
+  const p = await db.product.findUnique({ where: { id: productId }, select: { print3d: true } });
+  if (!p) return { ok: false, message: "Ce modèle n'existe plus." };
+  const before = parsePrint3D(p.print3d);
+  await db.product.update({ where: { id: productId }, data: { print3d: Object.keys(next).length ? next : Prisma.DbNull } });
+  updateTag(CATALOG_TAG);
+  const kept = new Set(PRINT_SIDES.map((s) => next[s]?.url));
+  for (const side of PRINT_SIDES) {
+    const old = before[side]?.url;
+    if (old && !kept.has(old)) await deleteFile(productId, old);
+  }
+  return { ok: true };
 }

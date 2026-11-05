@@ -30,7 +30,7 @@ Boutique en ligne de t-shirts imprimés dans notre atelier, avec un **studio 3D*
 
 **Admin** (`/admin`, protégé par mot de passe)
 - Vue d'ensemble, commandes, clients, studio, ventes et achats de crédits.
-- Produits et stock : création et modification des modèles, et photos envoyées sur Cloudflare R2.
+- Produits et stock : création et modification des modèles. Leurs images, envoyées sur Cloudflare R2, sont rangées en trois onglets : **Photos**, **Mockup** (le design posé à plat) et **3D** (l'image imprimée devant et dos sur le t-shirt 3D, placée et dimensionnée). La fiche produit de la boutique (`/boutique/[slug]`) montre les mêmes trois onglets.
 
 **Animations**
 - Un seul système de mouvement pour tout le site : courbes, durées et ressorts partagés.
@@ -114,13 +114,13 @@ Elles sont toutes listées et commentées dans [`.env.example`](.env.example). L
 1. Créer un bucket, par exemple `artsyde-photos`.
 2. Le rendre public, avec un domaine personnalisé ou l'adresse `r2.dev` (Settings → Public access). Cette adresse va dans `R2_PUBLIC_URL`, sans `/` final.
 3. Créer un jeton d'API (R2 → Manage API tokens) avec la permission « Object Read & Write », limitée à ce bucket.
-4. Autoriser l'envoi depuis le navigateur (Settings → CORS policy), en remplaçant le domaine par le tien :
+4. Autoriser l'envoi et la lecture depuis le navigateur (Settings → CORS policy), en remplaçant le domaine par le tien. `GET` sert au t-shirt 3D, qui charge les images d'impression dans WebGL :
 
    ```json
    [
      {
        "AllowedOrigins": ["http://localhost:3000", "https://artsyde.ci"],
-       "AllowedMethods": ["PUT"],
+       "AllowedMethods": ["GET", "PUT"],
        "AllowedHeaders": ["content-type"],
        "MaxAgeSeconds": 3600
      }

@@ -14,7 +14,37 @@ export type Product = {
   art?: Art | string; // built-in illustration, shown when there is no photo
   bg: string;
   photo?: string; // first photo uploaded from the admin
+  photos: string[]; // every photo, in the admin's order (the product page shows them all)
+  flats: string[]; // flat mockups (the "Mockup" tab), in the admin's order
+  print3d: Print3D; // the print on the 3D t-shirt (the "3D" tab)
+  description: string;
 };
+
+/** One side's print on the 3D t-shirt: centre (x, y) and width (w), in fractions of the print area, like the studio. */
+export type PrintPlacement = { url: string; x: number; y: number; w: number };
+export type Print3D = { front?: PrintPlacement; back?: PrintPlacement };
+export const PRINT_SIDES = ["front", "back"] as const;
+export type PrintSide = (typeof PRINT_SIDES)[number];
+/** Where a new print lands: chest height on the front, upper back on the back (as in the studio). */
+export const DEFAULT_PLACEMENT: Record<PrintSide, Omit<PrintPlacement, "url">> = { front: { x: 0.5, y: 0.36, w: 0.34 }, back: { x: 0.5, y: 0.36, w: 0.4 } };
+
+const clamp = (v: unknown, lo: number, hi: number, d: number) => (typeof v === "number" && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d);
+
+/** Reads Product.print3d (JSON) safely: anything malformed is dropped. */
+export function parsePrint3D(json: unknown): Print3D {
+  const out: Print3D = {};
+  if (!json || typeof json !== "object") return out;
+  for (const side of PRINT_SIDES) {
+    const s = (json as Record<string, unknown>)[side] as Record<string, unknown> | undefined;
+    if (!s || typeof s.url !== "string" || !/^https?:\/\//.test(s.url)) continue;
+    const d = DEFAULT_PLACEMENT[side];
+    out[side] = { url: s.url, x: clamp(s.x, 0, 1, d.x), y: clamp(s.y, 0, 1, d.y), w: clamp(s.w, 0.05, 1, d.w) };
+  }
+  return out;
+}
+
+/** A product's own page. */
+export const productHref = (p: Pick<Product, "slug">) => `/boutique/${p.slug}`;
 
 /**
  * The starting catalogue. The shop no longer reads it: prisma/seed.ts writes it into the

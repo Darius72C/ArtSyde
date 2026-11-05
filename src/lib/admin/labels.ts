@@ -3,6 +3,8 @@ import { TEE_COLORS } from "@/lib/data";
 
 /** "Noir" for "#1C1C1E"; "Couleur libre" for a colour the shop does not list (as in the cart). */
 export const colorName = (hex: string) => TEE_COLORS.find((c) => c.hex.toLowerCase() === hex.toLowerCase())?.name ?? "Couleur libre";
+/** Like colorName, but a colour outside the palette shows its code: needed where several such colours sit side by side. */
+export const colorLabel = (hex: string) => TEE_COLORS.find((c) => c.hex.toLowerCase() === hex.toLowerCase())?.name ?? hex.toUpperCase();
 
 /**
  * French labels for the admin, safe to import from server and client code

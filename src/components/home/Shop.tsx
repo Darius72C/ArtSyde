@@ -5,7 +5,7 @@ import { useRef, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { cart } from "@/lib/cart";
 import { flyToCart } from "@/lib/flyToCart";
-import { formatFCFA, type Product } from "@/lib/products";
+import { formatFCFA, productHref, type Product } from "@/lib/products";
 import { ProductImage } from "../ProductImage";
 import { RevealLines, Tilt } from "../Reveal";
 import { DUR, EASE, SPRING, STAGGER, VIEWPORT } from "@/lib/motion";
@@ -45,7 +45,9 @@ function Card({ p, i, onAdd }: { p: Product; i: number; onAdd: (p: Product, colo
             exit={{ opacity: 0, scale: 1.04 }}
             transition={{ duration: DUR.base, ease: EASE.out }}
           >
-            <ProductImage color={color} art={p.art} photo={p.photo} alt={p.name} bg="transparent" className="h-full w-full rounded-[22px]" />
+            <Link href={productHref(p)} tabIndex={-1} aria-hidden className="block h-full w-full">
+              <ProductImage color={color} art={p.art} photo={p.photo} alt={p.name} bg="transparent" className="h-full w-full rounded-[22px]" />
+            </Link>
           </motion.div>
         </AnimatePresence>
       </div>
@@ -61,7 +63,9 @@ function Card({ p, i, onAdd }: { p: Product; i: number; onAdd: (p: Product, colo
           />
         ))}
       </div>
-      <h3 className="display mt-4 text-center text-[21px]">{p.name}</h3>
+      <h3 className="display mt-4 text-center text-[21px]">
+        <Link href={productHref(p)} className="underline-offset-4 hover:underline">{p.name}</Link>
+      </h3>
       <p className="mt-1 text-center text-[15px]">
         {formatFCFA(p.price)} {p.oldPrice && <span className="text-muted line-through">{formatFCFA(p.oldPrice)}</span>}
       </p>

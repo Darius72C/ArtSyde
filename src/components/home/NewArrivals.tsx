@@ -6,7 +6,7 @@ import { motion } from "motion/react";
 import { cart } from "@/lib/cart";
 import { flyToCart } from "@/lib/flyToCart";
 import { gsap, useGSAP } from "@/lib/gsap";
-import { formatFCFA, type Product } from "@/lib/products";
+import { formatFCFA, productHref, type Product } from "@/lib/products";
 import { ProductImage } from "../ProductImage";
 import { RevealLines, Tilt } from "../Reveal";
 import { DUR, EASE, STAGGER, VIEWPORT } from "@/lib/motion";
@@ -60,11 +60,13 @@ export function NewArrivals({ products }: { products: Product[] }) {
           >
             <Tilt className="tile flex h-full flex-col p-7">
               <p className="eyebrow">{p.tag === "Nouveau" ? "Nouveau" : "Le plus vendu"}</p>
-              <h3 className="display mt-1 text-[28px]">{p.name}</h3>
+              <h3 className="display mt-1 text-[28px]">
+                <Link href={productHref(p)} className="underline-offset-4 hover:underline">{p.name}</Link>
+              </h3>
               <p className="mt-1 text-muted">À partir de {formatFCFA(p.price)}</p>
-              <div className="na-art my-6 md:my-4" style={{ transform: "translateZ(40px)" }}>
+              <Link href={productHref(p)} tabIndex={-1} aria-hidden className="na-art my-6 block md:my-4" style={{ transform: "translateZ(40px)" }}>
                 <ProductImage color={p.colors[0]} art={p.art} photo={p.photo} alt={p.name} bg="transparent" className="mx-auto aspect-square w-full rounded-[22px] md:w-auto md:h-[min(320px,34svh)]" />
-              </div>
+              </Link>
               <div className="mt-auto flex items-center justify-between">
                 <div className="flex gap-1.5">
                   {p.colors.map((c) => (

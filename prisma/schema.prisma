@@ -27,6 +27,11 @@ model Product {
   designUrl   String?
   // Photos de présentation (mockups). La première sert d'image dans le catalogue.
   mockups     String[]    @default([])
+  // Mockups à plat (onglet « Mockup ») : le design posé à plat, dans l'ordre choisi dans l'admin.
+  flatMockups String[]    @default([])
+  // Impression du t-shirt 3D (onglet « 3D ») : pour le devant et le dos, l'image et sa place
+  // { front?: { url, x, y, w }, back?: … } — x, y : centre, w : largeur, en fractions de la zone d'impression.
+  print3d     Json?
   colors      String[] // couleurs de t-shirt disponibles, en hexadécimal
   sizes       Size[]
   active      Boolean     @default(true)

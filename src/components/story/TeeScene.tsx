@@ -9,7 +9,7 @@ import { cubicBezier } from "motion/react";
 import { DUR, EASE } from "@/lib/motion";
 import { teeState } from "./teeState";
 import { SoftShadow } from "./SoftShadow";
-import { teeSnapshot } from "./snapshot";
+import { teeSnapshot, type TeeFace } from "./snapshot";
 import { TEE_HEIGHT, TEE_WIDTH, canvasTexture, colorTrue, printMaterial, stickerTexture, tintSheen, useTeeModel } from "./teeModel";
 
 const tmpA = new THREE.Color();
@@ -103,7 +103,7 @@ function Tee({ front: frontCanvas, back: backCanvas, play }: Props & { play: Pla
   });
 
   return (
-    <group ref={group}>
+    <group ref={group} name="tee-pose">
       <group ref={lift}>
         <Float speed={1} rotationIntensity={0.04} floatIntensity={studio ? 0.1 : 0.25}>
           <mesh geometry={geometry} material={print.mat} castShadow />
@@ -114,15 +114,30 @@ function Tee({ front: frontCanvas, back: backCanvas, play }: Props & { play: Pla
 }
 
 /**
- * Studio only: lets the page render the scene, exactly as it is on screen, at a chosen width
- * (the 3D view in the download). The canvas keeps its size on the page; only the drawing buffer
- * is enlarged for one frame, then put back.
+ * Studio only: lets the page render the scene at a chosen width (the views in the download).
+ * The canvas keeps its size on the page; only the drawing buffer is enlarged for one frame, then
+ * put back. With `face`, the tee is posed straight on for that frame (no turn, tilt, float or
+ * entrance), front or back, then put back exactly as it was.
  */
 function SnapshotBridge() {
   const get = useThree((s) => s.get);
   useEffect(() => {
-    teeSnapshot.current = (width) => {
+    teeSnapshot.current = (width, face?: TeeFace) => {
       const { gl, scene, camera, size } = get();
+      // Straight pose: remember every transform under the tee, zero the motion, restore after the frame.
+      const pose = face ? scene.getObjectByName("tee-pose") : undefined;
+      const saved: [THREE.Object3D, THREE.Vector3, THREE.Euler, THREE.Vector3][] = [];
+      pose?.traverse((o) => {
+        if ((o as THREE.Mesh).isMesh) return;
+        saved.push([o, o.position.clone(), o.rotation.clone(), o.scale.clone()]);
+        if (o === pose) o.rotation.set(0, face === "back" ? Math.PI : 0, 0);
+        else {
+          o.position.set(0, 0, 0);
+          o.rotation.set(0, 0, 0);
+          o.scale.setScalar(1);
+        }
+      });
+      const restore = () => saved.forEach(([o, p, r, s]) => (o.position.copy(p), o.rotation.copy(r), o.scale.copy(s)));
       const max = gl.capabilities.maxTextureSize;
       const scale = Math.min(1, max / Math.max(width, (width * size.height) / size.width));
       const w = Math.round(width * scale);
@@ -131,6 +146,7 @@ function SnapshotBridge() {
       gl.setPixelRatio(1);
       gl.setSize(w, h, false);
       gl.render(scene, camera);
+      restore();
       return new Promise<Blob | null>((resolve) => {
         gl.domElement.toBlob(resolve, "image/png"); // the pixels are captured now, encoded afterwards
         gl.setPixelRatio(ratio);

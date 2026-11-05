@@ -13,7 +13,7 @@ export const pxFor = (dpi: number) => Math.round((PRINT_WIDTH_CM / 2.54) * dpi);
  * workshop with the order. All of them reach 150 DPI, the studio's print threshold. The height follows
  * the tee's shape.
  */
-// `view`: width in pixels of the 3D view (the tee as posed in the studio) included in the download.
+// `view`: width in pixels of the two 3D views (the tee straight on, front and back) included in the download.
 export const PRINT_QUALITY: Record<PrintQuality, { label: string; dpi: number; px: number; view: number; credits: number }> = {
   STANDARD: { label: "Standard", dpi: 150, px: pxFor(150), view: 1600, credits: 0 },
   HD: { label: "HD", dpi: 225, px: pxFor(225), view: 2560, credits: 1 },

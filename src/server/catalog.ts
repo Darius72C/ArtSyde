@@ -1,7 +1,7 @@
 import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
 import { db } from "@/server/db";
-import { PRODUCTS, productSlug, type Product, type ProductTagLabel } from "@/lib/products";
+import { PRODUCTS, parsePrint3D, productSlug, type Product, type ProductTagLabel } from "@/lib/products";
 
 /** Cache tag of the shop's catalogue: the admin's product actions expire it. */
 export const CATALOG_TAG = "catalog";
@@ -27,7 +27,16 @@ async function readCatalog(): Promise<Product[]> {
     // The starting products keep their backdrop; new ones get the shop's sand.
     bg: PRODUCTS.find((s) => productSlug(s.name) === p.slug)?.bg ?? "var(--sand)",
     photo: p.mockups[0],
+    photos: p.mockups,
+    flats: p.flatMockups,
+    print3d: parsePrint3D(p.print3d),
+    description: p.description,
   }));
+}
+
+/** One active product by its slug (its page, /boutique/[slug]), from the same cached catalogue. */
+export async function getProduct(slug: string): Promise<Product | undefined> {
+  return (await getCatalog()).find((p) => p.slug === slug);
 }
 
 /** Active products, oldest first. If the database cannot be read, the shop shows none rather than crashing (not cached). */

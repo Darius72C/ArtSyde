@@ -27,11 +27,12 @@ const W = 1400;
 const H = Math.round(W / TEE_ASPECT);
 const { base: BASE_PRICE, back: BACK_PRICE } = STUDIO_PRICE;
 
-type Img = { src: string; nw: number; nh: number; x: number; y: number; scale: number; rot: number };
+type Img = { id: string; src: string; nw: number; nh: number; x: number; y: number; scale: number; rot: number };
 type Txt = { value: string; font: "serif" | "italic" | "sans"; color: string; x: number; y: number; size: number; rot: number };
-type Side = { image?: Img; text?: Txt };
+type Side = { images: Img[]; text?: Txt }; // images in stacking order: the last one is on top
 type SideId = "front" | "back";
-type Layer = "image" | "text";
+/** The selected layer: "text", or an image's id. */
+type Layer = string;
 
 const FONTS = { serif: "Serif", italic: "Italique", sans: "Linéaire" } as const;
 const INKS = [
@@ -51,6 +52,7 @@ const panelIn = (i: number) => fadeUp(0.15 + i * STAGGER.item);
 // Positions are fractions of the print area; sizes are fractions of its width (× PRINT_WIDTH_CM for cm).
 const DEFAULT_TEXT: Txt = { value: "Atelier", font: "italic", color: "#efe9df", x: 0.5, y: 0.27, size: 0.085, rot: 0 };
 const DEFAULT_IMAGE = { x: 0.5, y: 0.4, scale: 0.34, rot: 0 };
+const MAX_IMAGES = 8; // per side
 
 // Print canvases live outside React (they are drawing surfaces, not state).
 let shared: Record<"front" | "back", HTMLCanvasElement> | null = null;
@@ -63,6 +65,64 @@ function getCanvases() {
 }
 const noop = () => () => {};
 
+/*
+ * Capture deterrents. A web page cannot stop the system's screenshots or screen recording, so the
+ * previews are made less worth capturing: a watermark over them (never in the files downloaded with
+ * credits, which come from the print canvases and the 3D renderer), and a veil while the page is
+ * not in front or a screenshot shortcut is pressed.
+ */
+const WATERMARK = `url("data:image/svg+xml,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="220" height="140"><text x="110" y="76" text-anchor="middle" transform="rotate(-24 110 70)" font-family="sans-serif" font-size="15" font-weight="600" letter-spacing="2" fill="rgb(128,128,128)" fill-opacity="0.38">ARTSYDE · APERÇU</text></svg>',
+)}")`;
+
+function Watermark() {
+  return <div className="pointer-events-none absolute inset-0" style={{ backgroundImage: WATERMARK, backgroundSize: "220px 140px" }} aria-hidden />;
+}
+
+function Veil({ on, compact = false }: { on: boolean; compact?: boolean }) {
+  return (
+    <div
+      className={`pointer-events-none absolute inset-0 grid place-items-center bg-surface/70 backdrop-blur-2xl transition-opacity duration-300 ${on ? "opacity-100" : "opacity-0"}`}
+      aria-hidden
+    >
+      {!compact && <p className="eyebrow px-6 text-center">Aperçu masqué · reviens sur la page pour continuer</p>}
+    </div>
+  );
+}
+
+/** True while the page is hidden or not focused, and for a moment after a screenshot shortcut. */
+function useCaptureVeil() {
+  const [veiled, setVeiled] = useState(false);
+  useEffect(() => {
+    let timer: number | undefined;
+    const show = () => setVeiled(true);
+    const settle = () => setVeiled(document.hidden || !document.hasFocus());
+    const shortcut = (e: KeyboardEvent) => {
+      const mac = e.metaKey && e.shiftKey && ["3", "4", "5", "6"].includes(e.key);
+      const win = e.key === "PrintScreen" || ((e.metaKey || e.key === "Meta") && e.shiftKey && e.key.toLowerCase() === "s");
+      if (!mac && !win) return;
+      show();
+      navigator.clipboard?.writeText("").catch(() => {}); // Windows: Print Screen copies the screen; replace it when allowed
+      window.clearTimeout(timer);
+      timer = window.setTimeout(settle, 1500);
+    };
+    window.addEventListener("blur", show);
+    window.addEventListener("focus", settle);
+    document.addEventListener("visibilitychange", settle);
+    window.addEventListener("keydown", shortcut);
+    window.addEventListener("keyup", shortcut); // Print Screen only fires on key up on Windows
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("blur", show);
+      window.removeEventListener("focus", settle);
+      document.removeEventListener("visibilitychange", settle);
+      window.removeEventListener("keydown", shortcut);
+      window.removeEventListener("keyup", shortcut);
+    };
+  }, []);
+  return veiled;
+}
+
 function fontFamily(f: Txt["font"]) {
   const v = getComputedStyle(document.documentElement).getPropertyValue(f === "sans" ? "--font-body" : "--font-display").trim();
   return v || (f === "sans" ? "sans-serif" : "serif");
@@ -73,17 +133,16 @@ function paint(ctx: CanvasRenderingContext2D, d: Side, w: number, h: number, ima
   ctx.clearRect(0, 0, w, h);
   ctx.save();
   ctx.clip(teePath2D(w, h));
-  if (d.image) {
-    const el = images.get(d.image.src);
-    if (el) {
-      const iw = d.image.scale * w;
-      const ih = (iw * d.image.nh) / d.image.nw;
-      ctx.save();
-      ctx.translate(d.image.x * w, d.image.y * h);
-      ctx.rotate((d.image.rot * Math.PI) / 180);
-      ctx.drawImage(el, -iw / 2, -ih / 2, iw, ih);
-      ctx.restore();
-    }
+  for (const img of d.images) {
+    const el = images.get(img.src);
+    if (!el) continue;
+    const iw = img.scale * w;
+    const ih = (iw * img.nh) / img.nw;
+    ctx.save();
+    ctx.translate(img.x * w, img.y * h);
+    ctx.rotate((img.rot * Math.PI) / 180);
+    ctx.drawImage(el, -iw / 2, -ih / 2, iw, ih);
+    ctx.restore();
   }
   if (d.text?.value) {
     const t = d.text;
@@ -100,13 +159,101 @@ function paint(ctx: CanvasRenderingContext2D, d: Side, w: number, h: number, ima
   ctx.restore();
 }
 
-const hasContent = (d: Side) => Boolean(d.image || d.text?.value);
+/** Side length, in cm on the tee, of the square the quality comparison zooms into. */
+const COMPARE_CM = 1.5;
+const cmLabel = `${COMPARE_CM.toLocaleString("fr-FR")} cm`;
+
+/**
+ * The same 1.5 cm square of the design, painted at each output quality and enlarged to the same size
+ * without smoothing: more dots means a sharper print. Centred on the selected layer.
+ */
+function QualityCompare({ side, center, images, current, onPick }: { side: Side; center: { x: number; y: number }; images: React.RefObject<Map<string, HTMLImageElement>>; current: PrintQuality; onPick: (q: PrintQuality) => void }) {
+  const refs = useRef<(HTMLCanvasElement | null)[]>([]);
+  useEffect(() => {
+    PRINT_QUALITIES.forEach((k, i) => {
+      const out = refs.current[i];
+      if (!out) return;
+      const w = PRINT_QUALITY[k].px;
+      const h = Math.round(w / TEE_ASPECT);
+      const crop = Math.round((w * COMPARE_CM) / PRINT_WIDTH_CM);
+      const tile = Object.assign(document.createElement("canvas"), { width: crop, height: crop });
+      const t = tile.getContext("2d")!;
+      t.translate(crop / 2 - center.x * w, crop / 2 - center.y * h);
+      paint(t, side, w, h, images.current);
+      const o = out.getContext("2d")!;
+      o.clearRect(0, 0, out.width, out.height);
+      o.imageSmoothingEnabled = false;
+      o.drawImage(tile, 0, 0, out.width, out.height);
+    });
+  }, [side, center.x, center.y, images]);
+
+  return (
+    <div className="mt-4 rounded-2xl border border-line p-4">
+      <div className="grid grid-cols-3 gap-2">
+        {PRINT_QUALITIES.map((k, i) => {
+          const q = PRINT_QUALITY[k];
+          return (
+            <button key={k} type="button" onClick={() => onPick(k)} aria-pressed={current === k} className="text-left">
+              <canvas
+                ref={(el) => void (refs.current[i] = el)}
+                width={240}
+                height={240}
+                className={`aspect-square w-full rounded-xl border bg-surface [image-rendering:pixelated] ${current === k ? "border-accent shadow-[0_0_0_1px_var(--accent)]" : "border-line"}`}
+                aria-label={`Aperçu en ${q.label}`}
+              />
+              <span className="mt-2 block text-sm font-medium">{q.label}</span>
+              <span className="block text-[11px] text-muted">{q.dpi} DPI · {Math.round((q.dpi / 2.54) * COMPARE_CM)} points pour {cmLabel}</span>
+            </button>
+          );
+        })}
+      </div>
+      <dl className="mt-4 space-y-1.5 text-xs">
+        {PRINT_QUALITIES.map((k) => {
+          const q = PRINT_QUALITY[k];
+          return (
+            <div key={k} className="flex justify-between gap-3">
+              <dt className="text-muted">{q.label}</dt>
+              <dd className="text-right tabular-nums">{q.px.toLocaleString("fr-FR")} × {Math.round(q.px / TEE_ASPECT).toLocaleString("fr-FR")} px · vue 3D {q.view.toLocaleString("fr-FR")} px</dd>
+            </div>
+          );
+        })}
+      </dl>
+      <p className="mt-3 text-xs text-muted">Un carré de {cmLabel} de ton design, agrandi. Une image importée trop petite reste floue, quelle que soit la qualité.</p>
+    </div>
+  );
+}
+
+const hasContent = (d: Side) => Boolean(d.images.length || d.text?.value);
+
+/** The topmost layer under a point of the print area (fractions of its width and height), or null. */
+function layerAt(d: Side, px: number, py: number, w: number, h: number): Layer | null {
+  const inside = (cx: number, cy: number, bw: number, bh: number, rot: number) => {
+    const a = (-rot * Math.PI) / 180;
+    const dx = (px - cx) * w;
+    const dy = (py - cy) * h;
+    const x = dx * Math.cos(a) - dy * Math.sin(a);
+    const y = dx * Math.sin(a) + dy * Math.cos(a);
+    return Math.abs(x) <= bw / 2 && Math.abs(y) <= bh / 2;
+  };
+  const t = d.text;
+  if (t?.value) {
+    const lines = t.value.split("\n");
+    const longest = Math.max(...lines.map((l) => l.length));
+    if (inside(t.x, t.y, longest * t.size * w * 0.55, lines.length * t.size * w * 1.05, t.rot)) return "text";
+  }
+  for (let i = d.images.length - 1; i >= 0; i--) {
+    const img = d.images[i];
+    const iw = img.scale * w;
+    if (inside(img.x, img.y, iw, (iw * img.nh) / img.nw, img.rot)) return img.id;
+  }
+  return null;
+}
 
 export function StudioView() {
   const mounted = useSyncExternalStore(noop, () => true, () => false);
   const canvases = mounted ? getCanvases() : null;
   const images = useRef(new Map<string, HTMLImageElement>());
-  const [design, setDesign] = useState<Record<SideId, Side>>({ front: { text: DEFAULT_TEXT }, back: {} });
+  const [design, setDesign] = useState<Record<SideId, Side>>({ front: { images: [], text: DEFAULT_TEXT }, back: { images: [] } });
   const [side, setSide] = useState<SideId>("front");
   const [selected, setSelected] = useState<Layer | null>("text");
   const [tab, setTab] = useState<"couleur" | "image" | "texte">("texte");
@@ -118,8 +265,10 @@ export function StudioView() {
   const [noTokens, setNoTokens] = useState(false);
   const [quality, setQuality] = useState<PrintQuality>("STANDARD");
   const [exporting, setExporting] = useState(false);
+  const [compare, setCompare] = useState(false);
   const preview = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
+  const veiled = useCaptureVeil();
 
   useEffect(() => {
     Object.assign(teeState, { hex: TEE_COLORS[0].hex, rotY: 0, scrollRot: 0, scale: 1, parallax: 0.25 });
@@ -159,16 +308,18 @@ export function StudioView() {
     return true;
   };
 
-  const update = <K extends Layer>(layer: K, patch: Partial<K extends "image" ? Img : Txt>) =>
+  /** Changes the text ("text") or one image (by its id) on the current side. */
+  const update = (layer: Layer, patch: Partial<Img> & Partial<Txt>) =>
     setDesign((d) => {
-      const cur = d[side][layer];
-      if (!cur) return d;
-      return { ...d, [side]: { ...d[side], [layer]: { ...cur, ...patch } } };
+      const s = d[side];
+      if (layer === "text") return s.text ? { ...d, [side]: { ...s, text: { ...s.text, ...patch } } } : d;
+      return { ...d, [side]: { ...s, images: s.images.map((i) => (i.id === layer ? { ...i, ...patch } : i)) } };
     });
+  const topLayer = (s: Side): Layer | null => (s.images.length ? s.images[s.images.length - 1].id : s.text?.value ? "text" : null);
 
   const flip = (s: SideId) => {
     setSide(s);
-    setSelected(design[s].text ? "text" : design[s].image ? "image" : null);
+    setSelected(topLayer(design[s]));
     gsap.to(teeState, { rotY: s === "front" ? 0 : Math.PI, duration: 1, ease: "back.out(1.4)" });
   };
   const pickColor = (hex: string) => {
@@ -177,44 +328,100 @@ export function StudioView() {
   };
 
 
-  const onUpload = (file?: File) => {
-    if (!file) return;
-    if (!/^image\/(png|jpeg|webp)$/.test(file.type)) return flash("Format accepté : PNG, JPG ou WEBP");
-    if (file.size > 15 * 1024 * 1024) return flash("Image trop lourde (15 Mo max)");
-    if (!spend(1)) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const src = String(reader.result);
-      const el = new Image();
-      el.onload = () => {
-        images.current.set(src, el);
-        setDesign((d) => ({ ...d, [side]: { ...d[side], image: { src, nw: el.naturalWidth, nh: el.naturalHeight, ...DEFAULT_IMAGE } } }));
-        setSelected("image");
-        flash("Image ajoutée · 1 crédit utilisé");
+  // Adds images to the current side, on top of what is there: 1 credit each. Several can be picked at once.
+  const onUpload = (list: FileList | null) => {
+    const files = [...(list ?? [])];
+    if (!files.length) return;
+    if (files.some((f) => !/^image\/(png|jpeg|webp)$/.test(f.type))) return flash("Format accepté : PNG, JPG ou WEBP");
+    if (files.some((f) => f.size > 15 * 1024 * 1024)) return flash("Image trop lourde (15 Mo max)");
+    const room = MAX_IMAGES - design[side].images.length;
+    if (room <= 0) return flash(`${MAX_IMAGES} images maximum par face`);
+    const take = files.slice(0, room);
+    if (!spend(take.length)) return;
+    const target = side;
+    const extra = files.length > take.length ? ` (${MAX_IMAGES} max par face)` : "";
+    let loaded = 0;
+    take.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const src = String(reader.result);
+        const el = new Image();
+        el.onload = () => {
+          images.current.set(src, el);
+          const id = `img-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+          setDesign((d) => {
+            // Each new image lands a little to the side and lower, so they don't hide each other.
+            const n = d[target].images.length;
+            const img: Img = { id, src, nw: el.naturalWidth, nh: el.naturalHeight, ...DEFAULT_IMAGE, x: 0.5 + ((n % 3) - 1) * 0.12, y: DEFAULT_IMAGE.y + (n % 4) * 0.05 };
+            return { ...d, [target]: { ...d[target], images: [...d[target].images, img] } };
+          });
+          setSelected(id);
+          if (++loaded === take.length) flash(take.length > 1 ? `${take.length} images ajoutées · ${take.length} crédits utilisés${extra}` : `Image ajoutée · 1 crédit utilisé${extra}`);
+        };
+        el.src = src;
       };
-      el.src = src;
-    };
-    reader.readAsDataURL(file);
+      reader.readAsDataURL(file);
+    });
   };
 
-  // Drag the selected layer directly on the print preview.
-  const dragging = useRef(false);
-  const moveTo = (e: React.PointerEvent) => {
-    if (!selected || !preview.current) return;
-    const r = preview.current.getBoundingClientRect();
-    const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
-    const y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
-    update(selected, { x, y });
+  // Stacking order and removal of the selected layer.
+  const restack = (id: string, by: -1 | 1) =>
+    setDesign((d) => {
+      const list = [...d[side].images];
+      const i = list.findIndex((x) => x.id === id);
+      const j = i + by;
+      if (i < 0 || j < 0 || j >= list.length) return d;
+      [list[i], list[j]] = [list[j], list[i]];
+      return { ...d, [side]: { ...d[side], images: list } };
+    });
+  const removeLayer = (layer: Layer) => {
+    const s = design[side];
+    const next: Side = layer === "text" ? { ...s, text: undefined } : { ...s, images: s.images.filter((i) => i.id !== layer) };
+    setDesign((d) => ({ ...d, [side]: next }));
+    setSelected(topLayer(next));
+  };
+
+  // On the print preview: press a layer to select it, then drag it (it keeps the point you grabbed).
+  // Pressing an empty spot moves the selected layer there.
+  const drag = useRef<{ layer: Layer; dx: number; dy: number } | null>(null);
+  const pointAt = (e: React.PointerEvent) => {
+    const r = preview.current!.getBoundingClientRect();
+    return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height, w: r.width, h: r.height };
+  };
+  const startDrag = (e: React.PointerEvent) => {
+    if (!preview.current) return;
+    const p = pointAt(e);
+    const s = design[side];
+    const hit = layerAt(s, p.x, p.y, p.w, p.h);
+    const target = hit ?? selected;
+    const l = target === "text" ? s.text : s.images.find((i) => i.id === target);
+    if (!target || !l) return;
+    if (hit) {
+      setSelected(hit);
+      setTab(hit === "text" ? "texte" : "image");
+      drag.current = { layer: hit, dx: l.x - p.x, dy: l.y - p.y };
+    } else {
+      drag.current = { layer: target, dx: 0, dy: 0 };
+      update(target, { x: p.x, y: p.y });
+    }
+  };
+  const moveDrag = (e: React.PointerEvent) => {
+    const g = drag.current;
+    if (!g || !preview.current) return;
+    const p = pointAt(e);
+    update(g.layer, { x: Math.min(1, Math.max(0, p.x + g.dx)), y: Math.min(1, Math.max(0, p.y + g.dy)) });
   };
 
   // Drag on the 3D stage rotates the tee.
   const spin = useRef<number | null>(null);
 
   const cur = design[side];
-  const layer = selected ? cur[selected] : undefined;
-  const hasBack = Boolean(design.back.image || design.back.text?.value);
+  const selImage = selected && selected !== "text" ? cur.images.find((i) => i.id === selected) : undefined;
+  const layer = selected === "text" ? cur.text : selImage;
+  const selIndex = selImage ? cur.images.indexOf(selImage) : -1;
+  const hasBack = hasContent(design.back);
   const price = BASE_PRICE + (hasBack ? BACK_PRICE : 0);
-  const dpi = cur.image ? Math.round(cur.image.nw / ((cur.image.scale * PRINT_WIDTH_CM) / 2.54)) : null;
+  const dpi = selImage ? Math.round(selImage.nw / ((selImage.scale * PRINT_WIDTH_CM) / 2.54)) : null;
   const q = PRINT_QUALITY[quality];
   const creditsLabel = (n: number) => `${n} crédit${n > 1 ? "s" : ""}`;
   const setInk = (color: string) =>
@@ -249,9 +456,12 @@ export function StudioView() {
       setTimeout(() => URL.revokeObjectURL(a.href), 2000);
     };
     try {
-      const view = await teeSnapshot.current?.(q.view);
-      if (!view) throw new Error("3D view unavailable");
-      save(view, `artsyde-vue-3d-${tag}.png`);
+      // The tee straight on, front then back, whatever angle it has on screen.
+      for (const face of ["front", "back"] as const) {
+        const view = await teeSnapshot.current?.(q.view, face);
+        if (!view) throw new Error("3D view unavailable");
+        save(view, `artsyde-vue-${face === "front" ? "devant" : "dos"}-${tag}.png`);
+      }
       for (const id of sides) {
         const c = Object.assign(document.createElement("canvas"), { width: q.px, height: Math.round(q.px / TEE_ASPECT) });
         const ctx = c.getContext("2d");
@@ -284,7 +494,7 @@ export function StudioView() {
       key={t}
       role="tab"
       aria-selected={tab === t}
-      onClick={() => (setTab(t), t !== "couleur" && setSelected(t === "image" ? "image" : "text"))}
+      onClick={() => (setTab(t), t !== "couleur" && setSelected(t === "texte" ? "text" : (cur.images.at(-1)?.id ?? null)))}
       className={`relative pb-2 text-[11px] tracking-[0.2em] uppercase transition-colors ${tab === t ? "" : "text-muted hover:text-ink"}`}
     >
       {t}
@@ -293,7 +503,7 @@ export function StudioView() {
   );
 
   return (
-    <div className="mx-auto max-w-[1440px] px-5 pb-16 pt-10 md:px-10">
+    <div className="mx-auto max-w-[1440px] px-5 pb-16 pt-10 md:px-10" onContextMenu={(e) => e.preventDefault()} onDragStart={(e) => e.preventDefault()}>
       <div className="mb-8 flex flex-wrap items-end justify-between gap-6">
         <RevealLines as="h1" lines={[{ text: "Studio 3D.", muted: "Crée le tien." }]} className="display text-5xl md:text-6xl" />
         <div className="flex items-center gap-6 text-sm">
@@ -330,7 +540,9 @@ export function StudioView() {
               </button>
             ))}
           </div>
+          <Watermark />
           <p className="eyebrow pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap">Glisse pour tourner</p>
+          <Veil on={veiled} />
         </motion.section>
 
         {/* Tools */}
@@ -351,11 +563,33 @@ export function StudioView() {
               {tab === "image" && (
                 <>
                   <label className="flex cursor-pointer flex-col items-center gap-2 rounded-2xl border border-dashed border-line bg-bg px-6 py-10 text-center transition-colors duration-300 hover:border-accent">
-                    <span className="text-[17px] font-semibold text-link">{cur.image ? "Remplacer l'image" : "Importer une image"}</span>
-                    <span className="text-xs text-muted">PNG, JPG ou WEBP · 1 crédit</span>
-                    <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => (onUpload(e.target.files?.[0]), (e.target.value = ""))} />
+                    <span className="text-[17px] font-semibold text-link">{cur.images.length ? "Ajouter des images" : "Importer des images"}</span>
+                    <span className="text-xs text-muted">PNG, JPG ou WEBP · 1 crédit par image · {MAX_IMAGES} max sur le {side === "front" ? "devant" : "dos"}</span>
+                    <input type="file" multiple accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => (onUpload(e.target.files), (e.target.value = ""))} />
                   </label>
-                  {cur.image && dpi !== null && (
+                  {cur.images.length > 0 && (
+                    <div>
+                      <p className="text-sm text-muted">
+                        {cur.images.length} image{cur.images.length > 1 ? "s" : ""} sur le {side === "front" ? "devant" : "dos"} · touche-en une pour la régler
+                      </p>
+                      <div className="mt-3 grid grid-cols-4 gap-2">
+                        {cur.images.map((img, i) => (
+                          <button
+                            key={img.id}
+                            type="button"
+                            onClick={() => setSelected(img.id)}
+                            aria-pressed={selected === img.id}
+                            aria-label={`Image ${i + 1}`}
+                            className={`aspect-square overflow-hidden rounded-xl border bg-surface p-1 transition-colors duration-300 ${selected === img.id ? "border-accent shadow-[0_0_0_1px_var(--accent)]" : "border-line hover:border-muted"}`}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element -- a local data URL */}
+                            <img src={img.src} alt="" draggable={false} className="h-full w-full object-contain" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {selImage && dpi !== null && (
                     <p className="text-sm">
                       <span className={dpi >= 150 ? "text-ok" : "text-danger"}>●</span>{" "}
                       {dpi >= 150 ? `Qualité d'impression satisfaisante (${dpi} DPI).` : `Image un peu petite (${dpi} DPI) : réduis-la ou choisis une image plus grande.`}
@@ -402,21 +636,21 @@ export function StudioView() {
 
               {tab !== "couleur" && layer && (
                 <div className="space-y-6 border-t border-line pt-6">
-                  <p className="eyebrow">Ajuster {selected === "image" ? "l'image" : "le texte"}</p>
-                  {selected === "image" && cur.image && slider("Largeur", cur.image.scale, 0.05, 1, 0.005, (v) => update("image", { scale: v }), (v) => `${Math.round(v * PRINT_WIDTH_CM)} cm`)}
+                  <p className="eyebrow">Ajuster {selImage ? (cur.images.length > 1 ? `l'image ${selIndex + 1}` : "l'image") : "le texte"}</p>
+                  {selImage && slider("Largeur", selImage.scale, 0.05, 1, 0.005, (v) => update(selImage.id, { scale: v }), (v) => `${Math.round(v * PRINT_WIDTH_CM)} cm`)}
                   {selected === "text" && cur.text && slider("Taille", cur.text.size, 0.02, 0.22, 0.001, (v) => update("text", { size: v }), (v) => `${(v * PRINT_WIDTH_CM).toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} cm`)}
                   {slider("Horizontal", layer.x, 0, 1, 0.01, (v) => update(selected!, { x: v }), (v) => `${Math.round(v * 100)} %`)}
                   {slider("Vertical", layer.y, 0, 1, 0.01, (v) => update(selected!, { y: v }), (v) => `${Math.round(v * 100)} %`)}
                   {slider("Rotation", layer.rot, -180, 180, 1, (v) => update(selected!, { rot: v }), (v) => `${v}°`)}
-                  <div className="flex gap-6 pt-2">
+                  <div className="flex flex-wrap gap-x-6 gap-y-3 pt-2">
                     <button onClick={() => update(selected!, { x: 0.5 })} className="link-line">Centrer</button>
-                    <button
-                      onClick={() => {
-                        setDesign((d) => ({ ...d, [side]: { ...d[side], [selected!]: undefined } }));
-                        setSelected(null);
-                      }}
-                      className="link-line text-danger"
-                    >
+                    {selImage && cur.images.length > 1 && (
+                      <>
+                        <button onClick={() => restack(selImage.id, 1)} disabled={selIndex === cur.images.length - 1} className="link-line disabled:opacity-40 disabled:no-underline">Devant</button>
+                        <button onClick={() => restack(selImage.id, -1)} disabled={selIndex === 0} className="link-line disabled:opacity-40 disabled:no-underline">Derrière</button>
+                      </>
+                    )}
+                    <button onClick={() => removeLayer(selected!)} className="link-line text-danger">
                       Supprimer
                     </button>
                   </div>
@@ -430,17 +664,16 @@ export function StudioView() {
         <motion.aside {...panelIn(2)} data-lenis-prevent className="tile order-3 space-y-8 p-6 lg:col-span-2 xl:col-span-1 xl:max-h-[calc(100svh-200px)] xl:!overflow-y-auto xl:overscroll-contain">
           <div>
             <p className="eyebrow">Zone d&apos;impression · {side === "front" ? "devant" : "dos"}</p>
-            <p className="mt-1 text-xs text-muted">Tout le {side === "front" ? "devant" : "dos"}, manches comprises. Glisse pour placer.</p>
+            <p className="mt-1 text-xs text-muted">Tout le {side === "front" ? "devant" : "dos"}, manches comprises. Touche une image ou le texte pour le choisir, glisse pour le placer.</p>
             <div
               className="relative mx-auto mt-4 w-full max-w-[360px] cursor-move touch-none"
               style={{ aspectRatio: `${W} / ${H}` }}
               onPointerDown={(e) => {
-                dragging.current = true;
                 e.currentTarget.setPointerCapture?.(e.pointerId);
-                moveTo(e);
+                startDrag(e);
               }}
-              onPointerMove={(e) => dragging.current && moveTo(e)}
-              onPointerUp={() => (dragging.current = false)}
+              onPointerMove={moveDrag}
+              onPointerUp={() => (drag.current = null)}
             >
               <svg viewBox="0 0 1 1" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden>
                 <defs>
@@ -451,9 +684,13 @@ export function StudioView() {
                 <path d={TEE_PATH_01} fill={teeHex} />
               </svg>
               <div ref={preview} className="absolute inset-0" style={{ clipPath: "url(#print-area)" }} />
+              <div className="pointer-events-none absolute inset-0" style={{ clipPath: "url(#print-area)" }}>
+                <Watermark />
+              </div>
               <svg viewBox="0 0 1 1" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full text-muted" aria-hidden>
                 <path d={TEE_PATH_01} fill="none" stroke="currentColor" strokeWidth={1} strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />
               </svg>
+              <Veil on={veiled} compact />
             </div>
           </div>
 
@@ -468,8 +705,12 @@ export function StudioView() {
               ))}
             </div>
             <p className="mt-3 text-xs text-muted">
-              Le t-shirt en 3D tel que tu l&apos;as placé ({q.view.toLocaleString("fr-FR")} px), et le fichier d&apos;impression à {q.dpi} DPI ({q.px.toLocaleString("fr-FR")} px de large). C&apos;est aussi la qualité du fichier d&apos;impression envoyé avec ta commande{q.credits ? ` : ${creditsLabel(q.credits)} à l'ajout au panier` : ""}.
+              Le t-shirt en 3D vu de face et de dos ({q.view.toLocaleString("fr-FR")} px), et le fichier d&apos;impression à {q.dpi} DPI ({q.px.toLocaleString("fr-FR")} × {Math.round(q.px / TEE_ASPECT).toLocaleString("fr-FR")} px). C&apos;est aussi la qualité du fichier d&apos;impression envoyé avec ta commande{q.credits ? ` : ${creditsLabel(q.credits)} à l'ajout au panier` : ""}.
             </p>
+            <button type="button" onClick={() => setCompare((v) => !v)} aria-expanded={compare} className="link-line mt-3 !text-[15px]">
+              {compare ? "Masquer la comparaison" : "Voir la différence entre les qualités"} <span className="arrow">›</span>
+            </button>
+            {compare && mounted && <QualityCompare side={cur} center={layer ? { x: layer.x, y: layer.y } : { x: 0.5, y: 0.32 }} images={images} current={quality} onPick={setQuality} />}
             <button onClick={exportDesign} disabled={exporting} className="btn-outline mt-4 w-full">
               {exporting ? <span className="h-4 w-4 animate-spin rounded-full border border-accent border-t-transparent" aria-label="Export en cours" /> : `Télécharger le visuel${q.credits ? ` · ${creditsLabel(q.credits)}` : ""}`}
             </button>

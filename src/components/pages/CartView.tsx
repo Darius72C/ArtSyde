@@ -8,7 +8,8 @@ import { TEE_COLORS } from "@/lib/data";
 
 const colorName = (hex: string) => TEE_COLORS.find((c) => c.hex.toLowerCase() === hex.toLowerCase())?.name ?? "Couleur libre";
 import { ProductImage } from "../ProductImage";
-import { FadeUp, RevealLines } from "../Reveal";
+import { RevealLines } from "../Reveal";
+import { Suggestions } from "../Suggestions";
 import { DUR, EASE, STAGGER } from "@/lib/motion";
 import { flyToBin } from "@/lib/flyToBin";
 
@@ -143,30 +144,7 @@ export function CartView({ products }: { products: Product[] }) {
         )}
       </AnimatePresence>
 
-      {suggestions.length > 0 && (
-        <section className="py-24">
-                    <RevealLines lines={[{ text: "Tu vas aimer.", muted: "Pour compléter." }]} className="display text-4xl md:text-5xl" />
-          <div className="mt-12 grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-4 md:gap-x-6">
-            {suggestions.map((p, i) => (
-              <FadeUp key={p.id} delay={i * STAGGER.item} className="group">
-                <div className="relative">
-                  <ProductImage color={p.colors[0]} art={p.art} photo={p.photo} alt={p.name} bg={p.bg} className="aspect-[4/5] rounded-[22px]" />
-                  <button
-                    onClick={() => cart.add({ productId: p.id, name: p.name, price: p.price, color: p.colors[0], size: p.sizes.includes("M") ? "M" : (p.sizes[0] ?? "M"), art: p.art, bg: p.bg, photo: p.photo })}
-                    className="btn absolute bottom-4 left-1/2 -translate-x-1/2 !px-4 !py-1.5 !text-[14px] transition md:opacity-0 md:group-hover:opacity-100"
-                  >
-                    Ajouter — M
-                  </button>
-                </div>
-                <div className="mt-4 flex justify-between gap-3">
-                  <p className="font-semibold">{p.name}</p>
-                  <p className="text-sm">{formatFCFA(p.price)}</p>
-                </div>
-              </FadeUp>
-            ))}
-          </div>
-        </section>
-      )}
+      <Suggestions products={suggestions} />
     </div>
   );
 }
