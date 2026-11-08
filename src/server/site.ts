@@ -1,4 +1,5 @@
 import "server-only";
+import { SITE_URL } from "@/lib/site";
 
-/** The site's public address (BETTER_AUTH_URL), for links that leave the site: e-mails, payment returns, webhooks. */
-export const siteUrl = () => (process.env.BETTER_AUTH_URL || "http://localhost:3000").replace(/\/$/, "");
+/** The site's public address (src/lib/site.ts), for links that leave the site: e-mails, payment returns, webhooks. */
+export const siteUrl = () => SITE_URL;

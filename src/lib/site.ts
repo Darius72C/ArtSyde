@@ -2,7 +2,7 @@
 const PRODUCTION_URL = "https://www.artsyde.store";
 
 /** True on the live Vercel deployment (not on previews or in local development). */
-const IS_PRODUCTION = process.env.VERCEL_ENV === "production";
+export const IS_PRODUCTION = process.env.VERCEL_ENV === "production";
 
 /**
  * Public address of the site, without a trailing slash: SITE_URL, else the production domain on the live

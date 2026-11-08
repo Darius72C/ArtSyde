@@ -8,6 +8,7 @@ import { sendEmail } from "@/server/email/send";
 import { welcomeEmail, welcomeTexts } from "@/server/email/welcome";
 import { emailAd, emailImage } from "@/server/email/image";
 import { logActivity, logError } from "@/server/log";
+import { IS_PRODUCTION, SITE_URL } from "@/lib/site";
 
 /** Studio credits given once to every new account. */
 export const SIGNUP_CREDITS = 5;
@@ -44,6 +45,11 @@ export async function linkCustomer(user: { id: string; name: string; email: stri
  * Needs BETTER_AUTH_SECRET, and GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET for Google (see .env.example).
  */
 export const auth = betterAuth({
+  // The live site always uses its real domain (a BETTER_AUTH_URL left at localhost would send Google back
+  // to http://localhost:3000/api/auth/callback/google). Elsewhere: BETTER_AUTH_URL, or the request's address.
+  baseURL: IS_PRODUCTION ? SITE_URL : process.env.BETTER_AUTH_URL || undefined,
+  // artsyde.store redirects to www, but both are accepted as origins.
+  trustedOrigins: IS_PRODUCTION ? [SITE_URL, SITE_URL.replace("://www.", "://")] : undefined,
   database: prismaAdapter(db, { provider: "postgresql" }),
   emailAndPassword: { enabled: true, minPasswordLength: 8, autoSignIn: true },
   socialProviders: google,
