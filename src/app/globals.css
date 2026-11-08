@@ -82,6 +82,9 @@
 
 html {
   background: var(--bg);
+  /* A #section reached by a link (/#boutique…) stops under the fixed header, whoever scrolls: the browser
+     or Lenis (src/components/SmoothScroll.tsx), which reads this value too. */
+  scroll-padding-top: 90px;
 }
 body {
   background: var(--bg);

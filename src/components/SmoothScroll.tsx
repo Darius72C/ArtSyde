@@ -17,12 +17,19 @@ function sameSiteReferrer() {
   }
 }
 
-/** Scrolls so the hero's cards sit just under the header (no glide: the page is just arriving). */
-function toCards(cards: HTMLElement) {
-  const offset = -72;
-  if (lenis) lenis.scrollTo(cards, { offset, immediate: true });
-  else window.scrollTo({ top: cards.getBoundingClientRect().top + window.scrollY + offset, behavior: "instant" });
+/**
+ * Puts an element `gap` px from the top of the window, at once (the page is just arriving). The position is
+ * worked out here and given to Lenis as a number, so the page's scroll-padding isn't counted twice.
+ */
+function jumpTo(el: HTMLElement, gap: number) {
+  const top = Math.max(0, el.getBoundingClientRect().top + window.scrollY - gap);
+  if (lenis) lenis.scrollTo(top, { immediate: true, force: true });
+  else window.scrollTo({ top, behavior: "instant" });
 }
+/** A section's top just under the header. */
+const toSection = (el: HTMLElement) => jumpTo(el, 90);
+/** The hero's three cards just under the header. */
+const toCards = (cards: HTMLElement) => jumpTo(cards, 72);
 
 /** Buttery smooth scrolling (Lenis) kept in sync with GSAP ScrollTrigger. Off for reduced-motion users. */
 export function SmoothScroll() {
@@ -32,7 +39,7 @@ export function SmoothScroll() {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     // lerp: how much of the remaining distance is covered each frame (lower = longer, softer glide).
     // wheelMultiplier: distance per wheel notch (below 1 = each notch travels a little less).
-    lenis = new Lenis({ autoRaf: false, anchors: { offset: -90 }, lerp: 0.07, wheelMultiplier: 0.8 });
+    lenis = new Lenis({ autoRaf: false, anchors: false /* #section links: the browser jumps, stopping under the header (html { scroll-padding-top }) */, lerp: 0.07, wheelMultiplier: 0.8 });
     lenis.on("scroll", ScrollTrigger.update);
     const tick = (time: number) => lenis?.raf(time * 1000);
     gsap.ticker.add(tick);
@@ -44,33 +51,51 @@ export function SmoothScroll() {
     };
   }, []);
 
-  // New page: start at the top (or at the #anchor) and re-measure scroll animations.
-  // Coming to the home page from another page of the site (a link, the logo, a redirect after signing in,
-  // deleting the account…), it opens on the hero's three cards rather than on its title. A direct visit
-  // (typed address, a search result) still starts at the very top.
+  // New page: where it opens, then re-measure the scroll animations.
+  // - With a #section (/#boutique, /#nouveautes, /#equipes, /#aide…): on that section, under the header.
+  // - The home page, coming from another page of the site (a link, the logo, a redirect after signing in,
+  //   deleting the account…): on the hero's three cards rather than on its title.
+  // - Anything else, and a direct visit to the home page (typed address, a search result): at the top.
+  // The new page may still be fading in, so the target is waited for (2 s at most). The pinned scroll story
+  // grows the page once ScrollTrigger re-measures, which moves everything below it: the jump is made again
+  // after that, and once more when images have settled, so a section below it isn't missed.
   const previous = useRef<string | null>(null);
   useEffect(() => {
     const cameFrom = previous.current;
     previous.current = pathname;
-    const hash = window.location.hash;
-    const target = hash ? document.querySelector(hash) : null;
+    const hash = decodeURIComponent(window.location.hash.slice(1));
+    const toHome = !hash && pathname === "/" && (cameFrom ? cameFrom !== "/" : sameSiteReferrer());
+    const find = () => (hash ? document.getElementById(hash) : toHome ? document.getElementById("cartes") : null);
+    const go = (el: HTMLElement) => (hash ? toSection(el) : toCards(el));
+
     let frame = 0;
-    if (target) {
-      if (lenis) lenis.scrollTo(target as HTMLElement, { offset: -90, immediate: true });
-    } else if (pathname === "/" && (cameFrom ? cameFrom !== "/" : sameSiteReferrer())) {
-      // The new page may still be fading in: wait for the cards (about 1.5 s at most).
+    const timers: number[] = [];
+    if (hash || toHome) {
       const started = performance.now();
       const land = () => {
-        const cards = document.getElementById("cartes");
-        if (cards) return toCards(cards);
-        if (performance.now() - started < 1500) frame = requestAnimationFrame(land);
+        const el = find();
+        if (!el) {
+          if (performance.now() - started < 2000) frame = requestAnimationFrame(land);
+          return;
+        }
+        go(el);
+        timers.push(
+          window.setTimeout(() => {
+            ScrollTrigger.refresh();
+            go(el);
+          }, 200),
+          window.setTimeout(() => go(el), 800),
+        );
       };
       land();
-    } else if (lenis) lenis.scrollTo(0, { immediate: true });
-    const id = setTimeout(() => ScrollTrigger.refresh(), 150);
+    } else {
+      if (lenis) lenis.scrollTo(0, { immediate: true });
+      else window.scrollTo({ top: 0, behavior: "instant" });
+      timers.push(window.setTimeout(() => ScrollTrigger.refresh(), 150));
+    }
     return () => {
-      clearTimeout(id);
       cancelAnimationFrame(frame);
+      timers.forEach(clearTimeout);
     };
   }, [pathname]);
 

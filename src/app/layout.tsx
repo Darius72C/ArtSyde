@@ -5,6 +5,7 @@ import "./globals.css";
 import { SmoothScroll } from "@/components/SmoothScroll";
 import { Magnetic } from "@/components/Magnetic";
 import { MotionProvider } from "@/components/MotionProvider";
+import { Pwa } from "@/components/Pwa";
 import { SITE_INDEXING, SITE_URL } from "@/lib/site";
 
 const display = Inter_Tight({ variable: "--font-display", subsets: ["latin"], weight: ["500", "600", "700"] });
@@ -20,6 +21,14 @@ export const metadata: Metadata = {
     other: process.env.BING_SITE_VERIFICATION ? { "msvalidate.01": process.env.BING_SITE_VERIFICATION } : undefined,
   },
   openGraph: { type: "website", locale: "fr_FR", siteName: "ArtSyde" },
+  // The installed app (src/app/manifest.ts): its name and icon on the home screen, iPhone included.
+  applicationName: "ArtSyde",
+  appleWebApp: { capable: true, title: "ArtSyde", statusBarStyle: "black-translucent" },
+  formatDetection: { telephone: false },
+  icons: {
+    icon: [{ url: "/favicon.ico", sizes: "48x48" }, { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+  },
 };
 
 export const viewport: Viewport = {
@@ -37,7 +46,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <SmoothScroll />
         </Suspense>
         <Magnetic />
-        <MotionProvider>{children}</MotionProvider>
+        <MotionProvider>
+          {children}
+          <Pwa />
+        </MotionProvider>
       </body>
     </html>
   );
