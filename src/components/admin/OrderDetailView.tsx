@@ -10,16 +10,8 @@ import { PRINT_QUALITY } from "@/lib/studio";
 import { OrderActions } from "./OrderActions";
 import { Track } from "./Track";
 import { StudioTee3D } from "./StudioTee3D";
+import { studioFiles } from "@/lib/studio-files";
 import { DbNotice, Empty, MoreLink, PageTitle, StatusLabel, Swatch } from "./ui";
-
-/** A studio piece's print files, by side (from their placement, else their layer: 0 front, 1 back). */
-function studioFiles(designs: { fileUrl: string; layer: number; placement: unknown }[]) {
-  return designs.flatMap((d) => {
-    const s = (d.placement as { side?: string } | null)?.side;
-    const side = s === "front" || s === "back" ? s : d.layer === 0 ? "front" : d.layer === 1 ? "back" : null;
-    return side ? [{ side, url: d.fileUrl } as const] : [];
-  });
-}
 
 /** The steps this order goes through, and how far it is. */
 function progress(status: OrderStatus, delivery: DeliveryMethod, hasStudio: boolean) {

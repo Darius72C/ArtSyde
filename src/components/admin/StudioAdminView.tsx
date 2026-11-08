@@ -1,10 +1,13 @@
+import Link from "next/link";
 import { ProductImage } from "../ProductImage";
 import { FadeUp } from "../Reveal";
 import { STAGGER } from "@/lib/motion";
 import { formatFCFA } from "@/lib/products";
 import type { CreditPack } from "@/generated/prisma/client";
-import { CREDIT_PACK, CREDIT_REASON, dateTime, plural, shortDate } from "@/lib/admin/labels";
+import { CREDIT_PACK, CREDIT_REASON, ORDER_STATUS, dateTime, plural, shortDate } from "@/lib/admin/labels";
 import { getStudio, load } from "@/server/admin/queries";
+import { StudioTee3D } from "./StudioTee3D";
+import { studioFiles } from "@/lib/studio-files";
 import { DbNotice, Empty, Panel, Share, Stat, TableScroll, table, td, th } from "./ui";
 
 const PACKS = Object.keys(CREDIT_PACK) as CreditPack[];
@@ -97,6 +100,47 @@ export async function StudioAdminView() {
           <p className="text-muted">Aucun mouvement de crédits pour l&apos;instant.</p>
         )}
       </Panel>
+
+      <div className="pt-9">
+        <p className="text-[21px] font-semibold">Créations commandées</p>
+        {s.creations.length ? (
+          <ul className="mt-6 grid gap-x-6 gap-y-10 sm:grid-cols-2 xl:grid-cols-3">
+            {s.creations.map((c, i) => {
+              const files = studioFiles(c.customDesigns);
+              return (
+                <li key={c.id} className="min-w-0">
+                  <FadeUp delay={(i % 3) * STAGGER.item}>
+                    {c.previewUrl ? (
+                      // The studio's capture of the 3D t-shirt, taken when the customer added it to the cart.
+                      // eslint-disable-next-line @next/next/no-img-element -- a stored data URL
+                      <img src={c.previewUrl} alt={`Aperçu 3D de la création de ${c.order.customerName}`} width={220} height={220} className="aspect-square w-full rounded-[22px] bg-sand object-contain" />
+                    ) : (
+                      <ProductImage color={c.color} className="aspect-square rounded-[22px]" zoom={false} />
+                    )}
+                    <p className="mt-4 truncate font-semibold">
+                      <Link href={`/admin/commandes/${c.order.reference}`} className="hover:underline">
+                        Commande {c.order.reference}
+                      </Link>
+                    </p>
+                    <p className="truncate text-xs text-muted">
+                      {c.order.customerName} · {shortDate(c.order.createdAt)} · {ORDER_STATUS[c.order.status].label}
+                    </p>
+                    <p className="mt-1 text-xs text-muted">
+                      {c.colorName} · Taille {c.size} · × {c.quantity} · {files.length ? plural(files.length, "fichier") : <span className="text-new">pas de fichier</span>}
+                    </p>
+                    <StudioTee3D color={c.color} files={files} />
+                  </FadeUp>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <div className="mt-6">
+            <Empty title="Aucune création commandée.">Les t-shirts créés dans le studio 3D et commandés apparaîtront ici, avec leur vue 3D.</Empty>
+          </div>
+        )}
+        {s.creationCount > s.creations.length && <p className="mt-8 text-sm text-muted">Les {s.creations.length} plus récentes sur {s.creationCount}.</p>}
+      </div>
 
       <div className="pt-9">
         <p className="text-[21px] font-semibold">Designs sauvegardés</p>

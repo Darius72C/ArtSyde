@@ -2,6 +2,7 @@ import "server-only";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
+import { createAuthMiddleware } from "better-auth/api";
 import { after } from "next/server";
 import { db } from "@/server/db";
 import { sendEmail } from "@/server/email/send";
@@ -75,6 +76,23 @@ export const auth = betterAuth({
         },
       },
     },
+  },
+  // The journal: every customer sign-in, by e-mail or Google, and the failed ones.
+  hooks: {
+    after: createAuthMiddleware(async (ctx) => {
+      const email = ctx.path === "/sign-in/email";
+      const social = ctx.path.startsWith("/callback/");
+      if (!email && !social) return;
+      const how = social ? " avec Google" : "";
+      const s = ctx.context.newSession;
+      if (s) {
+        await logActivity("account.signin", `Connexion${how} : ${s.user.name || s.user.email}`, { userId: s.user.id, via: social ? "google" : "email" }, `compte:${s.user.id}`);
+      } else {
+        const who = email && typeof ctx.body?.email === "string" ? ` (${ctx.body.email.slice(0, 120)})` : "";
+        const why = typeof ctx.query?.error === "string" ? ` : ${ctx.query.error.slice(0, 120)}` : "";
+        await logActivity("account.signin_failed", `Connexion${how} échouée${who}${why}`, { via: social ? "google" : "email" }, "inconnu");
+      }
+    }),
   },
   plugins: [nextCookies()], // lets server actions set the session cookie
 });

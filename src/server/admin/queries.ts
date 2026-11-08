@@ -219,7 +219,7 @@ export async function getCustomers(q?: string) {
 // ---------- Studio: credits and saved designs ----------
 
 export async function getStudio() {
-  const [inCirculation, used30, packs, usage, ledger, designs, designCount] = await Promise.all([
+  const [inCirculation, used30, packs, usage, ledger, designs, designCount, creations, creationCount] = await Promise.all([
     db.creditEntry.aggregate({ _sum: { amount: true } }),
     db.creditEntry.aggregate({ where: { amount: { lt: 0 }, createdAt: { gte: since(30) } }, _sum: { amount: true } }),
     db.creditEntry.groupBy({ by: ["pack"], where: { reason: "PURCHASE" }, _count: { _all: true }, _sum: { priceXof: true, amount: true } }),
@@ -235,6 +235,17 @@ export async function getStudio() {
       include: { customer: { select: { name: true } }, orderItems: { select: { quantity: true } } },
     }),
     db.savedDesign.count(),
+    // T-shirts created in the studio and ordered (an order line with no catalogue product), newest first.
+    db.orderItem.findMany({
+      where: { productId: null },
+      orderBy: { order: { createdAt: "desc" } },
+      take: 24,
+      include: {
+        order: { select: { reference: true, customerName: true, createdAt: true, status: true } },
+        customDesigns: { orderBy: { layer: "asc" }, select: { fileUrl: true, layer: true, placement: true } },
+      },
+    }),
+    db.orderItem.count({ where: { productId: null } }),
   ]);
   return {
     inCirculation: inCirculation._sum.amount ?? 0,
@@ -244,6 +255,8 @@ export async function getStudio() {
     ledger,
     designs: designs.map((d) => ({ ...d, colorName: colorName(d.teeColor), ordered: d.orderItems.reduce((n, i) => n + i.quantity, 0) })),
     designCount,
+    creations: creations.map((c) => ({ ...c, colorName: colorName(c.color) })),
+    creationCount,
   };
 }
 

@@ -10,6 +10,7 @@ import { cart, SIZES } from "@/lib/cart";
 import { available, type StockMap } from "@/lib/stock";
 import { getMyCredits, refundCredits, spendCredits, type MyCredits } from "@/server/my-credits";
 import { presignDesignFile } from "@/server/design-upload";
+import { reportClientError } from "@/server/client-log";
 import { STUDIO_PRICE, formatFCFA } from "@/lib/products";
 import { teeState } from "../story/teeState";
 import { ColorPicker } from "../ColorPicker";
@@ -496,6 +497,8 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
       }
     } catch (err) {
       console.error("Print files upload failed", err);
+      // "Failed to fetch" here is most often the storage's CORS rule (see the README).
+      void reportClientError("studio.upload", err instanceof Error ? err.message : String(err), { path: location.pathname }).catch(() => {});
       setAdding(null);
       if (q.credits) refundCredits(q.credits).then((r) => r.ok && setCredits((c) => (c?.signedIn ? { ...c, balance: r.balance } : c)));
       return flash("Le fichier d'impression n'a pas pu être envoyé : vérifie ta connexion et réessaie");

@@ -2,7 +2,8 @@
 
 import { db } from "@/server/db";
 import { creditBalance, getMyCustomer } from "@/server/account";
-import { logError } from "@/server/log";
+import { logActivity, logError } from "@/server/log";
+import { CREDIT_REASON } from "@/lib/admin/labels";
 
 /*
  * The studio's credits, for the signed-in customer: read, spend, give back. The balance is the sum of the
@@ -29,13 +30,15 @@ export async function spendCredits(amount: number, reason: SpendReason): Promise
   const me = await getMyCustomer();
   if (!me) return { ok: false, reason: "signed-out" };
   try {
-    return await db.$transaction(async (tx) => {
+    const r = await db.$transaction(async (tx) => {
       const sum = await tx.creditEntry.aggregate({ where: { customerId: me.customer.id }, _sum: { amount: true } });
       const balance = sum._sum.amount ?? 0;
       if (balance < amount) return { ok: false as const, reason: "not-enough" as const, balance };
       await tx.creditEntry.create({ data: { customerId: me.customer.id, amount: -amount, reason } });
       return { ok: true as const, balance: balance - amount };
     });
+    if (r.ok) await logActivity("credits.spent", `${me.user.name || me.user.email} : ${amount} crédit${amount > 1 ? "s" : ""} — ${CREDIT_REASON[reason]} (reste ${r.balance})`, { amount, reason }, `client:${me.customer.id}`);
+    return r;
   } catch (e) {
     await logError("spendCredits", e);
     return { ok: false, reason: "error" };
@@ -48,5 +51,7 @@ export async function refundCredits(amount: number): Promise<SpendResult> {
   const me = await getMyCustomer();
   if (!me) return { ok: false, reason: "signed-out" };
   await db.creditEntry.create({ data: { customerId: me.customer.id, amount, reason: "REFUND" } });
-  return { ok: true, balance: await creditBalance(me.customer.id) };
+  const balance = await creditBalance(me.customer.id);
+  await logActivity("credits.refunded", `${me.user.name || me.user.email} : ${amount} crédit${amount > 1 ? "s" : ""} rendu${amount > 1 ? "s" : ""} après un échec dans le studio (solde ${balance})`, { amount }, `client:${me.customer.id}`);
+  return { ok: true, balance };
 }
