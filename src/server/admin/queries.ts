@@ -229,10 +229,19 @@ export async function getStudio() {
       take: 20,
       include: { customer: { select: { name: true } }, design: { select: { name: true } } },
     }),
+    // The latest saved creations, grouped below into one card per customer.
     db.savedDesign.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 24,
-      include: { customer: { select: { name: true } }, orderItems: { select: { quantity: true } } },
+      orderBy: { updatedAt: "desc" },
+      take: 200,
+      select: {
+        id: true,
+        name: true,
+        teeColor: true,
+        previewUrl: true,
+        updatedAt: true,
+        customer: { select: { id: true, name: true, email: true, phone: true } },
+        orderItems: { select: { quantity: true } },
+      },
     }),
     db.savedDesign.count(),
     // T-shirts created in the studio and ordered (an order line with no catalogue product), newest first.
@@ -253,7 +262,16 @@ export async function getStudio() {
     packs: packs.filter((p) => p.pack).map((p) => ({ pack: p.pack!, sold: p._count._all, revenue: p._sum.priceXof ?? 0, credits: p._sum.amount ?? 0 })),
     usage: usage.map((u) => ({ reason: u.reason, credits: -(u._sum.amount ?? 0) })).sort((a, b) => b.credits - a.credits),
     ledger,
-    designs: designs.map((d) => ({ ...d, colorName: colorName(d.teeColor), ordered: d.orderItems.reduce((n, i) => n + i.quantity, 0) })),
+    // One entry per customer, the one who saved most recently first (Map keeps the order of first sight).
+    designers: [
+      ...designs
+        .reduce((by, { customer, orderItems, ...d }) => {
+          const card = by.get(customer.id) ?? { ...customer, designs: [] as (typeof d & { colorName: string; ordered: number })[] };
+          card.designs.push({ ...d, colorName: colorName(d.teeColor), ordered: orderItems.reduce((n, i) => n + i.quantity, 0) });
+          return by.set(customer.id, card);
+        }, new Map<string, (typeof designs)[number]["customer"] & { designs: (Omit<(typeof designs)[number], "customer" | "orderItems"> & { colorName: string; ordered: number })[] }>())
+        .values(),
+    ],
     designCount,
     creations: creations.map((c) => ({ ...c, colorName: colorName(c.color) })),
     creationCount,

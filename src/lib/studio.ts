@@ -5,6 +5,10 @@ export type { PrintQuality };
 /** Physical width of the print area: sleeve tip to sleeve tip on the oversized tee, as measured on the 3D model. */
 export const PRINT_WIDTH_CM = 64;
 
+/** Creations a customer keeps in their account for free; each one beyond costs DESIGN_SAVE_CREDITS. Orders don't count. */
+export const FREE_DESIGNS = 3;
+export const DESIGN_SAVE_CREDITS = 1;
+
 /** Output width in pixels for a resolution across the whole print area. */
 export const pxFor = (dpi: number) => Math.round((PRINT_WIDTH_CM / 2.54) * dpi);
 

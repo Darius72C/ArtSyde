@@ -9,7 +9,7 @@ import { logError } from "@/server/log";
  * and short texts, and keeps at most a few lines per visitor per minute.
  */
 
-const WHERE = { "studio.upload": "Studio : envoi du fichier d'impression", "page.crash": "Page en erreur", "admin.crash": "Admin : page en erreur" } as const;
+const WHERE = { "studio.upload": "Studio : envoi du fichier d'impression", "studio.save": "Studio : sauvegarde d'une création", "page.crash": "Page en erreur", "admin.crash": "Admin : page en erreur" } as const;
 export type ClientErrorPlace = keyof typeof WHERE;
 
 const recent = new Map<string, number[]>();

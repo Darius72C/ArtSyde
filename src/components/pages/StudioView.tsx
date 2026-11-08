@@ -11,12 +11,13 @@ import { available, type StockMap } from "@/lib/stock";
 import { getMyCredits, refundCredits, spendCredits, type MyCredits } from "@/server/my-credits";
 import { presignDesignFile } from "@/server/design-upload";
 import { reportClientError } from "@/server/client-log";
+import { getMyDesign, presignMyDesignImage, saveMyDesign } from "@/server/my-designs";
 import { STUDIO_PRICE, formatFCFA } from "@/lib/products";
 import { teeState } from "../story/teeState";
 import { ColorPicker } from "../ColorPicker";
 import { fadeUp, RevealLines } from "../Reveal";
 import { DUR, EASE, STAGGER } from "@/lib/motion";
-import { PRINT_QUALITIES, PRINT_QUALITY, PRINT_WIDTH_CM, STANDARD_PREVIEW_PX, downloadWidth, type PrintQuality } from "@/lib/studio";
+import { DESIGN_SAVE_CREDITS, FREE_DESIGNS, PRINT_QUALITIES, PRINT_QUALITY, PRINT_WIDTH_CM, STANDARD_PREVIEW_PX, downloadWidth, type PrintQuality } from "@/lib/studio";
 import { TEE_ASPECT, TEE_PATH_01, teePath2D } from "../story/teeOutline";
 import { teeSnapshot } from "../story/snapshot";
 import { zipFiles } from "@/lib/zip";
@@ -233,6 +234,10 @@ function QualityCompare({ side, center, images, current, onPick }: { side: Side;
 
 const hasContent = (d: Side) => Boolean(d.images.length || d.text?.value);
 
+// Unique tags, outside the component (only ever called from event handlers).
+const cartKey = () => `custom-${Date.now()}`;
+const exportTrace = (quality: PrintQuality) => `${new Date().toISOString().slice(0, 10)}|${quality.toLowerCase()}|${Math.random().toString(36).slice(2, 8)}`;
+
 /** The topmost layer under a point of the print area (fractions of its width and height), or null. */
 function layerAt(d: Side, px: number, py: number, w: number, h: number): Layer | null {
   const inside = (cx: number, cy: number, bw: number, bh: number, rot: number) => {
@@ -283,6 +288,10 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
   const [exporting, setExporting] = useState(false);
   const [adding, setAdding] = useState<string | null>(null); // progress of the print files going to the workshop
   const [compare, setCompare] = useState(false);
+  // The creation saved in the customer's account that this design is (updated in place on the next save).
+  const [savedAs, setSavedAs] = useState<{ id: string; name: string } | null>(null);
+  const [naming, setNaming] = useState<string | null>(null); // the name being typed before the first save
+  const [saving, setSaving] = useState(false);
   const preview = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const veiled = useCaptureVeil();
@@ -366,6 +375,112 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
     teeState.hex = hex; // the 3D scene eases towards it
   };
 
+
+  /** A 220×220 capture of the 3D t-shirt as it is on screen (cart line, saved creation). */
+  const snapshot3d = (): string | undefined => {
+    const gl = stage.current?.querySelector("canvas");
+    if (!gl) return undefined;
+    const c = Object.assign(document.createElement("canvas"), { width: 220, height: 220 });
+    const s = Math.min(gl.width, gl.height);
+    c.getContext("2d")!.drawImage(gl, (gl.width - s) / 2, (gl.height - s) / 2, s, s, 0, 0, 220, 220);
+    try {
+      return c.toDataURL("image/png");
+    } catch {
+      return undefined;
+    }
+  };
+
+  // Reopens a creation saved in the account: /studio?design=<id> (from /compte). Its images come back from
+  // the storage (with CORS, so the print canvases stay exportable) before the design is shown.
+  useEffect(() => {
+    const id = new URLSearchParams(location.search).get("design");
+    if (!id) return;
+    let live = true;
+    (async () => {
+      const d = await getMyDesign(id).catch(() => null);
+      if (!live) return;
+      if (!d) return flash("Création introuvable : connecte-toi avec le compte qui l'a sauvegardée");
+      const srcs = [...new Set([...d.front.images, ...d.back.images].map((i) => i.src))];
+      await Promise.all(
+        srcs.map(
+          (src) =>
+            new Promise<void>((done) => {
+              const el = new Image();
+              el.crossOrigin = "anonymous";
+              el.onload = () => {
+                images.current.set(src, el);
+                done();
+              };
+              el.onerror = () => done();
+              el.src = src;
+            }),
+        ),
+      );
+      if (!live) return;
+      const keep = (sd: Side): Side => ({ ...sd, images: sd.images.filter((i) => images.current.has(i.src)) });
+      const lost = srcs.some((src) => !images.current.has(src));
+      setDesign({ front: keep(d.front), back: keep(d.back) });
+      pickColor(d.teeColor);
+      setSavedAs({ id: d.id, name: d.name });
+      setSelected(d.front.images.at(-1)?.id ?? (d.front.text ? "text" : null));
+      flash(lost ? `« ${d.name} » ouverte, mais une image n'a pas pu être chargée` : `« ${d.name} » ouverte`);
+    })();
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  /**
+   * Saves the design in the customer's account (free): images still only in this page are sent to the
+   * storage first, then the layout, the colour and a capture of the 3D t-shirt. A reopened creation is updated.
+   */
+  const saveDesign = async (name: string) => {
+    if (saving) return;
+    if (!credits?.signedIn) return setGate("signin");
+    if (!hasContent(design.front) && !hasContent(design.back)) return flash("Ajoute une image ou un texte avant de sauvegarder");
+    setSaving(true);
+    try {
+      const sent = new Map<string, string>(); // data URL -> stored URL
+      for (const img of [...design.front.images, ...design.back.images]) {
+        if (!img.src.startsWith("data:") || sent.has(img.src)) continue;
+        const blob = await (await fetch(img.src)).blob();
+        const signed = await presignMyDesignImage({ type: blob.type, size: blob.size });
+        if (!signed.ok) throw new Error(signed.message);
+        const put = await fetch(signed.uploadUrl, { method: "PUT", headers: { "Content-Type": blob.type }, body: blob });
+        if (!put.ok) throw new Error(`upload ${put.status}`);
+        const el = images.current.get(img.src);
+        if (el) images.current.set(signed.publicUrl, el);
+        sent.set(img.src, signed.publicUrl);
+      }
+      const swap = (sd: Side): Side => ({ ...sd, images: sd.images.map((i) => (sent.has(i.src) ? { ...i, src: sent.get(i.src)! } : i)) });
+      const next = { front: swap(design.front), back: swap(design.back) };
+      setDesign(next); // sent images keep their stored link: a retry won't send them again
+      const payload = { id: savedAs?.id, name, teeColor: teeHex, ...next, preview: snapshot3d() };
+      let r = await saveMyDesign(payload);
+      // Past the free creations, one more costs credits: asked first, then taken by the server with the save.
+      if (!r.ok && r.reason === "pay") {
+        if (!confirm(`${r.message}\n\nSauvegarder « ${name || "Ma création"} » pour ${creditsLabel(r.cost ?? DESIGN_SAVE_CREDITS)} ?`)) return;
+        r = await saveMyDesign({ ...payload, pay: true });
+      }
+      if (!r.ok && r.reason === "not-enough") {
+        if (credits?.signedIn) setCredits({ ...credits, balance: r.balance ?? 0 });
+        setGate("empty");
+        return flash(r.message);
+      }
+      if (!r.ok) throw new Error(r.message);
+      if (r.balance !== undefined && credits?.signedIn) setCredits({ ...credits, balance: r.balance });
+      setSavedAs({ id: r.id, name: r.name });
+      setNaming(null);
+      const paid = r.spent ? ` · ${creditsLabel(r.spent)} utilisé${r.spent > 1 ? "s" : ""}` : "";
+      flash(savedAs ? `« ${r.name} » mise à jour dans ton compte` : `« ${r.name} » sauvegardée dans ton compte${paid}`);
+    } catch (err) {
+      console.error("Design save failed", err);
+      void reportClientError("studio.save", err instanceof Error ? err.message : String(err), { path: location.pathname }).catch(() => {});
+      flash(err instanceof Error && !/fetch|upload/i.test(err.message) ? err.message : "La création n'a pas pu être sauvegardée : vérifie ta connexion et réessaie");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // Adds images to the current side, on top of what is there: 1 credit each. Several can be picked at once.
   const onUpload = async (list: FileList | null) => {
@@ -504,16 +619,9 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
       return flash("Le fichier d'impression n'a pas pu être envoyé : vérifie ta connexion et réessaie");
     }
     setAdding(null);
-    const gl = stage.current?.querySelector("canvas");
-    let thumb: string | undefined;
-    if (gl) {
-      const c = Object.assign(document.createElement("canvas"), { width: 220, height: 220 });
-      const s = Math.min(gl.width, gl.height);
-      c.getContext("2d")!.drawImage(gl, (gl.width - s) / 2, (gl.height - s) / 2, s, s, 0, 0, 220, 220);
-      thumb = c.toDataURL("image/png");
-    }
+    const thumb = snapshot3d();
     const name = quality === "STANDARD" ? "T-shirt personnalisé" : `T-shirt personnalisé · ${q.label}`;
-    cart.add({ key: `custom-${Date.now()}`, productId: null, name, price, color: teeHex, size, qty, preview: thumb, bg: "#e7e0d3", quality, files });
+    cart.add({ key: cartKey(), productId: null, name, price, color: teeHex, size, qty, preview: thumb, bg: "#e7e0d3", quality, files });
     flash(q.credits ? `Ajouté au panier · ${creditsLabel(q.credits)} utilisé${q.credits > 1 ? "s" : ""}` : "Ajouté au panier");
   };
 
@@ -535,7 +643,7 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
     // All of them carry an invisible trace (date, quality, a random id): see src/lib/watermark.ts.
     const free = quality === "STANDARD";
     const size = downloadWidth(quality);
-    const trace = `${new Date().toISOString().slice(0, 10)}|${quality.toLowerCase()}|${Math.random().toString(36).slice(2, 8)}`;
+    const trace = exportTrace(quality);
     try {
       // The tee straight on, front then back, whatever angle it has on screen.
       for (const face of ["front", "back"] as const) {
@@ -813,6 +921,54 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
             <button onClick={exportDesign} disabled={exporting} className="btn-outline mt-4 w-full">
               {exporting ? <span className="h-4 w-4 animate-spin rounded-full border border-accent border-t-transparent" aria-label="Export en cours" /> : `Télécharger le visuel${q.credits ? ` · ${creditsLabel(q.credits)}` : ""}`}
             </button>
+            {naming !== null ? (
+              <form
+                className="mt-3 flex gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void saveDesign(naming);
+                }}
+              >
+                <label htmlFor="design-name" className="sr-only">
+                  Nom de la création
+                </label>
+                <input id="design-name" autoFocus value={naming} onChange={(e) => setNaming(e.target.value)} maxLength={60} placeholder="Nom de la création" className="min-w-0 flex-1 rounded-full border border-line bg-transparent px-4 py-2.5 text-sm outline-none focus:border-accent" />
+                <button type="submit" disabled={saving} className="btn-outline !px-5">
+                  {saving ? <span className="h-4 w-4 animate-spin rounded-full border border-accent border-t-transparent" aria-label="Sauvegarde en cours" /> : "OK"}
+                </button>
+                <button type="button" onClick={() => setNaming(null)} className="px-2 text-sm text-muted hover:text-ink" aria-label="Annuler">
+                  ×
+                </button>
+              </form>
+            ) : (
+              <button type="button" onClick={() => (!credits?.signedIn ? setGate("signin") : savedAs ? void saveDesign(savedAs.name) : setNaming(""))} disabled={saving} className="btn-outline mt-3 w-full">
+                {saving ? <span className="h-4 w-4 animate-spin rounded-full border border-accent border-t-transparent" aria-label="Sauvegarde en cours" /> : savedAs ? `Mettre à jour « ${savedAs.name} »` : "Sauvegarder dans mon compte"}
+              </button>
+            )}
+            {!savedAs && naming === null && (
+              <p className="mt-2 text-center text-xs text-muted">
+                {FREE_DESIGNS} créations gratuites, puis {creditsLabel(DESIGN_SAVE_CREDITS)} par création en plus.
+              </p>
+            )}
+            {savedAs && (
+              <p className="mt-2 text-center text-xs text-muted">
+                Retrouve tes créations dans{" "}
+                <Link href="/compte#creations" className="text-link hover:underline">
+                  ton compte
+                </Link>
+                {" · "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSavedAs(null);
+                    setNaming("");
+                  }}
+                  className="text-link hover:underline"
+                >
+                  en faire une copie
+                </button>
+              </p>
+            )}
           </div>
 
           <div className="border-t border-line pt-8">

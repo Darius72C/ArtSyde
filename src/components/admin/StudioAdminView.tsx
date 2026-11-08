@@ -8,6 +8,7 @@ import { CREDIT_PACK, CREDIT_REASON, ORDER_STATUS, dateTime, plural, shortDate }
 import { getStudio, load } from "@/server/admin/queries";
 import { StudioTee3D } from "./StudioTee3D";
 import { studioFiles } from "@/lib/studio-files";
+import { DESIGN_SAVE_CREDITS, FREE_DESIGNS } from "@/lib/studio";
 import { DbNotice, Empty, Panel, Share, Stat, TableScroll, table, td, th } from "./ui";
 
 const PACKS = Object.keys(CREDIT_PACK) as CreditPack[];
@@ -144,29 +145,53 @@ export async function StudioAdminView() {
 
       <div className="pt-9">
         <p className="text-[21px] font-semibold">Designs sauvegardés</p>
-        {s.designs.length ? (
-          <ul className="mt-6 grid grid-cols-2 gap-x-4 gap-y-10 sm:grid-cols-3 md:grid-cols-4 md:gap-x-6 xl:grid-cols-6">
-            {s.designs.map((g, i) => (
-              <li key={g.id} className="min-w-0">
-                <FadeUp delay={(i % 6) * STAGGER.item}>
-                  <ProductImage color={g.teeColor} className="aspect-[4/5] rounded-[22px]" zoom={false} />
-                  <p className="mt-4 truncate font-semibold">{g.name}</p>
-                  <p className="truncate text-xs text-muted">
-                    {g.customer.name} · {shortDate(g.createdAt)}
-                  </p>
-                  <p className="mt-1 text-xs text-muted">
-                    {g.colorName} · {g.ordered ? <span className="text-ink">commandé × {g.ordered}</span> : "pas encore commandé"}
-                  </p>
+        <p className="mt-1 text-sm text-muted">
+          Par client. {FREE_DESIGNS} gratuites chacun, puis {DESIGN_SAVE_CREDITS} crédit{DESIGN_SAVE_CREDITS > 1 ? "s" : ""} par création en plus.
+        </p>
+        {s.designers.length ? (
+          <ul className="mt-6 grid items-start gap-5 lg:grid-cols-2">
+            {s.designers.map((c, i) => (
+              <li key={c.id} className="min-w-0">
+                <FadeUp delay={(i % 2) * STAGGER.item} className="tile p-6">
+                  <div className="flex items-baseline justify-between gap-4">
+                    <div className="min-w-0">
+                      <Link href={`/admin/clients?q=${encodeURIComponent(c.phone ?? c.email ?? c.name)}`} className="block truncate text-[17px] font-semibold hover:underline">
+                        {c.name}
+                      </Link>
+                      {(c.email || c.phone) && <p className="truncate text-xs text-muted">{c.email ?? c.phone}</p>}
+                    </div>
+                    <p className={`shrink-0 text-sm tabular-nums ${c.designs.length > FREE_DESIGNS ? "text-ink" : "text-muted"}`}>
+                      {plural(c.designs.length, "création")}
+                      {c.designs.length > FREE_DESIGNS && ` · ${c.designs.length - FREE_DESIGNS} payante${c.designs.length - FREE_DESIGNS > 1 ? "s" : ""}`}
+                    </p>
+                  </div>
+                  <ul className="mt-5 grid grid-cols-3 gap-3">
+                    {c.designs.map((g) => (
+                      <li key={g.id} className="min-w-0">
+                        {g.previewUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- a stored data URL
+                          <img src={g.previewUrl} alt={`Aperçu 3D de ${g.name}`} width={220} height={220} className="aspect-square w-full rounded-2xl bg-sand object-contain" />
+                        ) : (
+                          <ProductImage color={g.teeColor} className="aspect-square rounded-2xl" zoom={false} />
+                        )}
+                        <p className="mt-2 truncate text-sm font-semibold">{g.name}</p>
+                        <p className="truncate text-xs text-muted">
+                          {g.colorName} · {shortDate(g.updatedAt)}
+                        </p>
+                        <p className="text-xs text-muted">{g.ordered ? <span className="text-ink">commandé × {g.ordered}</span> : "pas encore commandé"}</p>
+                      </li>
+                    ))}
+                  </ul>
                 </FadeUp>
               </li>
             ))}
           </ul>
         ) : (
           <div className="mt-6">
-            <Empty title="Aucun design sauvegardé.">Les créations que les clients sauvegardent dans le studio 3D apparaîtront ici.</Empty>
+            <Empty title="Aucun design sauvegardé.">Les créations que les clients sauvegardent dans le studio 3D apparaîtront ici, par client.</Empty>
           </div>
         )}
-        {s.designCount > s.designs.length && <p className="mt-8 text-sm text-muted">Les {s.designs.length} plus récents sur {s.designCount}.</p>}
+        {s.designCount > 200 && <p className="mt-8 text-sm text-muted">Les 200 créations les plus récentes sur {s.designCount}.</p>}
       </div>
     </div>
   );

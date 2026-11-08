@@ -15,7 +15,7 @@ async function Account() {
   if (!me) redirect("/connexion?suite=/compte");
   const { user, customer } = me;
   // Orders of this customer, and (when the e-mail is verified, e.g. Google) the ones placed with this e-mail before signing up.
-  const [orders, credits] = await Promise.all([
+  const [orders, credits, designs] = await Promise.all([
     db.order.findMany({
       where: { OR: [{ customerId: customer.id }, ...(user.emailVerified ? [{ customerId: null, customerEmail: { equals: user.email, mode: "insensitive" as const } }] : [])] },
       orderBy: { createdAt: "desc" },
@@ -23,6 +23,8 @@ async function Account() {
       select: { id: true, reference: true, createdAt: true, status: true, totalXof: true, items: { select: { quantity: true } } },
     }),
     creditBalance(customer.id),
+    // The creations saved from the studio, newest first.
+    db.savedDesign.findMany({ where: { customerId: customer.id }, orderBy: { updatedAt: "desc" }, select: { id: true, name: true, teeColor: true, previewUrl: true, updatedAt: true } }),
   ]);
   return (
     <AccountView
@@ -36,6 +38,13 @@ async function Account() {
         status: ORDER_STATUS[o.status].label,
         total: o.totalXof,
         items: o.items.reduce((n, i) => n + i.quantity, 0),
+      }))}
+      designs={designs.map((d) => ({
+        id: d.id,
+        name: d.name,
+        color: d.teeColor,
+        preview: d.previewUrl,
+        date: d.updatedAt.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }),
       }))}
     />
   );
