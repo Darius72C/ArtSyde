@@ -121,7 +121,7 @@ Elles sont toutes listées et commentées dans [`.env.example`](.env.example). L
    ```json
    [
      {
-       "AllowedOrigins": ["http://localhost:3000", "https://artsyde.ci"],
+       "AllowedOrigins": ["http://localhost:3000", "https://www.artsyde.store", "https://artsyde.store"],
        "AllowedMethods": ["GET", "PUT"],
        "AllowedHeaders": ["content-type"],
        "MaxAgeSeconds": 3600
