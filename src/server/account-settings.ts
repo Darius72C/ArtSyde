@@ -1,11 +1,12 @@
 "use server";
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/server/auth";
 import { db } from "@/server/db";
 import { getMyCustomer } from "@/server/account";
 import { logActivity, logError } from "@/server/log";
+import { deleteObject, keyFromPublicUrl, r2Config } from "@/server/r2";
 
 /*
  * The signed-in customer's settings (/compte/parametres): name and phone, and the password
@@ -56,6 +57,56 @@ export async function changeMyPassword(input: { current: string; next: string })
     if (code === "CREDENTIAL_ACCOUNT_NOT_FOUND") return { ok: false, message: "Ton compte n'a pas encore de mot de passe : crée-le d'abord." };
     await logError("changeMyPassword", e);
     return { ok: false, message: "Le mot de passe n'a pas pu être changé. Réessaie." };
+  }
+}
+
+/** The word the customer types to confirm the deletion of their account. */
+const DELETE_WORD = "SUPPRIMER";
+
+/**
+ * Deletes the signed-in customer's account: their sign-in (user, sessions, Google link), their saved
+ * creations and their remaining credits. Their customer record stays as an archive (orders, credit history,
+ * e-mail): the workshop keeps its accounting, and someone who signs up again with the same e-mail is linked
+ * back to it by linkCustomer, which sees the signup credits already given and doesn't give them twice.
+ */
+export async function deleteMyAccount(input: { confirm: string }): Promise<SettingsResult> {
+  if (String(input?.confirm ?? "").trim().toUpperCase() !== DELETE_WORD) return { ok: false, field: "confirm", message: `Écris ${DELETE_WORD} pour confirmer.` };
+  const me = await getMyCustomer();
+  if (!me) return { ok: false, message: "Ta session a expiré : reconnecte-toi." };
+  const { user, customer } = me;
+  try {
+    const designs = await db.savedDesign.findMany({ where: { customerId: customer.id }, select: { front: true, back: true } });
+    const left = await db.$transaction(async (tx) => {
+      const balance = (await tx.creditEntry.aggregate({ where: { customerId: customer.id }, _sum: { amount: true } }))._sum.amount ?? 0;
+      // Remaining credits are lost with the account (written in the ledger, so the history adds up).
+      if (balance > 0) await tx.creditEntry.create({ data: { customerId: customer.id, amount: -balance, reason: "ADJUSTMENT" } });
+      await tx.savedDesign.deleteMany({ where: { customerId: customer.id } });
+      await tx.customer.update({ where: { id: customer.id }, data: { userId: null } });
+      await tx.user.delete({ where: { id: user.id } }); // sessions and sign-in methods go with it
+      return balance;
+    });
+    // The images of the saved creations, from the storage (best effort: the account is already gone).
+    const cfg = r2Config();
+    if (cfg) {
+      const srcs = new Set(designs.flatMap((d) => [d.front, d.back]).flatMap((s) => ((s as { images?: { src?: string }[] } | null)?.images ?? []).map((i) => String(i?.src ?? ""))));
+      for (const src of srcs) {
+        const key = keyFromPublicUrl(cfg, src);
+        if (key?.startsWith(`saved/${customer.id}/`)) await deleteObject(cfg, key);
+      }
+    }
+    // The session no longer exists: its cookies go too, so the browser is signed out right away.
+    const jar = await cookies();
+    for (const c of jar.getAll()) if (c.name.includes("better-auth")) jar.delete(c.name);
+    await logActivity(
+      "account.deleted",
+      `Compte supprimé : ${user.name || user.email} (${user.email})${designs.length ? `, ${designs.length} création${designs.length > 1 ? "s" : ""} effacée${designs.length > 1 ? "s" : ""}` : ""}${left > 0 ? `, ${left} crédit${left > 1 ? "s" : ""} perdu${left > 1 ? "s" : ""}` : ""}. Fiche client archivée : pas de crédits offerts s'il revient avec cet e-mail.`,
+      { userId: user.id, customerId: customer.id, credits: left, designs: designs.length },
+      `client:${customer.id}`,
+    );
+    return { ok: true, message: "Ton compte a été supprimé." };
+  } catch (e) {
+    await logError("deleteMyAccount", e, { userId: user.id });
+    return { ok: false, message: "Ton compte n'a pas pu être supprimé. Réessaie ou écris-nous." };
   }
 }
 

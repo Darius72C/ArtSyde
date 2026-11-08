@@ -137,7 +137,7 @@ export function Hero({ products = [], cards: set = [] }: { products?: Product[];
       </motion.div>
 
       {cards.length > 0 && (
-        <motion.div className="relative mx-auto mt-14 aspect-[4/3] max-w-[980px] sm:aspect-[16/9] md:mt-16" style={{ y: lift, scale: shrink }} aria-hidden>
+        <motion.div id="cartes" className="relative mx-auto mt-14 aspect-[4/3] max-w-[980px] sm:aspect-[16/9] md:mt-16" style={{ y: lift, scale: shrink }} aria-hidden>
           {cards.map((c, i) => (
             <HeroCard key={c.key} card={c} slot={SLOTS[i]} spread={spread} px={px} py={py} still={reduce} />
           ))}

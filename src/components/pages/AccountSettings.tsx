@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { DUR, EASE } from "@/lib/motion";
-import { changeMyPassword, setMyPassword, updateProfile, type SettingsResult } from "@/server/account-settings";
+import { changeMyPassword, deleteMyAccount, setMyPassword, updateProfile, type SettingsResult } from "@/server/account-settings";
 import { RevealLines } from "../Reveal";
 import { Field } from "./CheckoutView";
 
@@ -108,6 +108,62 @@ function PasswordForm({ hasPassword }: { hasPassword: boolean }) {
   );
 }
 
+/** Deletes the account, after the customer types SUPPRIMER. */
+function DeleteAccount() {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [r, setR] = useState<SettingsResult | null>(null);
+  const [pending, start] = useTransition();
+  if (!open) {
+    return (
+      <div className="mt-6">
+        <p className="text-[15px] text-muted">Ton compte, tes créations sauvegardées et tes crédits restants seront supprimés. Tes commandes restent enregistrées pour l&apos;atelier.</p>
+        <button type="button" onClick={() => setOpen(true)} className="mt-6 text-[15px] text-danger hover:underline">
+          Supprimer mon compte
+        </button>
+      </div>
+    );
+  }
+  return (
+    <form
+      noValidate
+      onSubmit={(e) => {
+        e.preventDefault();
+        const f = new FormData(e.currentTarget);
+        start(async () => {
+          const res = await deleteMyAccount({ confirm: String(f.get("confirm") ?? "") }).catch(() => null);
+          setR(res ?? { ok: false, message: "Connexion perdue. Réessaie." });
+          if (res?.ok) {
+            router.push("/?compte=supprime");
+            router.refresh();
+          }
+        });
+      }}
+      className="mt-6 space-y-6 rounded-[22px] border border-danger/40 p-6"
+    >
+      <div className="space-y-2 text-[15px]">
+        <p className="font-semibold">Supprimer définitivement ton compte ?</p>
+        <ul className="list-disc space-y-1 pl-5 text-muted">
+          <li>Tu ne pourras plus te connecter avec ce compte.</li>
+          <li>Tes créations sauvegardées et tes crédits restants sont perdus.</li>
+          <li>Tes commandes restent enregistrées pour l&apos;atelier et la comptabilité.</li>
+          <li>Si tu reviens avec le même e-mail, les crédits de bienvenue ne seront pas offerts une seconde fois.</li>
+        </ul>
+      </div>
+      <Field name="confirm" label="Écris SUPPRIMER pour confirmer" autoComplete="off" error={fieldError(r, "confirm")} />
+      <div className="flex flex-wrap items-center gap-6">
+        <button disabled={pending} className="btn !bg-danger !text-white">
+          {pending ? <span className="h-4 w-4 animate-spin rounded-full border border-white border-t-transparent" aria-label="Suppression" /> : "Supprimer mon compte"}
+        </button>
+        <button type="button" onClick={() => setOpen(false)} className="text-[15px] text-muted hover:text-ink">
+          Annuler
+        </button>
+        <Result r={r} />
+      </div>
+    </form>
+  );
+}
+
 /** /compte/parametres: the account's e-mail and sign-in methods, name and phone, password. */
 export function AccountSettings({ email, name, phone, hasPassword, google }: { email: string; name: string; phone: string; hasPassword: boolean; google: boolean }) {
   const methods = [google && "Google", hasPassword && "e-mail et mot de passe"].filter(Boolean).join(" · ");
@@ -142,6 +198,11 @@ export function AccountSettings({ email, name, phone, hasPassword, google }: { e
         <section>
           <h2 className={sectionTitle}>Mot de passe</h2>
           <PasswordForm hasPassword={hasPassword} />
+        </section>
+
+        <section>
+          <h2 className={sectionTitle}>Supprimer le compte</h2>
+          <DeleteAccount />
         </section>
       </div>
     </div>

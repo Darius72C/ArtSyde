@@ -26,9 +26,11 @@ export const googleEnabled = Boolean(google);
  * Links a new account to its customer (orders, credits): the customer with the same e-mail if there is one
  * (someone who ordered before signing up), else a new customer. The signup credits are given once.
  */
-export async function linkCustomer(user: { id: string; name: string; email: string }) {
+export async function linkCustomer(user: { id: string; name: string; email: string }): Promise<{ bonus: boolean }> {
   const email = user.email.toLowerCase();
-  await db.$transaction(async (tx) => {
+  // An e-mail whose account was deleted (src/server/account-settings.ts) finds its archived customer here:
+  // linked back to it, with the signup credits it already had once, so none are given again.
+  return db.$transaction(async (tx) => {
     const sameEmail = await tx.customer.findFirst({ where: { email: { equals: email, mode: "insensitive" } }, select: { id: true, userId: true } });
     const customer =
       sameEmail && !sameEmail.userId
@@ -37,6 +39,7 @@ export async function linkCustomer(user: { id: string; name: string; email: stri
           await tx.customer.create({ data: { name: user.name || email.split("@")[0], email: sameEmail ? undefined : email, userId: user.id }, select: { id: true } });
     const bonus = await tx.creditEntry.findFirst({ where: { customerId: customer.id, reason: "SIGNUP_BONUS" }, select: { id: true } });
     if (!bonus) await tx.creditEntry.create({ data: { customerId: customer.id, amount: SIGNUP_CREDITS, reason: "SIGNUP_BONUS" } });
+    return { bonus: !bonus };
   });
 }
 
@@ -60,12 +63,22 @@ export const auth = betterAuth({
     user: {
       create: {
         after: async (user) => {
+          let bonus = true;
           try {
-            await linkCustomer(user);
-            await logActivity("account.created", `Nouveau compte : ${user.name || user.email} (${user.email})`, { userId: user.id }, `compte:${user.id}`);
+            bonus = (await linkCustomer(user)).bonus;
+            await logActivity(
+              bonus ? "account.created" : "account.returned",
+              bonus
+                ? `Nouveau compte : ${user.name || user.email} (${user.email})`
+                : `Compte recréé : ${user.name || user.email} (${user.email}) — relié à sa fiche archivée, pas de crédits offerts`,
+              { userId: user.id },
+              `compte:${user.id}`,
+            );
           } catch (e) {
             await logError("linkCustomer", e, { userId: user.id }); // the account works; the customer is linked on the next visit
           }
+          // Coming back with an e-mail that already had its signup credits: no welcome gift to announce.
+          if (!bonus) return;
           // The welcome e-mail, sent after the response so sign-up isn't slowed down (skipped until Brevo is set up).
           const send = async () => sendEmail(welcomeEmail({ name: user.name, email: user.email, credits: SIGNUP_CREDITS, image: await emailImage(), texts: await welcomeTexts(), ad: await emailAd() }));
           try {
