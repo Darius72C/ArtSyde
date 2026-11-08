@@ -5,13 +5,21 @@ import "./globals.css";
 import { SmoothScroll } from "@/components/SmoothScroll";
 import { Magnetic } from "@/components/Magnetic";
 import { MotionProvider } from "@/components/MotionProvider";
+import { SITE_INDEXING, SITE_URL } from "@/lib/site";
 
 const display = Inter_Tight({ variable: "--font-display", subsets: ["latin"], weight: ["500", "600", "700"] });
 const body = Inter({ variable: "--font-body", subsets: ["latin"], weight: ["400", "500", "600"] });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "ArtSyde — T-shirts imprimés dans notre atelier",
   description: "Des t-shirts imprimés dans notre atelier. Crée le tien en 3D.",
+  robots: SITE_INDEXING ? { index: true, follow: true } : { index: false, follow: false },
+  verification: {
+    google: process.env.GOOGLE_SITE_VERIFICATION || undefined,
+    other: process.env.BING_SITE_VERIFICATION ? { "msvalidate.01": process.env.BING_SITE_VERIFICATION } : undefined,
+  },
+  openGraph: { type: "website", locale: "fr_FR", siteName: "ArtSyde" },
 };
 
 export const viewport: Viewport = {
