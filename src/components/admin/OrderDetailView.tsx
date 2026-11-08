@@ -9,7 +9,17 @@ import { getOrder, load } from "@/server/admin/queries";
 import { PRINT_QUALITY } from "@/lib/studio";
 import { OrderActions } from "./OrderActions";
 import { Track } from "./Track";
+import { StudioTee3D } from "./StudioTee3D";
 import { DbNotice, Empty, MoreLink, PageTitle, StatusLabel, Swatch } from "./ui";
+
+/** A studio piece's print files, by side (from their placement, else their layer: 0 front, 1 back). */
+function studioFiles(designs: { fileUrl: string; layer: number; placement: unknown }[]) {
+  return designs.flatMap((d) => {
+    const s = (d.placement as { side?: string } | null)?.side;
+    const side = s === "front" || s === "back" ? s : d.layer === 0 ? "front" : d.layer === 1 ? "back" : null;
+    return side ? [{ side, url: d.fileUrl } as const] : [];
+  });
+}
 
 /** The steps this order goes through, and how far it is. */
 function progress(status: OrderStatus, delivery: DeliveryMethod, hasStudio: boolean) {
@@ -96,6 +106,7 @@ export async function OrderDetailView({ params }: { params: Promise<{ reference:
                     <p className="whitespace-nowrap text-sm tabular-nums">{formatFCFA(it.unitPriceXof * it.quantity)}</p>
                   </div>
                   {it.customDesigns.length > 0 ? (
+                    <>
                     <ul className="mt-3 flex flex-wrap gap-3 text-sm">
                       {it.customDesigns.map((f) => (
                         <li key={f.id}>
@@ -107,6 +118,8 @@ export async function OrderDetailView({ params }: { params: Promise<{ reference:
                         </li>
                       ))}
                     </ul>
+                    <StudioTee3D color={it.color} files={studioFiles(it.customDesigns)} />
+                    </>
                   ) : (
                     !it.productId && <p className="mt-3 text-sm text-new">Pas de fichier d&apos;impression avec cette création : contacte le client pour récupérer son design.</p>
                   )}
