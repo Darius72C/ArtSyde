@@ -101,7 +101,7 @@ export function LoginView({ google = false, next = "/compte", failed = false }: 
     setErrors(err);
     if (Object.keys(err).length) return;
     setStatus("loading");
-    // `callbackURL`: where the confirmation link brings the customer back, signed in.
+    // `callbackURL`: where the confirmation link brings the customer back, signed in (through /adresse-confirmee).
     const r = mode === "login" ? await authClient.signIn.email({ email, password: pw, callbackURL: next }) : await authClient.signUp.email({ email, password: pw, name, callbackURL: next });
     if (r.error) {
       setStatus("idle");

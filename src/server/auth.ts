@@ -92,6 +92,22 @@ const PREVIEW_URLS =
     ? [process.env.VERCEL_BRANCH_URL, process.env.VERCEL_URL].filter((h): h is string => Boolean(h)).map((h) => `https://${h}`)
     : [];
 
+/**
+ * The confirmation link first shows /adresse-confirmee ("Adresse confirmée", or "Ce lien ne marche plus"), which
+ * then leads on to the page the customer came from. Done here, on the link only: the same `callbackURL` given to
+ * sign-in would otherwise send every ordinary sign-in to that page too.
+ */
+function throughConfirmedPage(url: string) {
+  try {
+    const u = new URL(url);
+    const back = u.searchParams.get("callbackURL") || "/compte";
+    if (!back.startsWith("/adresse-confirmee")) u.searchParams.set("callbackURL", `/adresse-confirmee?suite=${encodeURIComponent(back.startsWith("/") && !back.startsWith("//") ? back : "/compte")}`);
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 export const auth = betterAuth({
   // The live site always uses its real domain (a BETTER_AUTH_URL left at localhost would send Google back
   // to http://localhost:3000/api/auth/callback/google). A preview uses its own address, so the confirmation link
@@ -111,8 +127,9 @@ export const auth = betterAuth({
     autoSignInAfterVerification: true,
     expiresIn: VERIFY_HOURS * 60 * 60,
     sendVerificationEmail: async ({ user, url }) => {
+      const link = throughConfirmedPage(url);
       // Not awaited by the request (Better Auth's advice: the answer takes the same time whether the address exists).
-      const send = () => sendEmail(verifyEmail({ name: user.name, email: user.email, url }));
+      const send = () => sendEmail(verifyEmail({ name: user.name, email: user.email, url: link }));
       try {
         after(send);
       } catch {
