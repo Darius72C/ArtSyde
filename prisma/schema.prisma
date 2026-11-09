@@ -445,3 +445,15 @@ model PromoCode {
   note           String?
   createdAt      DateTime  @default(now())
 }
+
+// ---------- Limites anti-abus ----------
+
+// Un passage compté par une limite (src/server/rate-limit.ts) : `bucket` dit laquelle et pour qui,
+// ex. "print-upload:ip:203.0.113.7". Les lignes de plus d'un jour sont effacées par le nettoyage quotidien.
+model RateHit {
+  id     String   @id @default(cuid())
+  bucket String
+  at     DateTime @default(now())
+
+  @@index([bucket, at])
+}

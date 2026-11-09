@@ -605,18 +605,20 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
         const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/png"));
         if (!blob) throw new Error("canvas too large");
         const signed = await presignDesignFile({ side: id, size: blob.size });
-        if (!signed.ok) throw new Error(signed.message);
+        // Refused by the server (too many files in a short time…): its own message is shown as it is.
+        if (!signed.ok) throw Object.assign(new Error(signed.message), { name: "PrintRefused" });
         const put = await fetch(signed.uploadUrl, { method: "PUT", headers: { "Content-Type": "image/png" }, body: blob });
         if (!put.ok) throw new Error(`upload ${put.status}`);
         files.push({ side: id, url: signed.publicUrl });
       }
     } catch (err) {
+      const refused = err instanceof Error && err.name === "PrintRefused";
       console.error("Print files upload failed", err);
-      // "Failed to fetch" here is most often the storage's CORS rule (see the README).
-      void reportClientError("studio.upload", err instanceof Error ? err.message : String(err), { path: location.pathname }).catch(() => {});
+      // "Failed to fetch" here is most often the storage's CORS rule (see the README). A refusal is not a bug.
+      if (!refused) void reportClientError("studio.upload", err instanceof Error ? err.message : String(err), { path: location.pathname }).catch(() => {});
       setAdding(null);
       if (q.credits) refundCredits(q.credits).then((r) => r.ok && setCredits((c) => (c?.signedIn ? { ...c, balance: r.balance } : c)));
-      return flash("Le fichier d'impression n'a pas pu être envoyé : vérifie ta connexion et réessaie");
+      return flash(refused ? (err as Error).message : "Le fichier d'impression n'a pas pu être envoyé : vérifie ta connexion et réessaie");
     }
     setAdding(null);
     const thumb = snapshot3d();

@@ -21,10 +21,10 @@ const hmac = (key: Buffer | string, s: string) => createHmac("sha256", key).upda
 // RFC 3986, as SigV4 wants it.
 const enc = (s: string) => encodeURIComponent(s).replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
 
-type SignInput = { method: string; host: string; path: string; region: string; keyId: string; secret: string; headers?: Record<string, string>; expires: number; now: Date };
+type SignInput = { method: string; host: string; path: string; region: string; keyId: string; secret: string; headers?: Record<string, string>; expires: number; now: Date; params?: Record<string, string> };
 
 /** AWS Signature V4, query-string form ("presigned URL"). Pure, so it can be checked against AWS's own examples. */
-export function signUrl({ method, host, path, region, keyId, secret, headers = {}, expires, now }: SignInput) {
+export function signUrl({ method, host, path, region, keyId, secret, headers = {}, expires, now, params = {} }: SignInput) {
   const amzDate = now.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, ""); // 20261104T153000Z
   const date = amzDate.slice(0, 8);
   const scope = `${date}/${region}/s3/aws4_request`;
@@ -33,6 +33,7 @@ export function signUrl({ method, host, path, region, keyId, secret, headers = {
   const names = Object.keys(signed).sort();
   const signedHeaders = names.join(";");
   const query: Record<string, string> = {
+    ...params, // the request's own query (a listing's prefix, for instance), signed with the rest
     "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
     "X-Amz-Credential": `${keyId}/${scope}`,
     "X-Amz-Date": amzDate,
@@ -80,4 +81,41 @@ export async function deleteObject(cfg: R2Config, key: string) {
   } catch (e) {
     console.error("R2 delete failed", e);
   }
+}
+
+export type StoredObject = { key: string; lastModified: Date; size: number };
+
+/**
+ * Every object whose key starts with `prefix` (ListObjectsV2, 1 000 per page, all pages). For the daily clean-up:
+ * the bucket is private to read this way, only the server's keys can list it.
+ */
+export async function listObjects(cfg: R2Config, prefix: string): Promise<StoredObject[]> {
+  const out: StoredObject[] = [];
+  let token: string | undefined;
+  for (let page = 0; page < 100; page++) {
+    const params: Record<string, string> = { "list-type": "2", prefix, "max-keys": "1000", ...(token ? { "continuation-token": token } : {}) };
+    const url = signUrl({
+      method: "GET",
+      host: `${cfg.account}.r2.cloudflarestorage.com`,
+      path: `/${enc(cfg.bucket)}`,
+      region: "auto",
+      keyId: cfg.keyId,
+      secret: cfg.secret,
+      expires: 300,
+      now: new Date(),
+      params,
+    });
+    const res = await fetch(url, { signal: AbortSignal.timeout(20_000) });
+    if (!res.ok) throw new Error(`R2 list ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
+    const xml = await res.text();
+    const tag = (block: string, name: string) => block.match(new RegExp(`<${name}>([\\s\\S]*?)</${name}>`))?.[1] ?? "";
+    const unescape = (v: string) => v.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
+    for (const block of xml.match(/<Contents>[\s\S]*?<\/Contents>/g) ?? []) {
+      out.push({ key: unescape(tag(block, "Key")), lastModified: new Date(tag(block, "LastModified")), size: Number(tag(block, "Size")) || 0 });
+    }
+    if (tag(xml, "IsTruncated") !== "true") break;
+    token = unescape(tag(xml, "NextContinuationToken"));
+    if (!token) break;
+  }
+  return out;
 }
