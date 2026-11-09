@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { TeeIllustration } from "../ProductImage";
@@ -55,7 +55,11 @@ const AUTH_ERRORS: Record<string, string> = {
   USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL: "Un compte existe déjà avec cet e-mail : connecte-toi.",
   PASSWORD_TOO_SHORT: "8 caractères minimum.",
   INVALID_EMAIL: "Entre un e-mail valide.",
+  EMAIL_NOT_VERIFIED: "Confirme d'abord ton adresse : on vient de t'envoyer un nouveau lien. Pense à regarder dans les spams.",
 };
+
+/** Seconds before the confirmation link can be sent again. */
+const RESEND_AFTER = 30;
 
 /**
  * Sign in or sign up: Google (when `google` is set up), or e-mail and password. Once signed in, `next`
@@ -68,6 +72,22 @@ export function LoginView({ google = false, next = "/compte", failed = false }: 
   const [pw, setPw] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>(failed ? { form: "La connexion avec Google n'a pas abouti. Réessaie." } : {});
   const [status, setStatus] = useState<"idle" | "loading" | "google">("idle");
+  // After an e-mail sign-up: the address the confirmation link went to (the "check your inbox" screen).
+  const [sent, setSent] = useState<string | null>(null);
+  const [resend, setResend] = useState<{ wait: number; note?: string }>({ wait: 0 });
+
+  useEffect(() => {
+    if (resend.wait <= 0) return;
+    const t = setTimeout(() => setResend((r) => ({ ...r, wait: r.wait - 1 })), 1000);
+    return () => clearTimeout(t);
+  }, [resend.wait]);
+
+  async function sendAgain() {
+    if (!sent || resend.wait > 0) return;
+    setResend({ wait: RESEND_AFTER });
+    const r = await authClient.sendVerificationEmail({ email: sent, callbackURL: next });
+    setResend({ wait: RESEND_AFTER, note: r.error ? "L'envoi n'a pas marché. Réessaie dans un instant." : "Nouveau lien envoyé." });
+  }
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -81,11 +101,23 @@ export function LoginView({ google = false, next = "/compte", failed = false }: 
     setErrors(err);
     if (Object.keys(err).length) return;
     setStatus("loading");
-    const r = mode === "login" ? await authClient.signIn.email({ email, password: pw }) : await authClient.signUp.email({ email, password: pw, name });
+    // `callbackURL`: where the confirmation link brings the customer back, signed in (through /adresse-confirmee).
+    const r = mode === "login" ? await authClient.signIn.email({ email, password: pw, callbackURL: next }) : await authClient.signUp.email({ email, password: pw, name, callbackURL: next });
     if (r.error) {
       setStatus("idle");
-      const msg = (r.error.code && AUTH_ERRORS[r.error.code]) || "Ça n'a pas marché. Réessaie dans un instant.";
-      setErrors(r.error.code === "PASSWORD_TOO_SHORT" ? { pw: msg } : r.error.code === "INVALID_EMAIL" ? { id: msg } : { form: msg });
+      // EMAIL_NOT_VERIFIED: an e-mail account not confirmed yet (a fresh link has just been sent).
+      const code = r.error.code;
+      if (!code || !AUTH_ERRORS[code]) console.error("Better Auth", r.error.status, r.error.code, r.error.message);
+      const msg = (code && AUTH_ERRORS[code]) || "Ça n'a pas marché. Réessaie dans un instant.";
+      setErrors(code === "PASSWORD_TOO_SHORT" ? { pw: msg } : code === "INVALID_EMAIL" ? { id: msg } : { form: msg });
+      return;
+    }
+    // Signed up but not signed in: the address must be confirmed first.
+    if (mode === "signup" && !r.data?.token) {
+      setStatus("idle");
+      setPw("");
+      setSent(email);
+      setResend({ wait: RESEND_AFTER });
       return;
     }
     router.push(next);
@@ -122,7 +154,36 @@ export function LoginView({ google = false, next = "/compte", failed = false }: 
       <section className="flex items-center px-5 py-16 md:px-16 lg:px-24">
         <div className="w-full max-w-md">
           <AnimatePresence mode="wait">
-            {(
+            {sent ? (
+              <motion.div key="sent" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: DUR.slow, ease: EASE.out }}>
+                <h1 className="display text-5xl md:text-6xl">Vérifie ta boîte mail.</h1>
+                <p className="mt-6 text-[17px] text-muted">
+                  On a envoyé un lien de confirmation à <span className="font-medium text-ink">{sent}</span>. Clique dessus pour activer ton compte et recevoir tes crédits studio.
+                </p>
+                <p className="mt-3 text-sm text-muted">Rien reçu ? Regarde dans les spams, ou demande un nouveau lien. Le lien est valable 24 heures.</p>
+                <div className="mt-10 space-y-4">
+                  <button type="button" onClick={sendAgain} disabled={resend.wait > 0} className="btn-outline w-full disabled:opacity-50">
+                    {resend.wait > 0 ? `Renvoyer le lien (${resend.wait} s)` : "Renvoyer le lien"}
+                  </button>
+                  {resend.note && (
+                    <p role="status" className="text-center text-sm text-muted">
+                      {resend.note}
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSent(null);
+                      setResend({ wait: 0 });
+                      switchMode("login");
+                    }}
+                    className="block w-full text-center text-[15px] text-link hover:underline"
+                  >
+                    Revenir à la connexion
+                  </button>
+                </div>
+              </motion.div>
+            ) : (
               <motion.div key="form" exit={{ opacity: 0 }} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DUR.slow, ease: EASE.out }}>
                 <LayoutGroup>
                   <div className="relative isolate inline-flex rounded-full bg-surface p-1" role="tablist">
