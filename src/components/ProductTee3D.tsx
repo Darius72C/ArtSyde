@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
+import { Safe3D } from "@/components/Safe3D";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Environment, Lightformer } from "@react-three/drei";
 import { PRINT_SIDES, type Print3D, type PrintSide } from "@/lib/products";
@@ -124,6 +125,7 @@ export default function ProductTee3D({ color, print, side = "front", className =
       role="img"
       aria-label="T-shirt en 3D. Fais glisser pour le tourner."
     >
+      <Safe3D>
       <Canvas dpr={[1, 1.5]} camera={{ position: [0, 0, 6.2], fov: 35 }} gl={{ antialias: true, alpha: true }} onCreated={({ gl }) => colorTrue(gl)}>
         <ambientLight intensity={0.35} />
         <directionalLight position={[3, 4, 5]} intensity={1.4} />
@@ -138,6 +140,7 @@ export default function ProductTee3D({ color, print, side = "front", className =
           <Tee color={color} print={print} side={side} drag={drag} />
         </Suspense>
       </Canvas>
+      </Safe3D>
     </div>
   );
 }

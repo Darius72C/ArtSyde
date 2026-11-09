@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
+import { Safe3D } from "@/components/Safe3D";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Environment, Float, Lightformer, Preload } from "@react-three/drei";
 import { TEE_COLORS } from "@/lib/data";
@@ -185,6 +186,7 @@ export default function TeeScene(props: Props) {
   }, []);
 
   return (
+    <Safe3D>
     <Canvas dpr={[1, 1.5]} frameloop={onScreen ? "always" : "never"} camera={{ position: [0, 0, 6.2], fov: 35 }} gl={{ antialias: true, alpha: true, preserveDrawingBuffer: props.preserve }}
       onCreated={({ gl }) => {
         colorTrue(gl);
@@ -222,5 +224,6 @@ export default function TeeScene(props: Props) {
       </Suspense>
       {props.preserve && <SnapshotBridge />}
     </Canvas>
+    </Safe3D>
   );
 }
