@@ -32,6 +32,21 @@ export async function allow(bucket: string, max: number, windowMs: number): Prom
   }
 }
 
+/** How many passes `bucket` counted in the last `windowMs` (0 if the database can't be reached). */
+export async function hits(bucket: string, windowMs: number) {
+  try {
+    return await db.rateHit.count({ where: { bucket, at: { gt: new Date(Date.now() - windowMs) } } });
+  } catch (e) {
+    console.error("rate limit unavailable", e);
+    return 0;
+  }
+}
+
+/** Counts one pass in `bucket` (for limits on failures only: counted after the fact). */
+export async function record(bucket: string) {
+  await db.rateHit.create({ data: { bucket } }).catch((e) => console.error("rate limit unavailable", e));
+}
+
 /** Forgets the passes older than a day (called by the daily clean-up). */
 export async function forgetOldHits() {
   const { count } = await db.rateHit.deleteMany({ where: { at: { lt: new Date(Date.now() - 24 * 60 * 60 * 1000) } } });

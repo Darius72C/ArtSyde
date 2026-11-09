@@ -46,7 +46,7 @@ export default function Page() {
         </InfoSection>
 
         <InfoSection title="4. Commande">
-          <p>Tu choisis tes articles, ta taille et ton mode de livraison, puis tu indiques tes coordonnées. Ta commande reçoit une référence (par exemple AS-2611-0143) et un lien de suivi ; elle est enregistrée « en attente de paiement ».</p>
+          <p>Tu choisis tes articles, ta taille et ton mode de livraison, puis tu indiques tes coordonnées. Ta commande reçoit une référence (par exemple AS-7KP3-QX9M) et un lien de suivi ; elle est enregistrée « en attente de paiement ».</p>
           <p>La vente est conclue quand nous avons reçu ton paiement. Nous pouvons refuser ou annuler une commande en cas de paiement non reçu, d&apos;informations manifestement fausses, ou d&apos;une création du studio qui ne respecte pas nos <Link href="/conditions-d-utilisation">conditions d&apos;utilisation</Link> ; dans ce cas, tout montant reçu est remboursé.</p>
         </InfoSection>
 

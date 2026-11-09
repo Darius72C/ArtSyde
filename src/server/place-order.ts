@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/server/db";
+import { randomReference } from "@/server/reference";
 import { Prisma, Size } from "@/generated/prisma/client";
 import { DELIVERY, DELIVERY_METHODS, checkFields, orderKey, type CheckoutInput, type PlaceOrderResult } from "@/lib/orders";
 import { STUDIO_PRICE } from "@/lib/products";
@@ -163,10 +164,10 @@ export async function placeOrder(input: CheckoutInput): Promise<PlaceOrderResult
       },
     } satisfies Omit<Prisma.OrderUncheckedCreateInput, "reference">;
 
-    // Two orders placed at the same moment can pick the same number: the unique index refuses the second, which retries.
+    // Two orders drawing the same random reference (very unlikely): the unique index refuses the second, which draws again.
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
-        const order = await db.order.create({ data: { ...data, reference: await nextReference() }, select: { id: true, reference: true } });
+        const order = await db.order.create({ data: { ...data, reference: randomReference("AS") }, select: { id: true, reference: true } });
         await logActivity("order.placed", `Commande ${order.reference} passée par ${fields.name} (${data.totalXof.toLocaleString("fr-FR")} FCFA)`, { reference: order.reference, total: data.totalXof, items: items.length, ...(promo ? { promo: promo.code, discount: discountXof } : {}) }, customerId ? `client:${customerId}` : "invité");
         // Online payment on: GeniusPay's page to send the customer to (the order is saved whatever happens).
         if (onlinePaymentEnabled()) {
@@ -184,13 +185,4 @@ export async function placeOrder(input: CheckoutInput): Promise<PlaceOrderResult
     await logError("placeOrder", e);
     return { ok: false, errors: {}, message: "On n'a pas pu enregistrer ta commande. Réessaie dans un instant." };
   }
-}
-
-/** "AS-2611-0143": year, month, then a number that runs through the month. */
-async function nextReference() {
-  const now = new Date(); // Abidjan is on UTC
-  const prefix = `AS-${String(now.getUTCFullYear()).slice(2)}${String(now.getUTCMonth() + 1).padStart(2, "0")}-`;
-  const last = await db.order.findFirst({ where: { reference: { startsWith: prefix } }, orderBy: { reference: "desc" }, select: { reference: true } });
-  const n = last ? Number.parseInt(last.reference.slice(prefix.length), 10) || 0 : 0;
-  return `${prefix}${String(n + 1).padStart(4, "0")}`;
 }
