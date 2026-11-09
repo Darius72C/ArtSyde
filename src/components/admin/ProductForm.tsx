@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Field } from "../pages/CheckoutView";
 import { ColorPicker } from "../ColorPicker";
@@ -82,12 +82,38 @@ function PendingPicker({ kind, files, onChange, disabled }: { kind: keyof Pendin
   );
 }
 
+type FormProps = { product: EditableProduct; uploads?: boolean };
+
 /**
  * Name, prices, label, colours, sizes and visibility of one product. Empty `product.id` creates one; then
  * photos and mockups can be picked in the same form (`uploads`: R2 is configured): they are uploaded once the
  * product exists, and the admin lands on the product with everything in place.
+ *
+ * With Cache Components, Next.js hides a page on navigation instead of unmounting it (React <Activity>), and shows
+ * the same instance again on the next visit: /admin/produits/nouveau would come back filled with the last model,
+ * its photos and its "saved" message. So once a creation has been submitted, the form is remounted empty as soon
+ * as the page is hidden. A draft left without submitting is kept, as Next.js intends.
+ * https://nextjs.org/docs/app/guides/preserving-ui-state
  */
-export function ProductForm({ product, uploads = false }: { product: EditableProduct; uploads?: boolean }) {
+export function ProductForm({ product, uploads = false }: FormProps) {
+  const isNew = !product.id;
+  const [generation, setGeneration] = useState(0);
+  const submitted = useRef(false);
+
+  // The cleanup runs when the page is hidden (or left): a submitted creation starts over from an empty form.
+  useLayoutEffect(() => {
+    if (!isNew) return;
+    return () => {
+      if (!submitted.current) return;
+      submitted.current = false;
+      setGeneration((g) => g + 1);
+    };
+  }, [isNew]);
+
+  return <ProductFormBody key={generation} product={product} uploads={uploads} submitted={isNew ? submitted : undefined} />;
+}
+
+function ProductFormBody({ product, uploads = false, submitted }: FormProps & { submitted?: RefObject<boolean> }) {
   const [state, action, pending] = useActionState<ProductFormState, FormData>(saveProduct, {});
   const e = state.errors ?? {};
   const isNew = !product.id;
@@ -96,16 +122,25 @@ export function ProductForm({ product, uploads = false }: { product: EditablePro
   const [sending, setSending] = useState<{ done: number; total: number; failed: string[] } | null>(null);
   const toSend = files.photos.length + files.flats.length;
 
+  // Refused (field errors, or the save failed): the admin stays on the form, which is not a finished creation.
+  useEffect(() => {
+    if (submitted && (state.errors || state.message)) submitted.current = false;
+  }, [state, submitted]);
+
   // Once the product is created: upload what was picked, one file after the other, then open the product.
+  // Effects run again each time a hidden page is shown again: `uploadedFor` keeps this to once per product,
+  // so the photos are never sent a second time to the model created before.
+  const uploadedFor = useRef<string | null>(null);
   useEffect(() => {
     const id = state.created;
-    if (!id) return;
+    if (!id || uploadedFor.current === id) return;
+    uploadedFor.current = id;
     let stop = false;
     (async () => {
       const queue = [...files.photos.map((f) => ["photos", f] as const), ...files.flats.map((f) => ["flats", f] as const)];
       const failed: string[] = [];
+      // The uploads go on if the admin leaves the page meanwhile; only the final redirect is skipped.
       for (const [i, [kind, file]] of queue.entries()) {
-        if (stop) return;
         setSending({ done: i, total: queue.length, failed });
         try {
           await uploadMedia(id, file, kind);
@@ -132,6 +167,7 @@ export function ProductForm({ product, uploads = false }: { product: EditablePro
     <form
       action={(fd) => {
         if (isNew && toSend) fd.set("then", "upload");
+        if (submitted) submitted.current = true;
         action(fd);
       }}
       noValidate
