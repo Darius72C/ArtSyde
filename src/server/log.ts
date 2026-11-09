@@ -26,6 +26,11 @@ export function logActivity(action: string, message: string, meta?: Meta, actor 
   return write({ kind: "ACTIVITY", action, message, meta: json(meta), actor });
 }
 
+/** Something that happened and needs a look (shown as a warning in the journal), e.g. a payment to check by hand. */
+export function logWarning(action: string, message: string, meta?: Meta, actor = "système") {
+  return write({ kind: "ACTIVITY", action, message, meta: json(meta), actor, level: "warning" });
+}
+
 /** An e-mail sent, failed or skipped (Brevo not set up). */
 export function logEmail(action: "email.sent" | "email.failed" | "email.skipped", message: string, meta?: Meta) {
   return write({ kind: "EMAIL", action, message, meta: json(meta), level: action === "email.failed" ? "error" : action === "email.skipped" ? "warning" : "info" });

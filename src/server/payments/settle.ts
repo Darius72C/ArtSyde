@@ -5,7 +5,8 @@ import type { Prisma } from "@/generated/prisma/client";
 import { orderHref, orderKey } from "@/lib/orders";
 import { CREDIT_PACKS } from "@/lib/credits";
 import { STOCK_TAG } from "@/server/stock";
-import { logActivity, logError } from "@/server/log";
+import { logActivity, logWarning, logError } from "@/server/log";
+import { allow } from "@/server/rate-limit";
 import { siteUrl } from "@/server/site";
 import { GENIUS_METHOD, createPayment, failedStatus, geniusConfig, getPayment, paidStatus, sandbox, type GeniusPayment } from "./geniuspay";
 
@@ -188,12 +189,25 @@ export async function settle(paymentRef: string, said?: GeniusPayment): Promise<
   const label = order ? `commande ${order.reference}` : `achat de crédits ${purchase!.reference}`;
 
   if (paidStatus(pay.status)) {
-    const short = pay.amount > 0 && Math.round(pay.amount) < price;
-    const otherCurrency = pay.currency !== "" && pay.currency.toUpperCase() !== "XOF";
-    const testWhileLive = !sandbox(cfg) && pay.environment.toLowerCase() === "sandbox";
-    if (short || otherCurrency || testWhileLive) {
-      // Paid, but not what was sold: nothing given, the team looks at it by hand.
-      await logActivity("payment.mismatch", `Paiement GeniusPay à vérifier pour la ${label} : ${pay.amount} ${pay.currency || "?"} reçus (${pay.environment || "?"}), ${price} XOF attendus`, { paymentRef, amount: pay.amount, currency: pay.currency, environment: pay.environment, expected: price });
+    // Paid only when everything checks out. Anything missing or unreadable is a reason to stop, never to go on:
+    // an amount GeniusPay doesn't send (or sends under another name) must not mark an order paid.
+    const why: string[] = [];
+    if (!Number.isFinite(pay.amount) || pay.amount <= 0) why.push("montant absent ou illisible");
+    else if (Math.round(pay.amount) < price) why.push(`montant insuffisant (${Math.round(pay.amount)} reçus, ${price} attendus)`);
+    // The payment is created in XOF (startOrderPayment): a currency, when GeniusPay gives one, must be that.
+    if (pay.currency !== "" && !["XOF", "FCFA", "CFA"].includes(pay.currency.toUpperCase())) why.push(`devise ${pay.currency}`);
+    // With live keys, a payment GeniusPay calls a test one is no money.
+    if (!sandbox(cfg) && ["sandbox", "test", "testing"].includes(pay.environment.toLowerCase())) why.push(`paiement de test (${pay.environment})`);
+    if (why.length) {
+      // Nothing given; the team checks it by hand in GeniusPay. Noted once per payment (the customer's page and
+      // the webhook may ask several times).
+      if (await allow(`pay-mismatch:${paymentRef}`, 1, 30 * 24 * 60 * 60 * 1000)) {
+        await logWarning(
+          "payment.mismatch",
+          `Paiement GeniusPay à vérifier pour la ${label} : ${why.join(", ")}. Rien n'a été validé : vérifie dans GeniusPay, puis marque-le payé à la main s'il est bon.`,
+          { paymentRef, amount: pay.amount, currency: pay.currency, environment: pay.environment, expected: price, reasons: why },
+        );
+      }
       return "mismatch";
     }
     const r = order ? await payOrder(order.id, { by: "geniuspay", ref: paymentRef, method: order.paymentMethod ?? undefined }) : await payCreditPurchase(purchase!.id, { by: "geniuspay", ref: paymentRef });
