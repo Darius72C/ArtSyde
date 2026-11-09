@@ -110,6 +110,7 @@ Elles sont toutes listées et commentées dans [`.env.example`](.env.example). L
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_URL` | Photos des produits sur Cloudflare R2 (facultatif tant qu'on n'envoie pas de photos) |
 | `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` | Comptes clients : clé secrète des sessions et adresse du site |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Connexion avec Google (sans elles, seul l'e-mail est proposé) |
+| `CRON_SECRET` | Protège le nettoyage quotidien (`/api/cron/nettoyage`, planifié dans `vercel.json`) : fichiers d'impression jamais commandés supprimés après 14 jours |
 
 ### Photos des produits sur Cloudflare R2
 
