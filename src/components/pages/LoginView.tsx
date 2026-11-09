@@ -105,8 +105,9 @@ export function LoginView({ google = false, next = "/compte", failed = false }: 
     const r = mode === "login" ? await authClient.signIn.email({ email, password: pw, callbackURL: next }) : await authClient.signUp.email({ email, password: pw, name, callbackURL: next });
     if (r.error) {
       setStatus("idle");
-      // 403: an e-mail account not confirmed yet (a fresh link has just been sent).
-      const code = r.error.status === 403 ? "EMAIL_NOT_VERIFIED" : r.error.code;
+      // EMAIL_NOT_VERIFIED: an e-mail account not confirmed yet (a fresh link has just been sent).
+      const code = r.error.code;
+      if (!code || !AUTH_ERRORS[code]) console.error("Better Auth", r.error.status, r.error.code, r.error.message);
       const msg = (code && AUTH_ERRORS[code]) || "Ça n'a pas marché. Réessaie dans un instant.";
       setErrors(code === "PASSWORD_TOO_SHORT" ? { pw: msg } : code === "INVALID_EMAIL" ? { id: msg } : { form: msg });
       return;

@@ -83,12 +83,22 @@ async function welcome(user: { id: string; name: string; email: string }) {
  * Verification (prisma/schema.prisma); routes under /api/auth (src/app/api/auth/[...all]/route.ts).
  * Needs BETTER_AUTH_SECRET, and GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET for Google (see .env.example).
  */
+/**
+ * A Vercel preview (a pull request's test site) lives on its own *.vercel.app addresses: the branch's stable one and
+ * the deployment's own. Better Auth refuses requests from an origin it doesn't trust (403), so these are added.
+ */
+const PREVIEW_URLS =
+  process.env.VERCEL_ENV === "preview"
+    ? [process.env.VERCEL_BRANCH_URL, process.env.VERCEL_URL].filter((h): h is string => Boolean(h)).map((h) => `https://${h}`)
+    : [];
+
 export const auth = betterAuth({
   // The live site always uses its real domain (a BETTER_AUTH_URL left at localhost would send Google back
-  // to http://localhost:3000/api/auth/callback/google). Elsewhere: BETTER_AUTH_URL, or the request's address.
-  baseURL: IS_PRODUCTION ? SITE_URL : process.env.BETTER_AUTH_URL || undefined,
+  // to http://localhost:3000/api/auth/callback/google). A preview uses its own address, so the confirmation link
+  // brings the tester back to it. Elsewhere: BETTER_AUTH_URL, or the request's address.
+  baseURL: IS_PRODUCTION ? SITE_URL : PREVIEW_URLS[0] ?? (process.env.BETTER_AUTH_URL || undefined),
   // artsyde.store redirects to www, but both are accepted as origins.
-  trustedOrigins: IS_PRODUCTION ? [SITE_URL, SITE_URL.replace("://www.", "://")] : undefined,
+  trustedOrigins: IS_PRODUCTION ? [SITE_URL, SITE_URL.replace("://www.", "://")] : PREVIEW_URLS.length ? PREVIEW_URLS : undefined,
   database: prismaAdapter(db, { provider: "postgresql" }),
   // An e-mail sign-up must confirm its address before it can sign in: no one can open an account, see orders or
   // get the signup credits with an address that isn't theirs. Only when Brevo is set up: without it no link
