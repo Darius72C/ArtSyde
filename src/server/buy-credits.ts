@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/server/db";
+import { randomReference } from "@/server/reference";
 import { customerFor } from "@/server/account";
 import { Prisma } from "@/generated/prisma/client";
 import { checkFields } from "@/lib/orders";
@@ -46,10 +47,10 @@ export async function buyCredits(input: BuyCreditsInput): Promise<BuyCreditsResu
       customerEmail: fields.email || null,
     } satisfies Omit<Prisma.CreditPurchaseUncheckedCreateInput, "reference">;
 
-    // Two purchases at the same moment can pick the same number: the unique index refuses the second, which retries.
+    // Two purchases drawing the same random reference (very unlikely): the unique index refuses the second, which draws again.
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
-        const row = await db.creditPurchase.create({ data: { ...data, reference: await nextReference() }, select: { reference: true } });
+        const row = await db.creditPurchase.create({ data: { ...data, reference: randomReference("CR") }, select: { reference: true } });
         await logActivity("credits.requested", `Achat de crédits ${row.reference} : pack ${pack} (${credits} crédits, ${priceXof.toLocaleString("fr-FR")} FCFA) par ${fields.name}`, { reference: row.reference, pack, credits, price: priceXof }, customerId ? `client:${customerId}` : "invité");
         // Online payment on: GeniusPay's page to pay on (the purchase is saved whatever happens).
         if (onlinePaymentEnabled()) {
@@ -67,13 +68,4 @@ export async function buyCredits(input: BuyCreditsInput): Promise<BuyCreditsResu
     await logError("buyCredits", e);
     return { ok: false, errors: {}, message: "On n'a pas pu enregistrer ta demande. Réessaie dans un instant." };
   }
-}
-
-/** "CR-2611-0007": year, month, then a number that runs through the month (like orders' "AS-…"). */
-async function nextReference() {
-  const now = new Date(); // Abidjan is on UTC
-  const prefix = `CR-${String(now.getUTCFullYear()).slice(2)}${String(now.getUTCMonth() + 1).padStart(2, "0")}-`;
-  const last = await db.creditPurchase.findFirst({ where: { reference: { startsWith: prefix } }, orderBy: { reference: "desc" }, select: { reference: true } });
-  const n = last ? Number.parseInt(last.reference.slice(prefix.length), 10) || 0 : 0;
-  return `${prefix}${String(n + 1).padStart(4, "0")}`;
 }

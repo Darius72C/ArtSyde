@@ -28,7 +28,7 @@ export function TrackForm() {
   return (
     <form onSubmit={submit} noValidate className="space-y-8">
       <div className="grid gap-8 sm:grid-cols-2">
-        <Field name="reference" label="Référence de commande" placeholder="AS-2611-0143" autoComplete="off" />
+        <Field name="reference" label="Référence de commande" placeholder="AS-7KP3-QX9M" autoComplete="off" />
         <Field name="phone" label="Téléphone donné à la commande" type="tel" autoComplete="tel" />
       </div>
       <AnimatePresence>

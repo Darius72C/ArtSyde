@@ -9,7 +9,7 @@ import { onlinePaymentEnabled } from "@/server/payments/geniuspay";
 
 export const metadata: Metadata = { title: "Ma commande — ArtSyde", robots: { index: false } };
 
-/** `id` is the order reference (AS-2611-0143); `?k=` is the key the checkout gave with it. */
+/** `id` is the order reference (AS-7KP3-QX9M; AS-2611-0143 for the first orders); `?k=` is the key the checkout gave with it. */
 async function Order({ params, searchParams }: PageProps<"/commande/[id]">) {
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const k = sp.k;
