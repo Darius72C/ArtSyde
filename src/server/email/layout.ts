@@ -96,7 +96,7 @@ export function layout({ title, preheader, hero, body, reason, ad, unsubscribe }
     <!-- Top bar -->
     <tr><td class="px" style="background:${C.night};border-radius:28px 28px 0 0;padding:28px 44px 0;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-        <td><a href="${site}" style="font-family:${FONT};font-size:20px;font-weight:700;letter-spacing:-0.5px;color:${C.onNight};text-decoration:none;">ArtSyde</a></td>
+        <td><a href="${site}" style="font-family:${FONT};font-size:20px;font-weight:700;letter-spacing:-0.5px;color:${C.onNight};text-decoration:none;"><img src="${site}/icons/logo-header.png" width="90" height="50" alt="ArtSyde" style="display:block;width:90px;height:50px;border:0;"></a></td>
         <td align="right" style="font-family:${FONT};font-size:12px;letter-spacing:0.4px;color:${C.nightMuted};">Imprimé à ${COMPANY.city}</td>
       </tr></table>
     </td></tr>
