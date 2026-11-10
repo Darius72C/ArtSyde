@@ -80,6 +80,7 @@ function useDarkUnderNav() {
 }
 
 function Bar({ path }: { path: string | null }) {
+  const user = authClient.useSession().data?.user; // the phone menu's "Compte": the account when signed in
   const count = useCartCount();
   const [open, setOpen] = useState(false);
   const dark = useDarkUnderNav();
@@ -148,7 +149,7 @@ function Bar({ path }: { path: string | null }) {
             className="overflow-hidden bg-bg md:hidden"
           >
             <ul className="px-10 pt-6">
-              {[...LINKS, { href: "/connexion", label: "Compte" }, { href: "/panier", label: "Panier" }].map((l, i) => (
+              {[...LINKS, { href: user ? "/compte" : "/connexion", label: "Compte" }, { href: "/panier", label: "Panier" }].map((l, i) => (
                 <motion.li key={l.href} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 + i * 0.03, duration: DUR.fast, ease: EASE.out }}>
                   <Link href={l.href} onClick={() => setOpen(false)} className="display block py-2 text-[28px]">
                     {l.label}
