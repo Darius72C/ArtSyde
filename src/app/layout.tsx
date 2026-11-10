@@ -6,6 +6,7 @@ import { SmoothScroll } from "@/components/SmoothScroll";
 import { Magnetic } from "@/components/Magnetic";
 import { MotionProvider } from "@/components/MotionProvider";
 import { Pwa } from "@/components/Pwa";
+import { SiteAnalytics } from "@/components/SiteAnalytics";
 import { SITE_INDEXING, SITE_URL } from "@/lib/site";
 
 const display = Inter_Tight({ variable: "--font-display", subsets: ["latin"], weight: ["500", "600", "700"] });
@@ -50,6 +51,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           {children}
           <Pwa />
         </MotionProvider>
+        <SiteAnalytics />
       </body>
     </html>
   );

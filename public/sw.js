@@ -10,7 +10,8 @@ const STATIC = `artsyde-static-${VERSION}`;
 const PAGES = `artsyde-pages-${VERSION}`;
 const OFFLINE = "/hors-ligne";
 const PRECACHE = [OFFLINE, "/icons/icon-192.png", "/icons/icon-512.png"];
-const PRIVATE = /^\/(api|admin|connexion|compte|panier|commande|suivi|desabonnement|adresse-confirmee)(\/|$)/;
+// _vercel: Web Analytics (its script and the counts it sends) goes straight to the network, never cached.
+const PRIVATE = /^\/(api|admin|connexion|compte|panier|commande|suivi|desabonnement|adresse-confirmee|_vercel)(\/|$)/;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(STATIC).then((c) => c.addAll(PRECACHE)).then(() => self.skipWaiting()));
