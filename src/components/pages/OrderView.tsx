@@ -92,6 +92,7 @@ export function OrderView({ order, payment }: { order: PublicOrder | null; payme
             <div className="flex justify-between"><dt className="text-muted">Sous-total</dt><dd>{formatFCFA(order.subtotal)}</dd></div>
             {order.discount > 0 && <div className="flex justify-between"><dt className="text-muted">Code {order.promoCode}</dt><dd className="text-ok">-{formatFCFA(order.discount)}</dd></div>}
             <div className="flex justify-between"><dt className="text-muted">{DELIVERY[order.delivery].label}</dt><dd>{order.shipping ? formatFCFA(order.shipping) : "Offert"}</dd></div>
+            {order.paymentFee > 0 && <div className="flex justify-between"><dt className="text-muted">Frais de paiement</dt><dd>{formatFCFA(order.paymentFee)}</dd></div>}
             <div className="flex items-baseline justify-between border-t border-line pt-4"><dt className="font-semibold">Total</dt><dd className="display text-3xl">{formatFCFA(order.total)}</dd></div>
           </dl>
         </FadeUp>

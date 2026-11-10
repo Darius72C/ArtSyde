@@ -53,6 +53,7 @@ export type PublicOrder = {
   promoCode: string | null;
   discount: number;
   shipping: number;
+  paymentFee: number; // the operator's fee, already counted in total
   total: number;
 };
 

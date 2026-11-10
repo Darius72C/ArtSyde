@@ -10,6 +10,7 @@ import { placeOrder } from "@/server/place-order";
 import { checkPromo } from "@/server/promo";
 import type { PromoCheck } from "@/lib/promos";
 import { PAYMENT_METHODS, PAYMENT_METHOD_IDS, type PaymentMethodId } from "@/lib/credits";
+import { paymentFee } from "@/lib/payment-fees";
 import type { DeliveryMethod } from "@/generated/prisma/client";
 import { formatFCFA } from "@/lib/products";
 import { Thumb } from "./CartView";
@@ -71,6 +72,9 @@ export function CheckoutView({ online = false }: { online?: boolean }) {
   const [checking, startChecking] = useTransition();
   const discount = promo?.discount ?? 0;
   const total = subtotal - discount + shipping;
+  // Online, the customer pays the operator's fee: it changes with the operator chosen.
+  const fee = online ? paymentFee(total, method) : 0;
+  const toPay = total + fee;
 
   function applyPromo() {
     if (!code.trim()) return setPromoError("Entre ton code.");
@@ -195,7 +199,7 @@ export function CheckoutView({ online = false }: { online?: boolean }) {
                         </span>
                         <span className="flex-1">
                           <span className="block text-[17px] font-semibold">{PAYMENT_METHODS[k]}</span>
-                          <span className="text-sm text-muted">Mobile money</span>
+                          <span className="text-sm tabular-nums text-muted">Frais {formatFCFA(paymentFee(total, k))}</span>
                         </span>
                       </button>
                     );
@@ -237,6 +241,7 @@ export function CheckoutView({ online = false }: { online?: boolean }) {
               </div>
             )}
             <div className="flex justify-between"><dt className="text-muted">{DELIVERY[delivery].label}</dt><dd className="tabular-nums">{shipping ? formatFCFA(shipping) : "Offert"}</dd></div>
+            {fee > 0 && <div className="flex justify-between"><dt className="text-muted">Frais {PAYMENT_METHODS[method]}</dt><dd className="tabular-nums">{formatFCFA(fee)}</dd></div>}
           </dl>
 
           {/* Promo code: a button, not a form (this whole page is the order's form). */}
@@ -287,7 +292,7 @@ export function CheckoutView({ online = false }: { online?: boolean }) {
           </div>
           <div className="mt-6 flex items-baseline justify-between border-t border-line pt-6">
             <span className="font-semibold">Total</span>
-            <motion.span key={total} initial={{ opacity: 0.4 }} animate={{ opacity: 1 }} className="display text-3xl tabular-nums">{formatFCFA(total)}</motion.span>
+            <motion.span key={toPay} initial={{ opacity: 0.4 }} animate={{ opacity: 1 }} className="display text-3xl tabular-nums">{formatFCFA(toPay)}</motion.span>
           </div>
           <AnimatePresence>
             {message && (
@@ -297,7 +302,7 @@ export function CheckoutView({ online = false }: { online?: boolean }) {
             )}
           </AnimatePresence>
           <button disabled={sending} className="btn mt-8 w-full">
-            {sending ? <span className="h-4 w-4 animate-spin rounded-full border border-on-ink border-t-transparent" aria-label="Envoi" /> : online ? `Payer ${formatFCFA(total)}` : "Valider la commande"}
+            {sending ? <span className="h-4 w-4 animate-spin rounded-full border border-on-ink border-t-transparent" aria-label="Envoi" /> : online ? `Payer ${formatFCFA(toPay)}` : "Valider la commande"}
           </button>
           <p className="mt-4 text-center text-xs text-muted">
             En validant, tu acceptes nos{" "}

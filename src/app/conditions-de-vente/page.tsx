@@ -42,7 +42,7 @@ export default function Page() {
               </li>
             ))}
           </ul>
-          <p>Le prix appliqué est celui affiché au moment de la commande.</p>
+          <p>Le prix appliqué est celui affiché au moment de la commande. En paiement en ligne, les frais de l&apos;opérateur choisi s&apos;ajoutent et restent à ta charge : leur montant est indiqué avant que tu paies.</p>
         </InfoSection>
 
         <InfoSection title="4. Commande">

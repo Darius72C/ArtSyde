@@ -8,6 +8,7 @@ import { STOCK_TAG } from "@/server/stock";
 import { logActivity, logWarning, logError } from "@/server/log";
 import { allow } from "@/server/rate-limit";
 import { siteUrl } from "@/server/site";
+import { paymentFee } from "@/lib/payment-fees";
 import { GENIUS_METHOD, createPayment, failedStatus, geniusConfig, getPayment, paidStatus, sandbox, type GeniusPayment } from "./geniuspay";
 
 /*
@@ -117,12 +118,14 @@ export type StartResult = { ok: true; url: string } | { ok: false; message: stri
 export async function startOrderPayment(orderId: string, method?: string): Promise<StartResult> {
   const cfg = geniusConfig();
   if (!cfg) return { ok: false, message: "Le paiement en ligne n'est pas encore disponible." };
-  const o = await db.order.findUnique({ where: { id: orderId }, select: { id: true, reference: true, totalXof: true, customerName: true, customerEmail: true, status: true, paymentStatus: true } });
+  const o = await db.order.findUnique({ where: { id: orderId }, select: { id: true, reference: true, totalXof: true, paymentMethod: true, customerName: true, customerEmail: true, status: true, paymentStatus: true } });
   if (!o || o.status !== "PENDING_PAYMENT" || o.paymentStatus === "PAID") return { ok: false, message: "Cette commande n'attend plus de paiement." };
   const back = `${siteUrl()}${orderHref(o.reference, orderKey(o.id))}`;
+  // The customer pays the operator's fee on top of the order (src/lib/payment-fees.ts).
+  const fee = paymentFee(o.totalXof, method ?? o.paymentMethod);
   try {
     const pay = await open({
-      amount: o.totalXof,
+      amount: o.totalXof + fee,
       currency: "XOF",
       description: `Commande ${o.reference} — ArtSyde`,
       customer: { name: o.customerName, ...(o.customerEmail ? { email: o.customerEmail } : {}) },
@@ -132,8 +135,8 @@ export async function startOrderPayment(orderId: string, method?: string): Promi
       metadata: { kind: "order", order: o.reference },
     });
     if (!pay.url) throw new Error("no page to pay on");
-    await db.order.update({ where: { id: o.id }, data: { paymentRef: pay.reference, paymentStatus: "UNPAID", ...(method ? { paymentMethod: method } : {}) } });
-    await logActivity("payment.started", `Paiement en ligne ouvert pour la commande ${o.reference} (${o.totalXof.toLocaleString("fr-FR")} FCFA)`, { reference: o.reference, paymentRef: pay.reference, sandbox: sandbox(cfg) });
+    await db.order.update({ where: { id: o.id }, data: { paymentRef: pay.reference, paymentStatus: "UNPAID", paymentFeeXof: fee, ...(method ? { paymentMethod: method } : {}) } });
+    await logActivity("payment.started", `Paiement en ligne ouvert pour la commande ${o.reference} (${(o.totalXof + fee).toLocaleString("fr-FR")} FCFA, dont ${fee.toLocaleString("fr-FR")} de frais)`, { reference: o.reference, paymentRef: pay.reference, fee, sandbox: sandbox(cfg) });
     return { ok: true, url: pay.url };
   } catch (e) {
     await logError("geniuspay.create", e, { order: o.reference });
@@ -148,9 +151,10 @@ export async function startCreditPayment(purchaseId: string, method?: string): P
   const p = await db.creditPurchase.findUnique({ where: { id: purchaseId } });
   if (!p || p.paymentStatus === "PAID") return { ok: false, message: "Cet achat est déjà payé." };
   const back = `${siteUrl()}/credits?achat=${encodeURIComponent(p.reference)}`;
+  const fee = paymentFee(p.priceXof, method ?? p.paymentMethod);
   try {
     const pay = await open({
-      amount: p.priceXof,
+      amount: p.priceXof + fee,
       currency: "XOF",
       description: `Crédits studio ArtSyde : pack ${CREDIT_PACKS[p.pack].name} (${p.credits} crédits)`,
       customer: { name: p.customerName, ...(p.customerEmail ? { email: p.customerEmail } : {}) },
@@ -160,7 +164,7 @@ export async function startCreditPayment(purchaseId: string, method?: string): P
       metadata: { kind: "credits", purchase: p.reference },
     });
     if (!pay.url) throw new Error("no page to pay on");
-    await db.creditPurchase.update({ where: { id: p.id }, data: { paymentRef: pay.reference, paymentStatus: "UNPAID" } });
+    await db.creditPurchase.update({ where: { id: p.id }, data: { paymentRef: pay.reference, paymentStatus: "UNPAID", paymentFeeXof: fee, ...(method ? { paymentMethod: method } : {}) } });
     await logActivity("payment.started", `Paiement en ligne ouvert pour l'achat de crédits ${p.reference}`, { reference: p.reference, paymentRef: pay.reference, sandbox: sandbox(cfg) });
     return { ok: true, url: pay.url };
   } catch (e) {
@@ -179,13 +183,13 @@ export type SettleStatus = "paid" | "pending" | "failed" | "mismatch" | "unknown
 export async function settle(paymentRef: string, said?: GeniusPayment): Promise<SettleStatus> {
   const cfg = geniusConfig();
   if (!cfg) return "unknown";
-  const order = await db.order.findUnique({ where: { paymentRef }, select: { id: true, reference: true, totalXof: true, paymentStatus: true, paymentMethod: true } });
-  const purchase = order ? null : await db.creditPurchase.findUnique({ where: { paymentRef }, select: { id: true, reference: true, priceXof: true, paymentStatus: true } });
+  const order = await db.order.findUnique({ where: { paymentRef }, select: { id: true, reference: true, totalXof: true, paymentFeeXof: true, paymentStatus: true, paymentMethod: true } });
+  const purchase = order ? null : await db.creditPurchase.findUnique({ where: { paymentRef }, select: { id: true, reference: true, priceXof: true, paymentFeeXof: true, paymentStatus: true } });
   if (!order && !purchase) return "unknown"; // not ours (another site on the same account, a test)
   if ((order ?? purchase)!.paymentStatus === "PAID") return "paid";
 
   const pay = said ?? (await getPayment(cfg, paymentRef));
-  const price = order ? order.totalXof : purchase!.priceXof;
+  const price = order ? order.totalXof + order.paymentFeeXof : purchase!.priceXof + purchase!.paymentFeeXof; // what GeniusPay was asked to charge
   const label = order ? `commande ${order.reference}` : `achat de crédits ${purchase!.reference}`;
 
   if (paidStatus(pay.status)) {

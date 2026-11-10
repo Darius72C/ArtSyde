@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from "motion/react";
 import type { CreditPack } from "@/generated/prisma/client";
 import { buyCredits } from "@/server/buy-credits";
 import { CREDIT_PACKS, CREDIT_PACK_IDS, PAYMENT_METHODS, PAYMENT_METHOD_IDS, type CreditFields, type PaymentMethodId } from "@/lib/credits";
+import { paymentFee } from "@/lib/payment-fees";
 import { checkFields } from "@/lib/orders";
 import { formatFCFA } from "@/lib/products";
 import { DUR, EASE, SPRING } from "@/lib/motion";
@@ -35,6 +36,9 @@ export function CreditsView({ initialPack = DEFAULT_PACK, online = false, return
   const [done, setDone] = useState<{ reference: string; phone: string } | null>(null);
   const [pending, startTransition] = useTransition();
   const p = CREDIT_PACKS[pack];
+  // Online, the customer pays the operator's fee: it changes with the operator chosen.
+  const fee = online ? paymentFee(p.priceXof, method) : 0;
+  const toPay = p.priceXof + fee;
   const doneTitle = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     if (done) doneTitle.current?.focus();
@@ -80,7 +84,7 @@ export function CreditsView({ initialPack = DEFAULT_PACK, online = false, return
             <p className="eyebrow mt-6">Demande enregistrée</p>
             <h2 ref={doneTitle} tabIndex={-1} className="display mt-2 text-4xl outline-none md:text-5xl">{p.credits} crédits t&apos;attendent.</h2>
             <p className="mt-4 max-w-lg text-muted">
-              Référence <span className="font-semibold text-ink">{done.reference}</span>. On t&apos;envoie la demande de paiement {PAYMENT_METHODS[method]} de {formatFCFA(p.priceXof)} au {done.phone}. Tes crédits sont ajoutés dès que le paiement est reçu.
+              Référence <span className="font-semibold text-ink">{done.reference}</span>. On t&apos;envoie la demande de paiement {PAYMENT_METHODS[method]} de {formatFCFA(toPay)} au {done.phone}. Tes crédits sont ajoutés dès que le paiement est reçu.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-6">
               <Link href="/studio" className="btn">Retour au studio</Link>
@@ -135,7 +139,7 @@ export function CreditsView({ initialPack = DEFAULT_PACK, online = false, return
                         </span>
                         <span className="flex-1">
                           <span className="block text-[17px] font-semibold">{PAYMENT_METHODS[k]}</span>
-                          <span className="text-sm text-muted">Mobile money</span>
+                          <span className="text-sm tabular-nums text-muted">{online ? `Frais ${formatFCFA(paymentFee(p.priceXof, k))}` : "Mobile money"}</span>
                         </span>
                       </button>
                     );
@@ -158,10 +162,12 @@ export function CreditsView({ initialPack = DEFAULT_PACK, online = false, return
                 <div className="flex justify-between"><dt className="text-muted">Pack</dt><dd>{p.name}</dd></div>
                 <div className="flex justify-between"><dt className="text-muted">Crédits</dt><dd className="tabular-nums">{p.credits}</dd></div>
                 <div className="flex justify-between"><dt className="text-muted">Paiement</dt><dd>{PAYMENT_METHODS[method]}</dd></div>
+                <div className="flex justify-between"><dt className="text-muted">Prix du pack</dt><dd className="tabular-nums">{formatFCFA(p.priceXof)}</dd></div>
+                {fee > 0 && <div className="flex justify-between"><dt className="text-muted">Frais {PAYMENT_METHODS[method]}</dt><dd className="tabular-nums">{formatFCFA(fee)}</dd></div>}
               </dl>
               <div className="mt-6 flex items-baseline justify-between border-t border-line pt-6">
                 <span className="font-semibold">Total</span>
-                <motion.span key={p.priceXof} initial={{ opacity: 0.4 }} animate={{ opacity: 1 }} className="display text-3xl tabular-nums">{formatFCFA(p.priceXof)}</motion.span>
+                <motion.span key={toPay} initial={{ opacity: 0.4 }} animate={{ opacity: 1 }} className="display text-3xl tabular-nums">{formatFCFA(toPay)}</motion.span>
               </div>
               <AnimatePresence>
                 {message && (
@@ -171,7 +177,7 @@ export function CreditsView({ initialPack = DEFAULT_PACK, online = false, return
                 )}
               </AnimatePresence>
               <button disabled={pending} className="btn mt-8 w-full">
-                {pending ? <span className="h-4 w-4 animate-spin rounded-full border border-on-ink border-t-transparent" aria-label="Envoi" /> : online ? `Payer ${formatFCFA(p.priceXof)}` : "Valider l'achat"}
+                {pending ? <span className="h-4 w-4 animate-spin rounded-full border border-on-ink border-t-transparent" aria-label="Envoi" /> : online ? `Payer ${formatFCFA(toPay)}` : "Valider l'achat"}
               </button>
               <Link href="/studio" className="mt-5 block text-center text-sm text-muted underline-offset-4 hover:text-ink hover:underline">Retour au studio</Link>
             </aside>

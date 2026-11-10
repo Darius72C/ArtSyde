@@ -78,7 +78,10 @@ export async function CreditPurchasesView({ searchParams }: { searchParams: Prom
                       <p className="font-semibold">{CREDIT_PACKS[p.pack].name}</p>
                       <p className="text-xs text-muted">{plural(p.credits, "crédit")}</p>
                     </td>
-                    <td className={`${td} whitespace-nowrap text-right tabular-nums`}>{formatFCFA(p.priceXof)}</td>
+                    <td className={`${td} whitespace-nowrap text-right tabular-nums`}>
+                      {formatFCFA(p.priceXof)}
+                      {p.paymentFeeXof > 0 && <span className="block text-xs text-muted">+ {formatFCFA(p.paymentFeeXof)} de frais</span>}
+                    </td>
                     <td className={td}>
                       {p.paymentStatus === "PAID" ? <StatusLabel tone="ok">Payé</StatusLabel> : <StatusLabel tone="new">En attente</StatusLabel>}
                       <p className="text-xs text-muted">

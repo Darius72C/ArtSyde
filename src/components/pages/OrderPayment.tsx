@@ -4,12 +4,14 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { PAYMENT_METHODS, PAYMENT_METHOD_IDS, type PaymentMethodId } from "@/lib/credits";
 import { checkOrderPayment, payOrderNow } from "@/server/payment-actions";
+import { paymentFee } from "@/lib/payment-fees";
+import { formatFCFA } from "@/lib/products";
 
 /**
  * An order still waiting for its payment, with online payment on. Back from GeniusPay (`returning`), it checks
  * the payment right away (a few tries while GeniusPay confirms); otherwise, or if it failed, "Payer maintenant".
  */
-export function OrderPayment({ reference, orderKey, returning, failed }: { reference: string; orderKey: string; returning: boolean; failed: boolean }) {
+export function OrderPayment({ reference, orderKey, amount, returning, failed }: { reference: string; orderKey: string; amount: number; returning: boolean; failed: boolean }) {
   const router = useRouter();
   const [state, setState] = useState<"checking" | "pending" | "failed" | "idle">(returning ? "checking" : failed ? "failed" : "idle");
   const [method, setMethod] = useState<PaymentMethodId>("WAVE");
@@ -61,12 +63,13 @@ export function OrderPayment({ reference, orderKey, returning, failed }: { refer
       <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Moyen de paiement">
         {PAYMENT_METHOD_IDS.map((k) => (
           <button key={k} type="button" role="radio" aria-checked={method === k} onClick={() => setMethod(k)} className={`rounded-xl border px-3 py-2.5 text-sm transition-colors ${method === k ? "border-accent font-medium shadow-[0_0_0_1px_var(--accent)]" : "border-line hover:border-muted"}`}>
-            {PAYMENT_METHODS[k]}
+            <span className="block">{PAYMENT_METHODS[k]}</span>
+            <span className="block text-xs font-normal tabular-nums text-muted">Frais {formatFCFA(paymentFee(amount, k))}</span>
           </button>
         ))}
       </div>
       <button type="button" onClick={pay} disabled={pending} className="btn mt-5">
-        {pending ? <span className="h-4 w-4 animate-spin rounded-full border border-on-ink border-t-transparent" aria-label="Ouverture du paiement" /> : "Payer maintenant"}
+        {pending ? <span className="h-4 w-4 animate-spin rounded-full border border-on-ink border-t-transparent" aria-label="Ouverture du paiement" /> : `Payer ${formatFCFA(amount + paymentFee(amount, method))}`}
       </button>
       {message && (
         <p role="alert" className="mt-3 text-sm text-danger">

@@ -20,7 +20,7 @@ async function Order({ params, searchParams }: PageProps<"/commande/[id]">) {
         order={order}
         payment={
           order && typeof k === "string" && onlinePaymentEnabled() ? (
-            <OrderPayment reference={order.reference} orderKey={k} returning={sp.paiement === "retour"} failed={sp.paiement === "echec" || order.payment === "FAILED"} />
+            <OrderPayment reference={order.reference} orderKey={k} amount={order.total - order.paymentFee} returning={sp.paiement === "retour"} failed={sp.paiement === "echec" || order.payment === "FAILED"} />
           ) : undefined
         }
       />

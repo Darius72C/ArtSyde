@@ -207,6 +207,8 @@ model CreditPurchase {
   pack          CreditPack
   credits       Int
   priceXof      Int
+  // Frais de l'opérateur de paiement, payés par le client en plus de priceXof (0 hors paiement en ligne).
+  paymentFeeXof Int           @default(0)
   paymentMethod String // "WAVE", "ORANGE_MONEY", "MTN", "MOOV"
   paymentStatus PaymentStatus @default(UNPAID)
   paymentRef    String?       @unique // identifiant de transaction du prestataire
@@ -299,6 +301,8 @@ model Order {
   // Code promo utilisé (en majuscules) et la remise qu'il a donnée sur les articles (déjà retirée du total).
   promoCode   String?
   discountXof Int            @default(0)
+  // Frais de l'opérateur de paiement, payés par le client en plus de totalXof (0 hors paiement en ligne).
+  paymentFeeXof Int          @default(0)
 
   paymentStatus PaymentStatus @default(UNPAID)
   paymentMethod String? // ex. "WAVE", "ORANGE_MONEY", "MTN", "MOOV", "CARD"

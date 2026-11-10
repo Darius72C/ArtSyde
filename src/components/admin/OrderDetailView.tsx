@@ -124,6 +124,8 @@ export async function OrderDetailView({ params }: { params: Promise<{ reference:
             {o.discountXof > 0 && <div className="flex justify-between"><dt className="text-muted">Code promo {o.promoCode}</dt><dd className="tabular-nums text-ok">-{formatFCFA(o.discountXof)}</dd></div>}
             <div className="flex justify-between"><dt className="text-muted">{DELIVERY_METHOD[o.delivery].label}</dt><dd className="tabular-nums">{o.deliveryXof ? formatFCFA(o.deliveryXof) : "Offert"}</dd></div>
             <div className="flex items-baseline justify-between border-t border-line pt-4"><dt className="font-semibold">Total</dt><dd className="display text-3xl tabular-nums">{formatFCFA(o.totalXof)}</dd></div>
+            {o.paymentFeeXof > 0 && <div className="flex justify-between"><dt className="text-muted">Frais opérateur payés par le client</dt><dd className="tabular-nums">{formatFCFA(o.paymentFeeXof)}</dd></div>}
+            {o.paymentFeeXof > 0 && <div className="flex justify-between"><dt className="text-muted">Payé sur GeniusPay</dt><dd className="tabular-nums">{formatFCFA(o.totalXof + o.paymentFeeXof)}</dd></div>}
           </dl>
         </FadeUp>
 
