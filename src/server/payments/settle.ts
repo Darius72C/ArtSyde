@@ -9,7 +9,7 @@ import { logActivity, logWarning, logError } from "@/server/log";
 import { allow } from "@/server/rate-limit";
 import { siteUrl } from "@/server/site";
 import { paymentFee } from "@/lib/payment-fees";
-import { GENIUS_METHOD, createPayment, failedStatus, geniusConfig, getPayment, paidStatus, sandbox, type GeniusPayment } from "./geniuspay";
+import { createPayment, internationalPhone, operatorRouting, failedStatus, geniusConfig, getPayment, paidStatus, sandbox, type GeniusPayment } from "./geniuspay";
 
 /*
  * Orders and credit purchases getting paid: by hand from the admin, or online through GeniusPay.
@@ -98,18 +98,16 @@ export async function payCreditPurchase(id: string, via: { by: "admin" } | { by:
 
 /* ---------- Online payment (GeniusPay) ---------- */
 
-/** Creates a GeniusPay payment, with the chosen operator if it takes it that way, else on its page where the customer picks. */
+/**
+ * Creates a GeniusPay payment with the operator chosen. No falling back to another one if it refuses: the fee
+ * charged is that operator's, and the customer must not land on a different one. The error reaches the journal.
+ */
 async function open(np: Parameters<typeof createPayment>[1]): Promise<GeniusPayment> {
   const cfg = geniusConfig()!;
   const site = siteUrl();
   // GeniusPay can only reach a public address: no webhook from a local computer (the return check covers it).
   if (!/localhost|127\.0\.0\.1/.test(site)) np.webhook_url = `${site}/api/geniuspay/webhook`;
-  try {
-    return await createPayment(cfg, np);
-  } catch (e) {
-    if (!np.payment_method) throw e;
-    return createPayment(cfg, { ...np, payment_method: undefined });
-  }
+  return createPayment(cfg, np);
 }
 
 export type StartResult = { ok: true; url: string } | { ok: false; message: string };
@@ -118,7 +116,7 @@ export type StartResult = { ok: true; url: string } | { ok: false; message: stri
 export async function startOrderPayment(orderId: string, method?: string): Promise<StartResult> {
   const cfg = geniusConfig();
   if (!cfg) return { ok: false, message: "Le paiement en ligne n'est pas encore disponible." };
-  const o = await db.order.findUnique({ where: { id: orderId }, select: { id: true, reference: true, totalXof: true, paymentMethod: true, customerName: true, customerEmail: true, status: true, paymentStatus: true } });
+  const o = await db.order.findUnique({ where: { id: orderId }, select: { id: true, reference: true, totalXof: true, paymentMethod: true, customerName: true, customerPhone: true, customerEmail: true, status: true, paymentStatus: true } });
   if (!o || o.status !== "PENDING_PAYMENT" || o.paymentStatus === "PAID") return { ok: false, message: "Cette commande n'attend plus de paiement." };
   const back = `${siteUrl()}${orderHref(o.reference, orderKey(o.id))}`;
   // The customer pays the operator's fee on top of the order (src/lib/payment-fees.ts).
@@ -128,8 +126,8 @@ export async function startOrderPayment(orderId: string, method?: string): Promi
       amount: o.totalXof + fee,
       currency: "XOF",
       description: `Commande ${o.reference} — ArtSyde`,
-      customer: { name: o.customerName, ...(o.customerEmail ? { email: o.customerEmail } : {}) },
-      payment_method: method ? GENIUS_METHOD[method] : undefined,
+      customer: { name: o.customerName, phone: internationalPhone(o.customerPhone), country: "CI", ...(o.customerEmail ? { email: o.customerEmail } : {}) },
+      ...operatorRouting(method ?? o.paymentMethod),
       success_url: `${back}&paiement=retour`,
       error_url: `${back}&paiement=echec`,
       metadata: { kind: "order", order: o.reference },
@@ -140,7 +138,7 @@ export async function startOrderPayment(orderId: string, method?: string): Promi
     return { ok: true, url: pay.url };
   } catch (e) {
     await logError("geniuspay.create", e, { order: o.reference });
-    return { ok: false, message: "Le paiement en ligne ne répond pas. Ta commande est enregistrée : réessaie dans un instant depuis son suivi." };
+    return { ok: false, message: "Ce moyen de paiement ne répond pas. Ta commande est enregistrée : réessaie dans un instant depuis son suivi, ou choisis-en un autre." };
   }
 }
 
@@ -157,8 +155,8 @@ export async function startCreditPayment(purchaseId: string, method?: string): P
       amount: p.priceXof + fee,
       currency: "XOF",
       description: `Crédits studio ArtSyde : pack ${CREDIT_PACKS[p.pack].name} (${p.credits} crédits)`,
-      customer: { name: p.customerName, ...(p.customerEmail ? { email: p.customerEmail } : {}) },
-      payment_method: method ? GENIUS_METHOD[method] : undefined,
+      customer: { name: p.customerName, phone: internationalPhone(p.customerPhone), country: "CI", ...(p.customerEmail ? { email: p.customerEmail } : {}) },
+      ...operatorRouting(method ?? p.paymentMethod),
       success_url: `${back}&paiement=retour`,
       error_url: `${back}&paiement=echec`,
       metadata: { kind: "credits", purchase: p.reference },
@@ -169,7 +167,7 @@ export async function startCreditPayment(purchaseId: string, method?: string): P
     return { ok: true, url: pay.url };
   } catch (e) {
     await logError("geniuspay.create", e, { purchase: p.reference });
-    return { ok: false, message: "Le paiement en ligne ne répond pas. Ton achat est enregistré : réessaie dans un instant." };
+    return { ok: false, message: "Ce moyen de paiement ne répond pas. Ton achat est enregistré : réessaie dans un instant, ou choisis-en un autre." };
   }
 }
 

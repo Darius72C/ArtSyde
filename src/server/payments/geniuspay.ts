@@ -37,15 +37,31 @@ export function sandbox(cfg: GeniusConfig) {
   return cfg.test || k.startsWith("pk_sandbox") || k.startsWith("pk_test") || k.includes("_sandbox_") || k.includes("_test_");
 }
 
-/** GeniusPay's payment_method for each way to pay the shop offers (src/lib/credits.ts PAYMENT_METHODS). */
-export const GENIUS_METHOD: Record<string, string> = { WAVE: "wave", ORANGE_MONEY: "orange_money", MTN: "mtn_money", MOOV: "moov_money" };
+/**
+ * How to ask GeniusPay for each way to pay the shop offers (src/lib/credits.ts PAYMENT_METHODS). Wave has its own
+ * gateway; the others go through PawaPay, which needs the operator's code, or the customer lands on the wrong one.
+ */
+const OPERATOR: Record<string, { payment_method: string; mmo_provider?: string }> = {
+  WAVE: { payment_method: "wave" },
+  ORANGE_MONEY: { payment_method: "pawapay", mmo_provider: "ORANGE_CIV" },
+  MTN: { payment_method: "pawapay", mmo_provider: "MTN_MOMO_CIV" },
+  MOOV: { payment_method: "pawapay", mmo_provider: "MOOV_CIV" },
+};
+export const operatorRouting = (method?: string | null) => (method ? OPERATOR[method] : undefined);
+
+/** A Côte d'Ivoire number in international format (+225 and its 10 digits), as PawaPay wants it. */
+export function internationalPhone(phone: string) {
+  const digits = phone.replace(/\D/g, "").replace(/^00/, "");
+  return digits.length > 10 && digits.startsWith("225") ? `+${digits}` : `+225${digits}`;
+}
 
 export type NewPayment = {
   amount: number; // XOF, 200 at least
   currency: "XOF";
   description: string;
-  customer?: { name?: string; email?: string };
+  customer?: { name?: string; email?: string; phone?: string; country?: string };
   payment_method?: string;
+  mmo_provider?: string; // the operator, with payment_method "pawapay"
   success_url: string;
   error_url: string;
   webhook_url?: string;
@@ -73,7 +89,8 @@ export function paymentIn(data: unknown): GeniusPayment | null {
     currency: String(p.currency ?? ""),
     status: String(p.status ?? "").toLowerCase(),
     environment: String(p.environment ?? ""),
-    url: String(p.checkout_url || p.payment_url || ""),
+    // With an operator chosen, payment_url is that operator's own page; without, both are GeniusPay's page.
+    url: String(p.payment_url || p.checkout_url || ""),
   };
 }
 
