@@ -41,12 +41,12 @@ export function sandbox(cfg: GeniusConfig) {
  * How to ask GeniusPay for each way to pay the shop offers (src/lib/credits.ts PAYMENT_METHODS). Wave has its own
  * gateway. Orange and MTN go through Paystack (PawaPay answers ACCOUNT_DEACTIVATED for now); Moov only has PawaPay.
  */
-const OPERATOR: Record<string, { payment_method: string; mmo_provider?: string }> = {
+const OPERATOR: Record<string, { payment_method: string; gateway?: string; mmo_provider?: string }> = {
   WAVE: { payment_method: "wave" },
   ORANGE_MONEY: { payment_method: "paystack" },
   MTN: { payment_method: "paystack" },
   MOOV: { payment_method: "pawapay", mmo_provider: "MOOV_CIV" },
-  CARD: { payment_method: "card" },
+  CARD: { payment_method: "card", gateway: "stripe" },
 };
 export const operatorRouting = (method?: string | null) => (method ? OPERATOR[method] : undefined);
 
@@ -62,6 +62,7 @@ export type NewPayment = {
   description: string;
   customer?: { name?: string; email?: string; phone?: string; country?: string };
   payment_method?: string;
+  gateway?: string; // forces one gateway (Intégrations > Gateways in the GeniusPay dashboard)
   mmo_provider?: string; // the operator, with payment_method "pawapay"
   success_url: string;
   error_url: string;
