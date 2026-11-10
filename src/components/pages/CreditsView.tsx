@@ -62,6 +62,8 @@ export function CreditsView({ initialPack = DEFAULT_PACK, online = false, return
       }
       // Online payment: off to GeniusPay's page (it brings the customer back here).
       if (r.payUrl) return window.location.assign(r.payUrl);
+      // The payment couldn't be opened with this operator: back to the form, to choose another.
+      if (r.payError) return setMessage(r.payError);
       setDone({ reference: r.reference, phone: fields.phone });
     });
   }

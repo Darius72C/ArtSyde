@@ -3,13 +3,13 @@ import Link from "next/link";
 import { PageShell } from "@/components/PageShell";
 import { Fact, InfoPage, InfoSection } from "@/components/pages/InfoPage";
 import { COMPANY, LEGAL_UPDATED, filled } from "@/lib/company";
-import { PAYMENT_METHODS } from "@/lib/credits";
+import { PAYMENT_METHODS, PAYMENT_METHOD_IDS } from "@/lib/credits";
 import { DELIVERY, DELIVERY_METHODS } from "@/lib/orders";
 import { formatFCFA } from "@/lib/products";
 
 export const metadata: Metadata = { title: "Conditions générales de vente — ArtSyde" };
 
-const methods = Object.values(PAYMENT_METHODS).join(", ");
+const methods = PAYMENT_METHOD_IDS.map((k) => PAYMENT_METHODS[k]).join(", ");
 
 export default function Page() {
   return (
