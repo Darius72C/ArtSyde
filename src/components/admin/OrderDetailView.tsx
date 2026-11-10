@@ -83,7 +83,7 @@ export async function OrderDetailView({ params }: { params: Promise<{ reference:
                   // eslint-disable-next-line @next/next/no-img-element -- a stored data URL
                   <img src={it.previewUrl} alt="Aperçu 3D de la création" width={220} height={220} className="aspect-square w-24 shrink-0 rounded-lg border border-line bg-sand object-cover" />
                 ) : (
-                  <ProductImage color={it.color} art={it.product?.art ?? undefined} className="aspect-[4/5] w-16 shrink-0" zoom={false} />
+                  <ProductImage color={it.color} art={it.product?.art ?? undefined} photo={it.product?.mockups[0]} alt={it.product?.name ?? ""} className="aspect-square w-24 shrink-0 rounded-lg" zoom={false} />
                 )}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-4">

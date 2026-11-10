@@ -34,6 +34,10 @@ const LINKS = [
   { href: "/#equipes", label: "Équipes" },
   { href: "/#aide", label: "Aide" },
 ];
+// public/icons/logo-header.png is 1.8 times wider than tall.
+const LOGO_WIDTH = 72;
+const LOGO_MASK = "url(/icons/logo-header.png) center / contain no-repeat";
+
 export function Header() {
   // usePathname is request data on dynamic routes → stream it; fallback renders the same bar.
   return (
@@ -93,8 +97,9 @@ function Bar({ path }: { path: string | null }) {
       className="nav-tone sticky top-0 z-50 border-b border-line/60 bg-[var(--nav)] text-ink backdrop-blur-xl backdrop-saturate-150 transition-[background-color,border-color,color] duration-500"
     >
       <nav className="mx-auto flex h-12 max-w-[1024px] items-center justify-between px-5">
-        <Link href="/" className="text-[15px] font-semibold tracking-[-0.03em]" aria-label="ArtSyde, accueil">
-          ArtSyde
+        <Link href="/" className="block" aria-label="ArtSyde, accueil">
+          {/* The logo as a mask: it takes the header's text colour, white on dark, black on light. */}
+          <span aria-hidden className="block h-[40px] bg-current" style={{ width: LOGO_WIDTH, WebkitMask: LOGO_MASK, mask: LOGO_MASK }} />
         </Link>
         <ul className="hidden items-center gap-9 md:flex">
           {LINKS.map((l) => (

@@ -91,7 +91,7 @@ export async function getOrder(reference: string) {
       customer: { select: { id: true, name: true, createdAt: true, _count: { select: { orders: true } } } },
       items: {
         include: {
-          product: { select: { name: true, art: true } },
+          product: { select: { name: true, art: true, mockups: true } },
           savedDesign: { select: { name: true } },
           customDesigns: { orderBy: { layer: "asc" } },
         },
