@@ -70,7 +70,7 @@ export default function Page() {
               <b>Pourquoi</b> : traiter et livrer tes commandes, te demander le paiement, gérer ton compte et tes crédits, répondre à tes messages, et respecter nos obligations légales et comptables. Nous ne vendons pas tes données et ne les utilisons pas pour de la publicité.
             </li>
             <li>
-              <b>Qui y a accès</b> : notre équipe, et nos prestataires techniques pour ce qui les concerne (hébergement du site, base de données Neon, stockage Cloudflare, connexion Google si tu la choisis).
+              <b>Qui y a accès</b> : notre équipe, et nos prestataires techniques pour ce qui les concerne (hébergement et mesure d&apos;audience Vercel, base de données Neon, stockage Cloudflare, e-mails Brevo, paiement GeniusPay, connexion Google si tu la choisis).
             </li>
             <li>
               <b>Combien de temps</b> : tant que ton compte est ouvert, puis le temps imposé par nos obligations légales (notamment comptables) pour les commandes.
