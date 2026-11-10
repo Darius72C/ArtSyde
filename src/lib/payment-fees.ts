@@ -3,10 +3,10 @@ import type { PaymentMethodId } from "@/lib/credits";
 /*
  * What GeniusPay keeps on a payment, per operator: the gateway's rate + GeniusPay's 1 % + 100 FCFA. From the
  * merchant dashboard (Intégrations > Gateways): Wave 1.5 %; Orange, MTN and Moov through PawaPay or Paystack
- * 3.5 %. If the gateways or their rates change there, change them here. In basis points: 250 = 2.5 %.
+ * 3.5 %; cards through Stripe or Paystack 5 %. If the gateways or their rates change there, change them here. In basis points: 250 = 2.5 %.
  */
 const FIXED_XOF = 100;
-const RATE_BPS: Record<PaymentMethodId, number> = { WAVE: 250, ORANGE_MONEY: 450, MTN: 450, MOOV: 450 };
+const RATE_BPS: Record<PaymentMethodId, number> = { WAVE: 250, ORANGE_MONEY: 450, MTN: 450, MOOV: 450, CARD: 600 };
 const HIGHEST_BPS = Math.max(...Object.values(RATE_BPS));
 
 /**

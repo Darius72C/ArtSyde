@@ -46,6 +46,7 @@ const OPERATOR: Record<string, { payment_method: string; mmo_provider?: string }
   ORANGE_MONEY: { payment_method: "paystack" },
   MTN: { payment_method: "paystack" },
   MOOV: { payment_method: "pawapay", mmo_provider: "MOOV_CIV" },
+  CARD: { payment_method: "card" },
 };
 export const operatorRouting = (method?: string | null) => (method ? OPERATOR[method] : undefined);
 

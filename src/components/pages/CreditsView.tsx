@@ -141,14 +141,14 @@ export function CreditsView({ initialPack = DEFAULT_PACK, online = false, return
                         </span>
                         <span className="flex-1">
                           <span className="block text-[17px] font-semibold">{PAYMENT_METHODS[k]}</span>
-                          <span className="text-sm tabular-nums text-muted">{online ? `Frais ${formatFCFA(paymentFee(p.priceXof, k))}` : "Mobile money"}</span>
+                          <span className="text-sm tabular-nums text-muted">{online ? `Frais ${formatFCFA(paymentFee(p.priceXof, k))}` : k === "CARD" ? "Visa, Mastercard" : "Mobile money"}</span>
                         </span>
                       </button>
                     );
                   })}
                 </div>
                 {online ? (
-                  <p className="mt-6 max-w-lg text-sm text-muted">Tu paies sur la page sécurisée de GeniusPay (carte bancaire aussi possible). Tes crédits arrivent dès que le paiement est confirmé.</p>
+                  <p className="mt-6 max-w-lg text-sm text-muted">Tu paies sur la page sécurisée de GeniusPay. Tes crédits arrivent dès que le paiement est confirmé.</p>
                 ) : (
                   <>
                     <p className="mt-6 text-[21px] font-semibold">Paiement en ligne bientôt disponible.</p>

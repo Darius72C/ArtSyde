@@ -51,7 +51,7 @@ export default function Page() {
         </InfoSection>
 
         <InfoSection title="5. Paiement">
-          <p>Le paiement se fait par mobile money ({methods}). Après ta commande, nous t&apos;envoyons une demande de paiement sur le numéro indiqué. Ta commande n&apos;est imprimée qu&apos;après réception du paiement.</p>
+          <p>Le paiement se fait par {methods}. Après ta commande, nous t&apos;envoyons une demande de paiement sur le numéro indiqué. Ta commande n&apos;est imprimée qu&apos;après réception du paiement.</p>
         </InfoSection>
 
         <InfoSection title="6. Créations du studio">

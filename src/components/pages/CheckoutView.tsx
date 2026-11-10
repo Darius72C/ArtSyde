@@ -205,7 +205,7 @@ export function CheckoutView({ online = false }: { online?: boolean }) {
                     );
                   })}
                 </div>
-                <p className="mt-2 max-w-lg text-sm text-muted">Tu paies sur la page sécurisée de GeniusPay (carte bancaire aussi possible), puis tu reviens au suivi de ta commande.</p>
+                <p className="mt-2 max-w-lg text-sm text-muted">Tu paies sur la page sécurisée de GeniusPay, puis tu reviens au suivi de ta commande.</p>
               </>
             ) : (
               <>
