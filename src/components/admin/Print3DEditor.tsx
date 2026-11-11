@@ -8,6 +8,7 @@ import { DUR, EASE, SPRING } from "@/lib/motion";
 import { DEFAULT_PLACEMENT, PRINT_SIDES, type Print3D, type PrintSide } from "@/lib/products";
 import { colorLabel } from "@/lib/admin/labels";
 import { presignPhoto, savePrint3d } from "@/server/admin/products";
+import { shrinkPrint } from "@/lib/printImages";
 
 const ProductTee3D = dynamic(() => import("../ProductTee3D"), { ssr: false, loading: () => <div className="h-full w-full animate-pulse rounded-[22px] bg-surface" /> });
 
@@ -37,10 +38,11 @@ export function Print3DEditor({ productId, initial, colors, configured }: { prod
   };
   const place = (key: "x" | "y" | "w", v: number) => current && change({ ...print, [side]: { ...current, [key]: v } });
 
-  async function upload(file: File | undefined) {
-    if (!file) return;
+  async function upload(picked: File | undefined) {
+    if (!picked) return;
     setUploading(true);
     setStatus(null);
+    const file = await shrinkPrint(picked);
     try {
       const signed = await presignPhoto(productId, { type: file.type, size: file.size }, "print");
       if (!signed.ok) throw new Error(signed.message);

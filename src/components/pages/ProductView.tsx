@@ -8,7 +8,8 @@ import { cart } from "@/lib/cart";
 import { available, defaultSize } from "@/lib/stock";
 import { flyToCart } from "@/lib/flyToCart";
 import { DELIVERY, DELIVERY_METHODS } from "@/lib/orders";
-import { formatFCFA, type Product } from "@/lib/products";
+import { PRINT_SIDES, formatFCFA, type Product } from "@/lib/products";
+import { loadPrint } from "@/lib/printImages";
 import { colorLabel } from "@/lib/admin/labels";
 import { DUR, EASE, SPRING } from "@/lib/motion";
 import { ProductImage } from "../ProductImage";
@@ -21,8 +22,10 @@ const MAX_QTY = 20; // same cap as the cart
 type View = "photos" | "mockup" | "3d";
 const VIEW_LABEL: Record<View, string> = { photos: "Photos", mockup: "Mockup", "3d": "3D" };
 const PICTURE: Record<View, string> = { photos: "photo", mockup: "mockup", "3d": "vue 3D" };
-// The 3D t-shirt loads only when its tab is opened (three.js stays out of the page's first load).
-const ProductTee3D = dynamic(() => import("../ProductTee3D"), { ssr: false, loading: () => <div className="h-full w-full animate-pulse bg-surface" /> });
+// three.js stays out of the page's first load: the 3D t-shirt (code, model, print images) is fetched
+// once the page is idle, so it's ready when its tab is opened.
+const loadTee3D = () => import("../ProductTee3D");
+const ProductTee3D = dynamic(loadTee3D, { ssr: false, loading: () => <div className="h-full w-full animate-pulse bg-surface" /> });
 
 /** A product's own page (/boutique/[slug]). `others` (the suggestions) come from the same catalogue. */
 export function ProductView({ product: p, others }: { product: Product; others: Product[] }) {
@@ -36,6 +39,12 @@ export function ProductView({ product: p, others }: { product: Product; others: 
   const art = useRef<HTMLDivElement>(null);
   const timer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(timer.current), []);
+  const printKey = PRINT_SIDES.map((s) => p.print3d[s]?.url ?? "").join("|");
+  useEffect(() => {
+    for (const url of printKey.split("|")) if (url) loadPrint(url);
+    const idle = window.requestIdleCallback ?? ((f: () => void) => window.setTimeout(f, 1500));
+    idle(() => void loadTee3D());
+  }, [printKey]);
 
   const pictures = view === "photos" ? p.photos : view === "mockup" ? p.flats : [];
   const picture = pictures[shown];

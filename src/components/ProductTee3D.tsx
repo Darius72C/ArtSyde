@@ -9,6 +9,7 @@ import { PRINT_SIDES, type Print3D, type PrintSide } from "@/lib/products";
 import { TEE_HEIGHT, TEE_WIDTH, canvasTexture, colorTrue, printMaterial, tintSheen, useTeeModel } from "./story/teeModel";
 import { TEE_ASPECT, teePath2D } from "./story/teeOutline";
 import { SoftShadow } from "./story/SoftShadow";
+import { loadPrint, loadedPrint } from "@/lib/printImages";
 
 /*
  * A product's t-shirt in 3D: the fabric in the chosen colour, with the front and back prints set in
@@ -31,23 +32,15 @@ function drawPrint(canvas: HTMLCanvasElement, img: HTMLImageElement | undefined,
   ctx.restore();
 }
 
-/** Loads the print images (with CORS, so WebGL may use them). A failed image just leaves its side blank. */
+/** The print images, from the page-wide cache (already loading since the product page opened). */
 function usePrintImages(print: Print3D) {
   const urls = PRINT_SIDES.map((s) => print[s]?.url).filter((u): u is string => Boolean(u));
   const key = urls.join("|");
-  const [images, setImages] = useState<Map<string, HTMLImageElement>>(() => new Map());
-  const requested = useRef(new Set<string>());
+  const [images, setImages] = useState<Map<string, HTMLImageElement>>(() => new Map(urls.flatMap((u) => (loadedPrint(u) ? [[u, loadedPrint(u)!]] : []))));
   useEffect(() => {
     // No cancel on re-run: an image already on its way still lands (setState after unmount is a no-op).
     for (const url of key ? key.split("|") : []) {
-      if (requested.current.has(url)) continue;
-      requested.current.add(url);
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.decoding = "async";
-      img.onload = () => setImages((m) => new Map(m).set(url, img));
-      img.onerror = () => requested.current.delete(url);
-      img.src = url;
+      loadPrint(url).then((img) => img && setImages((m) => (m.get(url) === img ? m : new Map(m).set(url, img))));
     }
   }, [key]);
   return images;
