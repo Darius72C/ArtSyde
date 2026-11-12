@@ -21,14 +21,15 @@ import { teeState } from "./story/teeState";
  * lands at the same spot. Other sizes widen or narrow the same model to that size's chest.
  */
 
-export type Mannequin = "homme-baggy" | "homme-parachute" | "homme-assis" | "femme-baggy" | "femme-cargo";
+export type Mannequin = "homme-baggy" | "homme-parachute" | "homme-assis" | "homme-cargo" | "femme-baggy" | "femme-cargo";
 // `y`: where the floor sits in the frame (a seated mannequin is shorter, so it sits higher).
-export const MANNEQUINS: { id: Mannequin; label: string; y: number }[] = [
-  { id: "homme-baggy", label: "Homme", y: -0.92 },
-  { id: "homme-parachute", label: "Homme · parachute", y: -0.92 },
-  { id: "homme-assis", label: "Homme · assis", y: -0.78 },
-  { id: "femme-baggy", label: "Femme", y: -0.88 },
-  { id: "femme-cargo", label: "Femme · cargo", y: -0.88 },
+export const MANNEQUINS: { id: Mannequin; gender: "homme" | "femme"; look: string; y: number }[] = [
+  { id: "homme-baggy", gender: "homme", look: "Baggy", y: -0.92 },
+  { id: "homme-parachute", gender: "homme", look: "Parachute", y: -0.92 },
+  { id: "homme-assis", gender: "homme", look: "Assis", y: -0.78 },
+  { id: "homme-cargo", gender: "homme", look: "Cargo", y: -0.92 },
+  { id: "femme-baggy", gender: "femme", look: "Baggy", y: -0.88 },
+  { id: "femme-cargo", gender: "femme", look: "Cargo", y: -0.88 },
 ];
 
 // Body chest by size (cm, common size charts); the models are made in L.
@@ -136,6 +137,7 @@ function Figure({ id, color, print, size, drag, studio }: { id: Mannequin; color
  */
 export default function MannequinTryOn({ color, print = NO_PRINT, size, studio, className = "" }: { color: string; print?: Print3D; size: string; studio?: StudioCanvases; className?: string }) {
   const [id, setId] = useState<Mannequin>("homme-baggy");
+  const current = MANNEQUINS.find((m) => m.id === id)!;
   const drag = useRef<Drag>({ rot: 0.35, active: false });
   const last = useRef(0);
 
@@ -157,10 +159,10 @@ export default function MannequinTryOn({ color, print = NO_PRINT, size, studio, 
         onPointerUp={() => (drag.current.active = false)}
         onPointerCancel={() => (drag.current.active = false)}
         role="img"
-        aria-label={`T-shirt porté par un mannequin (${MANNEQUINS.find((m) => m.id === id)?.label}), taille ${size}. Fais glisser pour le tourner.`}
+        aria-label={`T-shirt porté par un mannequin ${current.gender}, look ${current.look.toLowerCase()}, taille ${size}. Fais glisser pour le tourner.`}
       >
         <Safe3D>
-          <Canvas dpr={[1, 1.5]} camera={{ position: [0, 0.02, 4.3], fov: 30 }} gl={{ antialias: true, alpha: true }} onCreated={({ gl }) => colorTrue(gl)}>
+          <Canvas dpr={[1, 1.5]} camera={{ position: [0, -0.38, 5.1], fov: 30 }} gl={{ antialias: true, alpha: true }} onCreated={({ gl }) => colorTrue(gl)}>
             <ambientLight intensity={0.3} />
             <directionalLight position={[2.5, 4, 4]} intensity={1.6} />
             <directionalLight position={[-3, 2, 2]} intensity={0.5} />
@@ -176,18 +178,28 @@ export default function MannequinTryOn({ color, print = NO_PRINT, size, studio, 
           </Canvas>
         </Safe3D>
       </div>
-      <div className={`absolute inset-x-4 flex flex-wrap justify-center gap-x-5 gap-y-2 ${studio ? "bottom-14" : "top-4"}`} role="group" aria-label="Mannequin">
-        {MANNEQUINS.map((m) => (
-          <button
-            key={m.id}
-            type="button"
-            onClick={() => setId(m.id)}
-            aria-pressed={id === m.id}
-            className={`whitespace-nowrap border-b pb-1 text-[11px] tracking-[0.18em] uppercase transition-colors ${id === m.id ? "border-ink" : "border-transparent text-muted hover:text-ink"}`}
-          >
-            {m.label}
-          </button>
-        ))}
+      {/* The picker: Homme / Femme, then that mannequin's looks. At the bottom, above the hint. */}
+      <div className={`absolute inset-x-4 grid justify-items-center gap-2 bottom-14`}>
+        <div className="flex gap-1 rounded-full bg-bg/80 p-0.5 text-[12px]" role="group" aria-label="Mannequin">
+          {(["homme", "femme"] as const).map((g) => (
+            <button key={g} type="button" onClick={() => current.gender !== g && setId(MANNEQUINS.find((m) => m.gender === g)!.id)} aria-pressed={current.gender === g} className={`rounded-full px-3 py-1 transition-colors ${current.gender === g ? "bg-ink text-on-ink" : "text-muted hover:text-ink"}`}>
+              {g === "homme" ? "Homme" : "Femme"}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap justify-center gap-x-4 gap-y-1" role="group" aria-label="Look">
+          {MANNEQUINS.filter((m) => m.gender === current.gender).map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => setId(m.id)}
+              aria-pressed={id === m.id}
+              className={`whitespace-nowrap border-b pb-0.5 text-[11px] tracking-[0.18em] uppercase transition-colors ${id === m.id ? "border-ink" : "border-transparent text-muted hover:text-ink"}`}
+            >
+              {m.look}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
