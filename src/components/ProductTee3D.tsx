@@ -16,11 +16,11 @@ import { loadPrint, loadedPrint } from "@/lib/printImages";
  * the admin's "3D" tab. Drag to turn it. Used by the shop's product page and by the admin editor.
  */
 
-const PRINT_W = 1024;
-const PRINT_H = Math.round(PRINT_W / TEE_ASPECT);
+export const PRINT_W = 1024;
+export const PRINT_H = Math.round(PRINT_W / TEE_ASPECT);
 
 /** Draws one side's print on its canvas (transparent outside the image), cut to the tee's silhouette. */
-function drawPrint(canvas: HTMLCanvasElement, img: HTMLImageElement | undefined, p: Print3D[PrintSide]) {
+export function drawPrint(canvas: HTMLCanvasElement, img: HTMLImageElement | undefined, p: Print3D[PrintSide]) {
   const ctx = canvas.getContext("2d")!;
   ctx.clearRect(0, 0, PRINT_W, PRINT_H);
   if (!img || !p || !img.naturalWidth) return;
@@ -33,7 +33,7 @@ function drawPrint(canvas: HTMLCanvasElement, img: HTMLImageElement | undefined,
 }
 
 /** The print images, from the page-wide cache (already loading since the product page opened). */
-function usePrintImages(print: Print3D) {
+export function usePrintImages(print: Print3D) {
   const urls = PRINT_SIDES.map((s) => print[s]?.url).filter((u): u is string => Boolean(u));
   const key = urls.join("|");
   const [images, setImages] = useState<Map<string, HTMLImageElement>>(() => new Map(urls.flatMap((u) => (loadedPrint(u) ? [[u, loadedPrint(u)!]] : []))));

@@ -19,20 +19,22 @@ import { Suggestions } from "../Suggestions";
 const sectionTitle = "border-b border-line pb-4 text-[24px] font-semibold tracking-[-0.02em]";
 const MAX_QTY = 20; // same cap as the cart
 
-type View = "photos" | "mockup" | "3d";
-const VIEW_LABEL: Record<View, string> = { photos: "Photos", mockup: "Mockup", "3d": "3D" };
-const PICTURE: Record<View, string> = { photos: "photo", mockup: "mockup", "3d": "vue 3D" };
+type View = "photos" | "mockup" | "3d" | "worn";
+const VIEW_LABEL: Record<View, string> = { photos: "Photos", mockup: "Mockup", "3d": "3D", worn: "Porté" };
+const PICTURE: Record<View, string> = { photos: "photo", mockup: "mockup", "3d": "vue 3D", worn: "vue portée" };
 // three.js stays out of the page's first load: the 3D t-shirt (code, model, print images) is fetched
 // once the page is idle, so it's ready when its tab is opened.
 const loadTee3D = () => import("../ProductTee3D");
 const ProductTee3D = dynamic(loadTee3D, { ssr: false, loading: () => <div className="h-full w-full animate-pulse bg-surface" /> });
+// The "Porté" tab: the tee on a shop mannequin, in the size chosen on the page. Loaded only when opened.
+const MannequinTryOn = dynamic(() => import("../MannequinTryOn"), { ssr: false, loading: () => <div className="h-full w-full animate-pulse bg-surface" /> });
 
 /** A product's own page (/boutique/[slug]). `others` (the suggestions) come from the same catalogue. */
 export function ProductView({ product: p, others }: { product: Product; others: Product[] }) {
   const [color, setColor] = useState(p.colors[0]);
   const [size, setSize] = useState(() => defaultSize(p.stock, p.colors[0], p.sizes));
   const [qty, setQty] = useState(1);
-  const views: View[] = p.flats.length ? ["photos", "mockup", "3d"] : ["photos", "3d"];
+  const views: View[] = p.flats.length ? ["photos", "mockup", "3d", "worn"] : ["photos", "3d", "worn"];
   const [view, setView] = useState<View>("photos");
   const [shown, setShown] = useState(0); // which picture of the tab is large
   const [added, setAdded] = useState(false);
@@ -77,7 +79,7 @@ export function ProductView({ product: p, others }: { product: Product; others: 
       {/* On a phone: pictures, then the purchase panel, then the details. On desktop the panel sits on the right of both. */}
       {/* Bottom space: the suggestions bring their own; with none, the page keeps the usual pb-24. */}
       <div className={`grid items-start gap-14 lg:grid-cols-[1fr_400px] lg:gap-x-20 lg:gap-y-16 ${others.length ? "" : "pb-24"}`}>
-        {/* Pictures in tabs: Photos (the admin's photos, or the illustration in the chosen colour), Mockup (flat mockups, when there are some) and 3D. */}
+        {/* Pictures in tabs: Photos (the admin's photos, or the illustration in the chosen colour), Mockup (flat mockups, when there are some), 3D, and Porté (on a mannequin). */}
         <section aria-label="Images" className="lg:col-start-1">
           <LayoutGroup id="product-views">
             <div className="mb-4 flex w-fit rounded-full bg-surface p-1" role="tablist" aria-label="Voir le t-shirt">
@@ -92,7 +94,7 @@ export function ProductView({ product: p, others }: { product: Product; others: 
           <div ref={art} id="product-view" role="tabpanel" aria-labelledby={`view-${view}`} className="relative aspect-[4/5] overflow-hidden rounded-[22px] md:aspect-[5/4]" style={{ background: p.bg }}>
             <AnimatePresence initial={false}>
               <motion.div
-                key={view === "3d" ? "3d" : `${view}-${picture ?? color}`}
+                key={view === "3d" || view === "worn" ? view : `${view}-${picture ?? color}`}
                 className="absolute inset-0"
                 initial={{ opacity: 0, scale: 0.96 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -101,11 +103,14 @@ export function ProductView({ product: p, others }: { product: Product; others: 
               >
                 {view === "3d" ? (
                   <ProductTee3D color={color} print={p.print3d} className="h-full w-full" />
+                ) : view === "worn" ? (
+                  <MannequinTryOn color={color} print={p.print3d} size={size} className="h-full w-full" />
                 ) : (
                   <ProductImage color={color} art={p.art} photo={picture} alt={`${p.name}, ${PICTURE[view]} ${shown + 1}`} bg="transparent" className="h-full w-full" zoom={false} fit="contain" />
                 )}
               </motion.div>
             </AnimatePresence>
+            {view === "worn" && <p className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-bg/85 px-3 py-1 text-sm text-muted">Taille {size} · fais glisser pour tourner</p>}
             {view === "3d" && <p className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-bg/85 px-3 py-1 text-sm text-muted">Fais glisser pour tourner le t-shirt</p>}
           </div>
           {pictures.length > 1 && (
