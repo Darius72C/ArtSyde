@@ -20,11 +20,14 @@ import { PRINT_H, PRINT_W, drawPrint, usePrintImages } from "./ProductTee3D";
  * lands at the same spot. Other sizes widen or narrow the same model to that size's chest.
  */
 
-export type Mannequin = "homme-baggy" | "femme-baggy" | "femme-cargo";
-export const MANNEQUINS: { id: Mannequin; label: string }[] = [
-  { id: "homme-baggy", label: "Homme" },
-  { id: "femme-baggy", label: "Femme" },
-  { id: "femme-cargo", label: "Femme · cargo" },
+export type Mannequin = "homme-baggy" | "homme-parachute" | "homme-assis" | "femme-baggy" | "femme-cargo";
+// `y`: where the floor sits in the frame (a seated mannequin is shorter, so it sits higher).
+export const MANNEQUINS: { id: Mannequin; label: string; y: number }[] = [
+  { id: "homme-baggy", label: "Homme", y: -0.92 },
+  { id: "homme-parachute", label: "Homme · parachute", y: -0.92 },
+  { id: "homme-assis", label: "Homme · assis", y: -0.78 },
+  { id: "femme-baggy", label: "Femme", y: -0.88 },
+  { id: "femme-cargo", label: "Femme · cargo", y: -0.88 },
 ];
 
 // Body chest by size (cm, common size charts); the models are made in L.
@@ -105,7 +108,7 @@ function Figure({ id, color, print, size, drag }: { id: Mannequin; color: string
   });
 
   return (
-    <group ref={group} position={[0, -0.92, 0]}>
+    <group ref={group} position={[0, MANNEQUINS.find((m) => m.id === id)?.y ?? -0.92, 0]}>
       <primitive object={look.root} />
     </group>
   );
@@ -153,7 +156,7 @@ export default function MannequinTryOn({ color, print, size, className = "" }: {
           </Canvas>
         </Safe3D>
       </div>
-      <div className="absolute left-1/2 top-4 flex -translate-x-1/2 gap-5" role="group" aria-label="Mannequin">
+      <div className="absolute inset-x-4 top-4 flex flex-wrap justify-center gap-x-5 gap-y-2" role="group" aria-label="Mannequin">
         {MANNEQUINS.map((m) => (
           <button
             key={m.id}
