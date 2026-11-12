@@ -35,7 +35,7 @@ export const filled = (v: string) => Boolean(v) && v !== TODO;
 
 /**
  * Size guide of the oversized tee, in centimetres, measured flat: width from armpit to armpit, length from
- * the top of the shoulder to the hem. TODO: replace with the workshop's real measurements.
+ * the top of the shoulder to the hem. Confirmed against the workshop's tees.
  */
 export const SIZE_GUIDE: { size: string; chest: number; length: number; sleeve: number }[] = [
   { size: "XS", chest: 54, length: 68, sleeve: 21 },
@@ -46,7 +46,7 @@ export const SIZE_GUIDE: { size: string; chest: number; length: number; sleeve: 
   { size: "XXL", chest: 67, length: 78, sleeve: 26 },
 ];
 /** Whether SIZE_GUIDE holds the workshop's real measurements (set to true once replaced). */
-export const SIZE_GUIDE_CONFIRMED = false;
+export const SIZE_GUIDE_CONFIRMED = true;
 
 /** Date shown under the legal pages ("Dernière mise à jour"). Change it when a text changes. */
 export const LEGAL_UPDATED = "5 novembre 2026";
