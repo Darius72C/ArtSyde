@@ -9,7 +9,7 @@ export const COMPANY = {
   /** Trading name, as on the site. */
   brand: "ArtSyde",
   /** Legal name and form, e.g. "ArtSyde SARL" or the owner's name for a sole trader. */
-  legalName: TODO,
+  legalName: "Darrell Coulibaly",
   /** Registration number at the RCCM, e.g. "CI-ABJ-2026-B-12345". */
   rccm: TODO,
   /** Tax number (NCC / compte contribuable). */
@@ -19,15 +19,15 @@ export const COMPANY = {
   city: "Abidjan",
   country: "Côte d'Ivoire",
   email: TODO,
-  phone: TODO,
+  phone: "+225 07 02 88 84 56",
   /** WhatsApp Business: the shop's chat link (wa.me/message/… or wa.me/<number>), or "" for none. */
   whatsapp: "https://wa.me/message/X6J6AFAIGRTAC1",
   /** Opening hours of the workshop for pickup. */
   hours: TODO,
   /** Person responsible for the site's content (directeur de la publication). */
-  publisher: TODO,
+  publisher: "Darrell Coulibaly",
   /** Where the site is hosted (e.g. "Vercel Inc., 440 N Barranca Ave #4133, Covina, CA 91723, États-Unis"). */
-  host: TODO,
+  host: "Vercel Inc., 440 N Barranca Ave #4133, Covina, CA 91723, États-Unis",
 } as const;
 
 /** True once a value has been filled in. */
