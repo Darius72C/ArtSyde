@@ -23,6 +23,8 @@ import { teeSnapshot } from "../story/snapshot";
 import { zipFiles } from "@/lib/zip";
 import { embedTrace, protectImage, stampWatermark } from "@/lib/watermark";
 
+// "Porté": the design in progress on a shop mannequin, loaded only when chosen.
+const MannequinTryOn = dynamic(() => import("../MannequinTryOn"), { ssr: false, loading: () => <div className="absolute inset-0 m-auto h-px w-24 animate-pulse bg-ink/40" aria-hidden /> });
 const TeeScene = dynamic(() => import("../story/TeeScene"), {
   ssr: false,
   loading: () => <div className="absolute inset-0 m-auto h-px w-24 animate-pulse bg-ink/40" aria-hidden />,
@@ -273,6 +275,7 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
   const images = useRef(new Map<string, HTMLImageElement>());
   const [design, setDesign] = useState<Record<SideId, Side>>({ front: { images: [], text: DEFAULT_TEXT }, back: { images: [] } });
   const [side, setSide] = useState<SideId>("front");
+  const [worn, setWorn] = useState(false); // the stage shows the tee alone, or worn by a mannequin
   const [selected, setSelected] = useState<Layer | null>("text");
   const [tab, setTab] = useState<"couleur" | "image" | "texte">("texte");
   const [teeHex, setTeeHex] = useState<string>(TEE_COLORS[0].hex.toLowerCase());
@@ -736,12 +739,27 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
           onPointerUp={() => (spin.current = null)}
           onPointerLeave={() => (spin.current = null)}
         >
-          {canvases && <TeeScene front={canvases.front} back={canvases.back} preserve />}
+          {/* The tee scene stays mounted under the mannequin: saved designs and the cart take their picture from it. */}
+          <div className={worn ? "invisible absolute inset-0" : "contents"} aria-hidden={worn || undefined}>
+            {canvases && <TeeScene front={canvases.front} back={canvases.back} preserve />}
+          </div>
+          {worn && canvases && (
+            <div className="absolute inset-0">
+              <MannequinTryOn color={teeHex} size={size} studio={canvases} className="h-full w-full" />
+            </div>
+          )}
           <div className="absolute left-1/2 top-5 flex -translate-x-1/2 gap-6">
             {(["front", "back"] as const).map((s) => (
               <button key={s} onClick={() => flip(s)} aria-pressed={side === s} className={`relative pb-1.5 text-[11px] tracking-[0.2em] uppercase ${side === s ? "" : "text-muted"}`}>
                 {s === "front" ? "Devant" : "Dos"}
                 {side === s && <motion.span layoutId="side-line" className="absolute inset-x-0 bottom-0 h-px bg-ink" />}
+              </button>
+            ))}
+          </div>
+          <div className="absolute left-1/2 top-14 flex -translate-x-1/2 rounded-full bg-bg/80 p-0.5 text-[12px]" role="group" aria-label="Affichage">
+            {([false, true] as const).map((w) => (
+              <button key={String(w)} type="button" onClick={() => setWorn(w)} aria-pressed={worn === w} className={`rounded-full px-3 py-1 transition-colors ${worn === w ? "bg-ink text-on-ink" : "text-muted hover:text-ink"}`}>
+                {w ? "Porté" : "T-shirt"}
               </button>
             ))}
           </div>

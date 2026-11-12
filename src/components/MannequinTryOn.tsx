@@ -9,6 +9,7 @@ import { Safe3D } from "@/components/Safe3D";
 import { PRINT_SIDES, type Print3D } from "@/lib/products";
 import { canvasTexture, colorTrue } from "./story/teeModel";
 import { PRINT_H, PRINT_W, drawPrint, usePrintImages } from "./ProductTee3D";
+import { teeState } from "./story/teeState";
 
 /*
  * The product worn by a shop mannequin (the "Porté" tab of a product page).
@@ -54,8 +55,11 @@ const FRAG_BODY = `#include <map_fragment>
   diffuseColor.rgb = mix(mix(base, uSkin, skinM), fabric, teeM);`;
 
 type Drag = { rot: number; active: boolean };
+/** The studio's live print canvases: the mannequin then follows the studio (colour, turn, redraws) through teeState. */
+export type StudioCanvases = { front: HTMLCanvasElement; back: HTMLCanvasElement };
+const NO_PRINT: Print3D = {};
 
-function Figure({ id, color, print, size, drag }: { id: Mannequin; color: string; print: Print3D; size: string; drag: React.RefObject<Drag> }) {
+function Figure({ id, color, print, size, drag, studio }: { id: Mannequin; color: string; print: Print3D; size: string; drag: React.RefObject<Drag>; studio?: StudioCanvases }) {
   const { scene } = useGLTF(`/models/mannequins/${id}.glb`);
   const mask = useLoader(THREE.TextureLoader, `/models/mannequins/${id}-mask.webp`);
   const images = usePrintImages(print);
@@ -63,7 +67,7 @@ function Figure({ id, color, print, size, drag }: { id: Mannequin; color: string
 
   const look = useMemo(() => {
     Object.assign(mask, { flipY: false, needsUpdate: true }); // the mask follows the model's UVs, as glTF textures do
-    const canvases = { front: Object.assign(document.createElement("canvas"), { width: PRINT_W, height: PRINT_H }), back: Object.assign(document.createElement("canvas"), { width: PRINT_W, height: PRINT_H }) };
+    const canvases = studio ?? { front: Object.assign(document.createElement("canvas"), { width: PRINT_W, height: PRINT_H }), back: Object.assign(document.createElement("canvas"), { width: PRINT_W, height: PRINT_H }) };
     const textures = { front: canvasTexture(canvases.front), back: canvasTexture(canvases.back) };
     const uniforms = { uMask: { value: mask }, uTee: { value: new THREE.Color() }, uSkin: { value: new THREE.Color(SKIN) }, uPrintFront: { value: textures.front }, uPrintBack: { value: textures.back } };
     const root = scene.clone(true);
@@ -83,26 +87,37 @@ function Figure({ id, color, print, size, drag }: { id: Mannequin; color: string
       mesh.material = mat;
     });
     return { root, canvases, textures, uniforms };
-  }, [scene, mask]);
+  }, [scene, mask, studio]);
   useEffect(() => () => (look.textures.front.dispose(), look.textures.back.dispose()), [look]);
 
   useEffect(() => {
     look.uniforms.uTee.value.set(color);
   }, [look, color]);
   useEffect(() => {
+    if (studio) return; // the studio paints its own canvases
     for (const s of PRINT_SIDES) {
       drawPrint(look.canvases[s], print[s] ? images.get(print[s].url) : undefined, print[s]);
       Object.assign(look.textures[s], { needsUpdate: true }); // re-upload the redrawn canvas
     }
-  }, [look, print, images]);
+  }, [look, print, images, studio]);
 
   const gender = id.startsWith("homme") ? "homme" : "femme";
   const k = (CHEST[gender][size] ?? CHEST[gender].L) / CHEST[gender].L;
 
+  const seen = useRef(-1);
   useFrame((_, dt) => {
     const g = group.current;
     if (!g) return;
-    g.rotation.y += (drag.current.rot - g.rotation.y) * (1 - Math.exp(-dt * 6));
+    if (studio) {
+      if (seen.current !== teeState.texVersion) {
+        seen.current = teeState.texVersion;
+        Object.assign(look.textures.front, { needsUpdate: true });
+        Object.assign(look.textures.back, { needsUpdate: true });
+      }
+      if (teeState.hex) look.uniforms.uTee.value.lerp(new THREE.Color(teeState.hex), 1 - Math.exp(-dt * 6));
+    }
+    const target = studio ? teeState.rotY : drag.current.rot;
+    g.rotation.y += (target - g.rotation.y) * (1 - Math.exp(-dt * 6));
     g.scale.x += (k - g.scale.x) * (1 - Math.exp(-dt * 8));
     g.scale.z = g.scale.x;
   });
@@ -114,8 +129,12 @@ function Figure({ id, color, print, size, drag }: { id: Mannequin; color: string
   );
 }
 
-/** `size`: the size chosen on the product page (the mannequin widens to that size's chest). */
-export default function MannequinTryOn({ color, print, size, className = "" }: { color: string; print: Print3D; size: string; className?: string }) {
+/**
+ * `size`: the size chosen on the page (the mannequin widens to that size's chest).
+ * `studio`: the studio's print canvases; the studio's stage then turns the mannequin (teeState.rotY) and the
+ * mannequin picker sits at the bottom, under the studio's Devant / Dos.
+ */
+export default function MannequinTryOn({ color, print = NO_PRINT, size, studio, className = "" }: { color: string; print?: Print3D; size: string; studio?: StudioCanvases; className?: string }) {
   const [id, setId] = useState<Mannequin>("homme-baggy");
   const drag = useRef<Drag>({ rot: 0.35, active: false });
   const last = useRef(0);
@@ -125,6 +144,7 @@ export default function MannequinTryOn({ color, print, size, className = "" }: {
       <div
         className="h-full w-full touch-pan-y cursor-grab select-none active:cursor-grabbing"
         onPointerDown={(e) => {
+          if (studio) return; // the studio's stage turns it
           drag.current.active = true;
           last.current = e.clientX;
           e.currentTarget.setPointerCapture(e.pointerId);
@@ -151,12 +171,12 @@ export default function MannequinTryOn({ color, print, size, className = "" }: {
               <Lightformer intensity={0.8} position={[5, 0, 2]} scale={[3, 8, 1]} />
             </Environment>
             <Suspense fallback={null}>
-              <Figure key={id} id={id} color={color} print={print} size={size} drag={drag} />
+              <Figure key={id} id={id} color={color} print={print} size={size} drag={drag} studio={studio} />
             </Suspense>
           </Canvas>
         </Safe3D>
       </div>
-      <div className="absolute inset-x-4 top-4 flex flex-wrap justify-center gap-x-5 gap-y-2" role="group" aria-label="Mannequin">
+      <div className={`absolute inset-x-4 flex flex-wrap justify-center gap-x-5 gap-y-2 ${studio ? "bottom-14" : "top-4"}`} role="group" aria-label="Mannequin">
         {MANNEQUINS.map((m) => (
           <button
             key={m.id}
