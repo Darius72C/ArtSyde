@@ -30,7 +30,7 @@ export const MANNEQUINS: { id: Mannequin; gender: "homme" | "femme"; look: strin
   { id: "homme-cargo", gender: "homme", look: "Cargo", y: -0.92 },
   { id: "femme-baggy", gender: "femme", look: "Baggy", y: -0.88 },
   { id: "femme-cargo", gender: "femme", look: "Cargo", y: -0.88 },
-  { id: "femme-assis", gender: "femme", look: "Assise", y: -0.78 },
+  { id: "femme-assis", gender: "femme", look: "Assise", y: -0.6 },
 ];
 
 // Body chest by size (cm, common size charts); the models are made in L.
