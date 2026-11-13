@@ -21,9 +21,9 @@ import { teeState } from "./story/teeState";
  * lands at the same spot. Other sizes widen or narrow the same model to that size's chest.
  */
 
-export type Mannequin = "homme-baggy" | "homme-parachute" | "homme-assis" | "homme-cargo" | "femme-baggy" | "femme-cargo" | "femme-assis";
+export type Mannequin = "homme-baggy" | "homme-parachute" | "homme-assis" | "homme-cargo" | "femme-baggy" | "femme-cargo" | "femme-assis" | "duo";
 // `y`: where the floor sits in the frame (a seated mannequin is shorter, so it sits higher).
-export const MANNEQUINS: { id: Mannequin; gender: "homme" | "femme"; look: string; y: number }[] = [
+export const MANNEQUINS: { id: Mannequin; gender: "homme" | "femme" | "duo"; look: string; y: number }[] = [
   { id: "homme-baggy", gender: "homme", look: "Baggy", y: -0.92 },
   { id: "homme-parachute", gender: "homme", look: "Parachute", y: -0.92 },
   { id: "homme-assis", gender: "homme", look: "Assis", y: -0.78 },
@@ -31,6 +31,8 @@ export const MANNEQUINS: { id: Mannequin; gender: "homme" | "femme"; look: strin
   { id: "femme-baggy", gender: "femme", look: "Baggy", y: -0.88 },
   { id: "femme-cargo", gender: "femme", look: "Cargo", y: -0.88 },
   { id: "femme-assis", gender: "femme", look: "Assise", y: -0.6 },
+  // a man and a woman side by side, both in the tee (each with their own print area)
+  { id: "duo", gender: "duo", look: "Ensemble", y: -0.92 },
 ];
 
 // Body chest by size (cm, common size charts); the models are made in L.
@@ -77,7 +79,7 @@ function Figure({ id, color, print, size, drag, studio }: { id: Mannequin; color
   // Once this one shows, fetch the other looks of the same mannequin, so switching look is instant.
   useEffect(() => {
     const idle = window.requestIdleCallback ?? ((f: () => void) => window.setTimeout(f, 1200));
-    const gender = id.startsWith("homme") ? "homme" : "femme";
+    const gender = MANNEQUINS.find((m) => m.id === id)?.gender;
     idle(() => MANNEQUINS.filter((m) => m.gender === gender && m.id !== id).forEach((m) => preloadMannequin(m.id)));
   }, [id]);
   const images = usePrintImages(print);
@@ -119,7 +121,8 @@ function Figure({ id, color, print, size, drag, studio }: { id: Mannequin; color
     }
   }, [look, print, images, studio]);
 
-  const gender = id.startsWith("homme") ? "homme" : "femme";
+  const g = MANNEQUINS.find((m) => m.id === id)?.gender;
+  const gender = g === "femme" ? "femme" : "homme"; // the duo widens like the man's sizes
   const k = (CHEST[gender][size] ?? CHEST[gender].L) / CHEST[gender].L;
 
   const seen = useRef(-1);
@@ -176,7 +179,7 @@ export default function MannequinTryOn({ color, print = NO_PRINT, size, studio, 
         onPointerUp={() => (drag.current.active = false)}
         onPointerCancel={() => (drag.current.active = false)}
         role="img"
-        aria-label={`T-shirt porté par un mannequin ${current.gender}, look ${current.look.toLowerCase()}, taille ${size}. Fais glisser pour le tourner.`}
+        aria-label={`T-shirt porté par ${current.gender === "duo" ? "deux mannequins, homme et femme" : `un mannequin ${current.gender}, look ${current.look.toLowerCase()}`}, taille ${size}. Fais glisser pour le tourner.`}
       >
         <Safe3D>
           <Canvas dpr={[1, 1.5]} camera={{ position: [0, -0.38, 5.1], fov: 30 }} gl={{ antialias: true, alpha: true }} onCreated={({ gl }) => colorTrue(gl)}>
@@ -195,12 +198,12 @@ export default function MannequinTryOn({ color, print = NO_PRINT, size, studio, 
           </Canvas>
         </Safe3D>
       </div>
-      {/* The picker: Homme / Femme, then that mannequin's looks. At the bottom, above the hint. */}
+      {/* The picker: Homme / Femme / Duo, then that choice's looks. At the bottom, above the hint. */}
       <div className={`absolute inset-x-4 grid justify-items-center gap-2 bottom-14`}>
         <div className="flex gap-1 rounded-full bg-bg/80 p-0.5 text-[12px]" role="group" aria-label="Mannequin">
-          {(["homme", "femme"] as const).map((g) => (
+          {(["homme", "femme", "duo"] as const).map((g) => (
             <button key={g} type="button" onClick={() => current.gender !== g && setId(MANNEQUINS.find((m) => m.gender === g)!.id)} aria-pressed={current.gender === g} className={`rounded-full px-3 py-1 transition-colors ${current.gender === g ? "bg-ink text-on-ink" : "text-muted hover:text-ink"}`}>
-              {g === "homme" ? "Homme" : "Femme"}
+              {g === "homme" ? "Homme" : g === "femme" ? "Femme" : "Duo"}
             </button>
           ))}
         </div>
