@@ -72,7 +72,7 @@ export type StudioCanvases = { front: HTMLCanvasElement; back: HTMLCanvasElement
 const NO_PRINT: Print3D = {};
 
 // Bump MODELS_V when the files change: browsers and the service worker keep the old ones otherwise.
-const MODELS_V = 7;
+const MODELS_V = 8;
 const modelUrl = (id: Mannequin) => `/models/mannequins/${id}.glb?v=${MODELS_V}`;
 const maskUrl = (id: Mannequin) => `/models/mannequins/${id}-mask.webp?v=${MODELS_V}`;
 /** Starts downloading a mannequin (model + mask) so it shows at once when asked for. */
