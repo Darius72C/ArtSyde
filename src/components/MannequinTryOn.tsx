@@ -183,13 +183,15 @@ function CameraRig({ view }: { view: React.RefObject<View> }) {
  * `studio`: the studio's print canvases; the studio's stage then turns the mannequin (teeState.rotY) and the
  * mannequin picker sits at the bottom, under the studio's Devant / Dos.
  */
-export default function MannequinTryOn({ color, print = NO_PRINT, size, studio, className = "" }: { color: string; print?: Print3D; size: string; studio?: StudioCanvases; className?: string }) {
+/** `onZoomChange`: told when the view gets zoomed or back to whole (e.g. to change a hint around it). */
+export default function MannequinTryOn({ color, print = NO_PRINT, size, studio, className = "", onZoomChange }: { color: string; print?: Print3D; size: string; studio?: StudioCanvases; className?: string; onZoomChange?: (zoomed: boolean) => void }) {
   const [id, setId] = useState<Mannequin>("homme-baggy");
   const current = MANNEQUINS.find((m) => m.id === id)!;
   const drag = useRef<Drag>({ rot: 0.35, active: false });
   const last = useRef(0);
   const view = useRef<View>({ target: 1, focusY: 0.4, panX: 0, panY: 0 });
   const [zoomed, setZoomed] = useState(false);
+  useEffect(() => onZoomChange?.(zoomed), [zoomed, onZoomChange]);
   // Moving the zoomed view: kept so the mannequin never leaves the frame.
   const panBy = useCallback((dx: number, dy: number, height: number) => {
     const v = view.current;

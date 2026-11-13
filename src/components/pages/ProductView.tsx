@@ -38,6 +38,7 @@ export function ProductView({ product: p, others }: { product: Product; others: 
   const [qty, setQty] = useState(1);
   const views: View[] = p.flats.length ? ["photos", "mockup", "3d", "worn"] : ["photos", "3d", "worn"];
   const [view, setView] = useState<View>("photos");
+  const [wornZoomed, setWornZoomed] = useState(false); // the "Porté" view is zoomed: dragging moves it instead of turning
   const [shown, setShown] = useState(0); // which picture of the tab is large
   const [added, setAdded] = useState(false);
   const art = useRef<HTMLDivElement>(null);
@@ -106,13 +107,13 @@ export function ProductView({ product: p, others }: { product: Product; others: 
                 {view === "3d" ? (
                   <ProductTee3D color={color} print={p.print3d} className="h-full w-full" />
                 ) : view === "worn" ? (
-                  <MannequinTryOn color={color} print={p.print3d} size={size} className="h-full w-full" />
+                  <MannequinTryOn color={color} print={p.print3d} size={size} className="h-full w-full" onZoomChange={setWornZoomed} />
                 ) : (
                   <ProductImage color={color} art={p.art} photo={picture} alt={`${p.name}, ${PICTURE[view]} ${shown + 1}`} bg="transparent" className="h-full w-full" zoom={false} fit="contain" />
                 )}
               </motion.div>
             </AnimatePresence>
-            {view === "worn" && <p className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-bg/85 px-3 py-1 text-sm text-muted">Taille {size} · fais glisser pour tourner</p>}
+            {view === "worn" && <p className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-bg/85 px-3 py-1 text-sm text-muted">Taille {size} · {wornZoomed ? "fais glisser pour te déplacer" : "fais glisser pour tourner"}</p>}
             {view === "3d" && <p className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-bg/85 px-3 py-1 text-sm text-muted">Fais glisser pour tourner le t-shirt</p>}
           </div>
           {pictures.length > 1 && (
