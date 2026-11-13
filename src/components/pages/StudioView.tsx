@@ -576,8 +576,8 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
   // The "Annuler" countdown.
   useEffect(() => {
     if (!undo) return;
-    if (undo.left <= 0) return setUndo(null);
-    const t = setTimeout(() => setUndo((u) => (u ? { ...u, left: u.left - 1 } : u)), 1000);
+    // one second later: count down, or close the offer once the last second has passed
+    const t = setTimeout(() => setUndo((u) => (u && u.left > 1 ? { ...u, left: u.left - 1 } : null)), 1000);
     return () => clearTimeout(t);
   }, [undo]);
 
