@@ -5,3 +5,9 @@
  */
 export type TeeFace = "front" | "back";
 export const teeSnapshot: { current: ((width: number, face?: TeeFace) => Promise<Blob | null>) | null } = { current: null };
+
+/**
+ * Same for the studio's "Porté" view: renders the mannequin chosen there (wearing the design), straight on,
+ * front or back, unzoomed, at a chosen width. Set by MannequinTryOn while it is mounted in the studio.
+ */
+export const wornSnapshot: { current: ((width: number, face: TeeFace) => Promise<Blob | null>) | null } = { current: null };

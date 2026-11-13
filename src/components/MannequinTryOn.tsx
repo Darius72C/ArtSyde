@@ -10,6 +10,7 @@ import { PRINT_SIDES, type Print3D } from "@/lib/products";
 import { canvasTexture, colorTrue } from "./story/teeModel";
 import { PRINT_H, PRINT_W, drawPrint, usePrintImages } from "./ProductTee3D";
 import { teeState } from "./story/teeState";
+import { wornSnapshot } from "./story/snapshot";
 
 /*
  * The product worn by a shop mannequin (the "Porté" tab of a product page).
@@ -157,10 +158,46 @@ function Figure({ id, color, print, size, drag, studio, onFocus }: { id: Mannequ
   });
 
   return (
-    <group ref={group} position={[0, MANNEQUINS.find((m) => m.id === id)?.y ?? -0.92, 0]}>
+    <group ref={group} name="mannequin-pose" position={[0, MANNEQUINS.find((m) => m.id === id)?.y ?? -0.92, 0]}>
       <primitive object={look.root} />
     </group>
   );
+}
+
+/**
+ * The studio's download of the worn view: the mannequin straight on (front or back), unzoomed, at the asked
+ * width, on a transparent background. The pose and camera are put back right after the frame.
+ */
+function WornSnapshot() {
+  const get = useThree((st) => st.get);
+  useEffect(() => {
+    wornSnapshot.current = (width, face) => {
+      const { gl, scene, camera, size } = get();
+      const pose = scene.getObjectByName("mannequin-pose");
+      const rot = pose?.rotation.y ?? 0;
+      const cam = camera.position.clone();
+      if (pose) pose.rotation.y = face === "back" ? Math.PI : 0;
+      camera.position.set(0, CAM_Y, CAM_Z);
+      const max = gl.capabilities.maxTextureSize;
+      const scale = Math.min(1, max / Math.max(width, (width * size.height) / size.width));
+      const w = Math.round(width * scale);
+      const h = Math.round(((width * size.height) / size.width) * scale);
+      const ratio = gl.getPixelRatio();
+      gl.setPixelRatio(1);
+      gl.setSize(w, h, false);
+      gl.render(scene, camera);
+      if (pose) pose.rotation.y = rot;
+      camera.position.copy(cam);
+      return new Promise<Blob | null>((resolve) => {
+        gl.domElement.toBlob(resolve, "image/png"); // the pixels are captured now, encoded afterwards
+        gl.setPixelRatio(ratio);
+        gl.setSize(size.width, size.height, false);
+        gl.render(scene, camera);
+      });
+    };
+    return () => void (wornSnapshot.current = null);
+  }, [get]);
+  return null;
 }
 
 /** Moves the camera with the zoom: closer, and up to the chest, looking straight ahead. */
@@ -307,7 +344,7 @@ export default function MannequinTryOn({ color, print = NO_PRINT, size, studio, 
         aria-label={`T-shirt porté par ${current.gender === "duo" ? "deux mannequins, homme et femme" : `un mannequin ${current.gender}, look ${current.look.toLowerCase()}`}, taille ${size}. Fais glisser pour le tourner, pince pour zoomer ; zoomé, deux doigts pour te déplacer.`}
       >
         <Safe3D>
-          <Canvas dpr={[1, 1.5]} camera={{ position: [0, CAM_Y, CAM_Z], fov: 30 }} gl={{ antialias: true, alpha: true }} onCreated={({ gl }) => colorTrue(gl)}>
+          <Canvas dpr={[1, 1.5]} camera={{ position: [0, CAM_Y, CAM_Z], fov: 30 }} gl={{ antialias: true, alpha: true, preserveDrawingBuffer: !!studio }} onCreated={({ gl }) => colorTrue(gl)}>
             <ambientLight intensity={0.3} />
             <directionalLight position={[2.5, 4, 4]} intensity={1.6} />
             <directionalLight position={[-3, 2, 2]} intensity={0.5} />
@@ -318,6 +355,7 @@ export default function MannequinTryOn({ color, print = NO_PRINT, size, studio, 
               <Lightformer intensity={0.8} position={[5, 0, 2]} scale={[3, 8, 1]} />
             </Environment>
             <CameraRig view={view} />
+            {studio && <WornSnapshot />}
             <Suspense fallback={null}>
               <Figure key={id} id={id} color={color} print={print} size={size} drag={drag} studio={studio} onFocus={onFocus} />
             </Suspense>
