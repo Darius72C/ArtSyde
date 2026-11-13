@@ -59,8 +59,12 @@ const FRAG_BODY = `#include <map_fragment>
   diffuseColor.rgb = mix(mix(base, uSkin, skinM), fabric, teeM);`;
 
 type Drag = { rot: number; active: boolean };
-/** Zoom: `target` is set by the gestures (the camera follows it smoothly); `focusY` is the chest of the shown mannequin. */
-type View = { target: number; focusY: number };
+/**
+ * Zoom: `target` is set by the gestures (the camera follows it smoothly); `focusY` is the chest of the shown
+ * mannequin; `panX` / `panY` move the zoomed view (metres, back to 0 when the zoom is undone).
+ */
+type View = { target: number; focusY: number; panX: number; panY: number };
+const HALF_FOV = Math.tan((30 / 2) * (Math.PI / 180));
 const CAM_Y = -0.38, CAM_Z = 5.1, ZOOM_MAX = 2.8;
 const clampZoom = (z: number) => Math.min(ZOOM_MAX, Math.max(1, z));
 /** The studio's live print canvases: the mannequin then follows the studio (colour, turn, redraws) through teeState. */
@@ -68,7 +72,7 @@ export type StudioCanvases = { front: HTMLCanvasElement; back: HTMLCanvasElement
 const NO_PRINT: Print3D = {};
 
 // Bump MODELS_V when the files change: browsers and the service worker keep the old ones otherwise.
-const MODELS_V = 6;
+const MODELS_V = 7;
 const modelUrl = (id: Mannequin) => `/models/mannequins/${id}.glb?v=${MODELS_V}`;
 const maskUrl = (id: Mannequin) => `/models/mannequins/${id}-mask.webp?v=${MODELS_V}`;
 /** Starts downloading a mannequin (model + mask) so it shows at once when asked for. */
@@ -162,12 +166,14 @@ function Figure({ id, color, print, size, drag, studio, onFocus }: { id: Mannequ
 /** Moves the camera with the zoom: closer, and up to the chest, looking straight ahead. */
 function CameraRig({ view }: { view: React.RefObject<View> }) {
   const camera = useThree((st) => st.camera);
-  const zoom = useRef(1); // follows view.target smoothly
+  const cur = useRef({ zoom: 1, x: 0, y: 0 }); // follows the view smoothly
   useFrame((_, dt) => {
-    const v = view.current;
-    zoom.current += (v.target - zoom.current) * (1 - Math.exp(-dt * 8));
-    const t = (zoom.current - 1) / (ZOOM_MAX - 1);
-    camera.position.set(0, CAM_Y + (v.focusY - CAM_Y) * t, CAM_Z / zoom.current);
+    const v = view.current, c = cur.current, k = 1 - Math.exp(-dt * 10);
+    c.zoom += (v.target - c.zoom) * k;
+    c.x += (v.panX - c.x) * k;
+    c.y += (v.panY - c.y) * k;
+    const t = (c.zoom - 1) / (ZOOM_MAX - 1);
+    camera.position.set(c.x, CAM_Y + (v.focusY - CAM_Y) * t + c.y, CAM_Z / c.zoom);
   });
   return null;
 }
@@ -182,22 +188,36 @@ export default function MannequinTryOn({ color, print = NO_PRINT, size, studio, 
   const current = MANNEQUINS.find((m) => m.id === id)!;
   const drag = useRef<Drag>({ rot: 0.35, active: false });
   const last = useRef(0);
-  const view = useRef<View>({ target: 1, focusY: 0.4 });
+  const view = useRef<View>({ target: 1, focusY: 0.4, panX: 0, panY: 0 });
   const [zoomed, setZoomed] = useState(false);
+  // Moving the zoomed view: kept so the mannequin never leaves the frame.
+  const panBy = useCallback((dx: number, dy: number, height: number) => {
+    const v = view.current;
+    const perPx = (2 * (CAM_Z / v.target) * HALF_FOV) / Math.max(1, height);
+    v.panX = Math.min(0.7, Math.max(-0.7, v.panX - dx * perPx));
+    v.panY = Math.min(0.6, Math.max(-1.2, v.panY + dy * perPx));
+  }, []);
   const zoomTo = useCallback((z: number) => {
-    view.current.target = clampZoom(z);
-    setZoomed(view.current.target > 1.05);
+    const v = view.current;
+    v.target = clampZoom(z);
+    if (v.target <= 1.05) Object.assign(v, { target: 1, panX: 0, panY: 0 });
+    setZoomed(v.target > 1.05);
   }, []);
   const onFocus = useCallback((y: number) => {
     view.current.focusY = y;
   }, []);
   // Two fingers on the mannequin: pinch to zoom (one finger still turns it).
   const pointers = useRef(new Map<number, { x: number; y: number }>());
-  const pinch = useRef<{ dist: number; zoom: number } | null>(null);
+  const pinch = useRef<{ dist: number; zoom: number; mid: { x: number; y: number } } | null>(null);
   const spread = () => {
     const [a, b] = [...pointers.current.values()];
     return Math.hypot(a.x - b.x, a.y - b.y);
   };
+  const middle = () => {
+    const [a, b] = [...pointers.current.values()];
+    return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  };
+  const panFrom = useRef<{ x: number; y: number } | null>(null); // one finger / the mouse, while zoomed
   // Trackpad pinch (or Ctrl + wheel) zooms; a plain wheel still scrolls the page.
   const area = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -216,23 +236,46 @@ export default function MannequinTryOn({ color, print = NO_PRINT, size, studio, 
     <div className={`relative ${className}`}>
       <div
         ref={area}
-        className="h-full w-full touch-pan-y cursor-grab select-none active:cursor-grabbing"
+        className={`h-full w-full select-none ${zoomed ? "touch-none cursor-move" : "touch-pan-y cursor-grab active:cursor-grabbing"}`}
         onPointerDown={(e) => {
           pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          try {
+            e.currentTarget.setPointerCapture(e.pointerId); // keep the moves even if the finger leaves the area
+          } catch {
+            // the pointer is already gone (e.g. a very quick tap): nothing to keep
+          }
           if (pointers.current.size === 2) {
-            pinch.current = { dist: spread(), zoom: view.current.target };
+            pinch.current = { dist: spread(), zoom: view.current.target, mid: middle() };
             drag.current.active = false;
+            panFrom.current = null;
+            e.stopPropagation(); // not a turn of the studio's stage
+            return;
+          }
+          if (view.current.target > 1.05) {
+            // zoomed: one finger (or the mouse) moves the view; − or a double-click to turn it again
+            panFrom.current = { x: e.clientX, y: e.clientY };
+            e.stopPropagation();
             return;
           }
           if (studio) return; // the studio's stage turns it
           drag.current.active = true;
           last.current = e.clientX;
-          e.currentTarget.setPointerCapture(e.pointerId);
         }}
         onPointerMove={(e) => {
           if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          const h = e.currentTarget.clientHeight;
           if (pinch.current && pointers.current.size === 2) {
+            e.stopPropagation();
             zoomTo((pinch.current.zoom * spread()) / Math.max(1, pinch.current.dist));
+            const m = middle();
+            panBy(m.x - pinch.current.mid.x, m.y - pinch.current.mid.y, h);
+            pinch.current.mid = m;
+            return;
+          }
+          if (panFrom.current) {
+            e.stopPropagation();
+            panBy(e.clientX - panFrom.current.x, e.clientY - panFrom.current.y, h);
+            panFrom.current = { x: e.clientX, y: e.clientY };
             return;
           }
           if (!drag.current.active) return;
@@ -242,16 +285,18 @@ export default function MannequinTryOn({ color, print = NO_PRINT, size, studio, 
         onPointerUp={(e) => {
           pointers.current.delete(e.pointerId);
           if (pointers.current.size < 2) pinch.current = null;
+          panFrom.current = null;
           drag.current.active = false;
         }}
         onPointerCancel={(e) => {
           pointers.current.delete(e.pointerId);
           pinch.current = null;
+          panFrom.current = null;
           drag.current.active = false;
         }}
         onDoubleClick={() => zoomTo(view.current.target > 1.05 ? 1 : 2.2)}
         role="img"
-        aria-label={`T-shirt porté par ${current.gender === "duo" ? "deux mannequins, homme et femme" : `un mannequin ${current.gender}, look ${current.look.toLowerCase()}`}, taille ${size}. Fais glisser pour le tourner, pince pour zoomer.`}
+        aria-label={`T-shirt porté par ${current.gender === "duo" ? "deux mannequins, homme et femme" : `un mannequin ${current.gender}, look ${current.look.toLowerCase()}`}, taille ${size}. Fais glisser pour le tourner, pince pour zoomer ; zoomé, fais glisser pour te déplacer.`}
       >
         <Safe3D>
           <Canvas dpr={[1, 1.5]} camera={{ position: [0, CAM_Y, CAM_Z], fov: 30 }} gl={{ antialias: true, alpha: true }} onCreated={({ gl }) => colorTrue(gl)}>
