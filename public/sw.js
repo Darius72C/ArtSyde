@@ -5,7 +5,7 @@
  * - Never cached: the API, the admin, sign-in, the cart and checkout, accounts (always fresh and private).
  * Bump VERSION to drop every old cache on the next visit.
  */
-const VERSION = "v2";
+const VERSION = "v3";
 const STATIC = `artsyde-static-${VERSION}`;
 const PAGES = `artsyde-pages-${VERSION}`;
 const OFFLINE = "/hors-ligne";

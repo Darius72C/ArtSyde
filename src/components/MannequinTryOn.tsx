@@ -21,7 +21,7 @@ import { teeState } from "./story/teeState";
  * lands at the same spot. Other sizes widen or narrow the same model to that size's chest.
  */
 
-export type Mannequin = "homme-baggy" | "homme-parachute" | "homme-assis" | "homme-cargo" | "femme-baggy" | "femme-cargo";
+export type Mannequin = "homme-baggy" | "homme-parachute" | "homme-assis" | "homme-cargo" | "femme-baggy" | "femme-cargo" | "femme-assis";
 // `y`: where the floor sits in the frame (a seated mannequin is shorter, so it sits higher).
 export const MANNEQUINS: { id: Mannequin; gender: "homme" | "femme"; look: string; y: number }[] = [
   { id: "homme-baggy", gender: "homme", look: "Baggy", y: -0.92 },
@@ -30,6 +30,7 @@ export const MANNEQUINS: { id: Mannequin; gender: "homme" | "femme"; look: strin
   { id: "homme-cargo", gender: "homme", look: "Cargo", y: -0.92 },
   { id: "femme-baggy", gender: "femme", look: "Baggy", y: -0.88 },
   { id: "femme-cargo", gender: "femme", look: "Cargo", y: -0.88 },
+  { id: "femme-assis", gender: "femme", look: "Assise", y: -0.78 },
 ];
 
 // Body chest by size (cm, common size charts); the models are made in L.
@@ -60,8 +61,10 @@ type Drag = { rot: number; active: boolean };
 export type StudioCanvases = { front: HTMLCanvasElement; back: HTMLCanvasElement };
 const NO_PRINT: Print3D = {};
 
-const modelUrl = (id: Mannequin) => `/models/mannequins/${id}.glb`;
-const maskUrl = (id: Mannequin) => `/models/mannequins/${id}-mask.webp`;
+// Bump MODELS_V when the files change: browsers and the service worker keep the old ones otherwise.
+const MODELS_V = 3;
+const modelUrl = (id: Mannequin) => `/models/mannequins/${id}.glb?v=${MODELS_V}`;
+const maskUrl = (id: Mannequin) => `/models/mannequins/${id}-mask.webp?v=${MODELS_V}`;
 /** Starts downloading a mannequin (model + mask) so it shows at once when asked for. */
 export function preloadMannequin(id: Mannequin = "homme-baggy") {
   useGLTF.preload(modelUrl(id));
