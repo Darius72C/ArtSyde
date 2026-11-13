@@ -1,8 +1,8 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { Canvas, useFrame, useLoader } from "@react-three/fiber";
+import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
 import { Environment, Lightformer, useGLTF } from "@react-three/drei";
 import { toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { Safe3D } from "@/components/Safe3D";
@@ -59,6 +59,10 @@ const FRAG_BODY = `#include <map_fragment>
   diffuseColor.rgb = mix(mix(base, uSkin, skinM), fabric, teeM);`;
 
 type Drag = { rot: number; active: boolean };
+/** Zoom: `target` is set by the gestures (the camera follows it smoothly); `focusY` is the chest of the shown mannequin. */
+type View = { target: number; focusY: number };
+const CAM_Y = -0.38, CAM_Z = 5.1, ZOOM_MAX = 2.8;
+const clampZoom = (z: number) => Math.min(ZOOM_MAX, Math.max(1, z));
 /** The studio's live print canvases: the mannequin then follows the studio (colour, turn, redraws) through teeState. */
 export type StudioCanvases = { front: HTMLCanvasElement; back: HTMLCanvasElement };
 const NO_PRINT: Print3D = {};
@@ -73,7 +77,7 @@ export function preloadMannequin(id: Mannequin = "homme-baggy") {
   useLoader.preload(THREE.TextureLoader, maskUrl(id));
 }
 
-function Figure({ id, color, print, size, drag, studio }: { id: Mannequin; color: string; print: Print3D; size: string; drag: React.RefObject<Drag>; studio?: StudioCanvases }) {
+function Figure({ id, color, print, size, drag, studio, onFocus }: { id: Mannequin; color: string; print: Print3D; size: string; drag: React.RefObject<Drag>; studio?: StudioCanvases; onFocus: (y: number) => void }) {
   const { scene } = useGLTF(modelUrl(id));
   const mask = useLoader(THREE.TextureLoader, maskUrl(id));
   // Once this one shows, fetch the other looks of the same mannequin, so switching look is instant.
@@ -109,6 +113,11 @@ function Figure({ id, color, print, size, drag, studio }: { id: Mannequin; color
     return { root, canvases, textures, uniforms };
   }, [scene, mask, studio]);
   useEffect(() => () => (look.textures.front.dispose(), look.textures.back.dispose()), [look]);
+  // Where the zoom aims: the chest, a little under the top of the head (standing, seated or the duo's taller one).
+  useEffect(() => {
+    const top = new THREE.Box3().setFromObject(look.root).max.y;
+    onFocus((MANNEQUINS.find((m) => m.id === id)?.y ?? -0.92) + top - 0.45);
+  }, [look, id, onFocus]);
 
   useEffect(() => {
     look.uniforms.uTee.value.set(color);
@@ -150,6 +159,19 @@ function Figure({ id, color, print, size, drag, studio }: { id: Mannequin; color
   );
 }
 
+/** Moves the camera with the zoom: closer, and up to the chest, looking straight ahead. */
+function CameraRig({ view }: { view: React.RefObject<View> }) {
+  const camera = useThree((st) => st.camera);
+  const zoom = useRef(1); // follows view.target smoothly
+  useFrame((_, dt) => {
+    const v = view.current;
+    zoom.current += (v.target - zoom.current) * (1 - Math.exp(-dt * 8));
+    const t = (zoom.current - 1) / (ZOOM_MAX - 1);
+    camera.position.set(0, CAM_Y + (v.focusY - CAM_Y) * t, CAM_Z / zoom.current);
+  });
+  return null;
+}
+
 /**
  * `size`: the size chosen on the page (the mannequin widens to that size's chest).
  * `studio`: the studio's print canvases; the studio's stage then turns the mannequin (teeState.rotY) and the
@@ -160,29 +182,79 @@ export default function MannequinTryOn({ color, print = NO_PRINT, size, studio, 
   const current = MANNEQUINS.find((m) => m.id === id)!;
   const drag = useRef<Drag>({ rot: 0.35, active: false });
   const last = useRef(0);
+  const view = useRef<View>({ target: 1, focusY: 0.4 });
+  const [zoomed, setZoomed] = useState(false);
+  const zoomTo = useCallback((z: number) => {
+    view.current.target = clampZoom(z);
+    setZoomed(view.current.target > 1.05);
+  }, []);
+  const onFocus = useCallback((y: number) => {
+    view.current.focusY = y;
+  }, []);
+  // Two fingers on the mannequin: pinch to zoom (one finger still turns it).
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ dist: number; zoom: number } | null>(null);
+  const spread = () => {
+    const [a, b] = [...pointers.current.values()];
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  };
+  // Trackpad pinch (or Ctrl + wheel) zooms; a plain wheel still scrolls the page.
+  const area = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = area.current;
+    if (!el) return;
+    const wheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      zoomTo(view.current.target * Math.exp(-e.deltaY * 0.01));
+    };
+    el.addEventListener("wheel", wheel, { passive: false });
+    return () => el.removeEventListener("wheel", wheel);
+  }, [zoomTo]);
 
   return (
     <div className={`relative ${className}`}>
       <div
+        ref={area}
         className="h-full w-full touch-pan-y cursor-grab select-none active:cursor-grabbing"
         onPointerDown={(e) => {
+          pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          if (pointers.current.size === 2) {
+            pinch.current = { dist: spread(), zoom: view.current.target };
+            drag.current.active = false;
+            return;
+          }
           if (studio) return; // the studio's stage turns it
           drag.current.active = true;
           last.current = e.clientX;
           e.currentTarget.setPointerCapture(e.pointerId);
         }}
         onPointerMove={(e) => {
+          if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          if (pinch.current && pointers.current.size === 2) {
+            zoomTo((pinch.current.zoom * spread()) / Math.max(1, pinch.current.dist));
+            return;
+          }
           if (!drag.current.active) return;
           drag.current.rot += (e.clientX - last.current) * 0.01;
           last.current = e.clientX;
         }}
-        onPointerUp={() => (drag.current.active = false)}
-        onPointerCancel={() => (drag.current.active = false)}
+        onPointerUp={(e) => {
+          pointers.current.delete(e.pointerId);
+          if (pointers.current.size < 2) pinch.current = null;
+          drag.current.active = false;
+        }}
+        onPointerCancel={(e) => {
+          pointers.current.delete(e.pointerId);
+          pinch.current = null;
+          drag.current.active = false;
+        }}
+        onDoubleClick={() => zoomTo(view.current.target > 1.05 ? 1 : 2.2)}
         role="img"
-        aria-label={`T-shirt porté par ${current.gender === "duo" ? "deux mannequins, homme et femme" : `un mannequin ${current.gender}, look ${current.look.toLowerCase()}`}, taille ${size}. Fais glisser pour le tourner.`}
+        aria-label={`T-shirt porté par ${current.gender === "duo" ? "deux mannequins, homme et femme" : `un mannequin ${current.gender}, look ${current.look.toLowerCase()}`}, taille ${size}. Fais glisser pour le tourner, pince pour zoomer.`}
       >
         <Safe3D>
-          <Canvas dpr={[1, 1.5]} camera={{ position: [0, -0.38, 5.1], fov: 30 }} gl={{ antialias: true, alpha: true }} onCreated={({ gl }) => colorTrue(gl)}>
+          <Canvas dpr={[1, 1.5]} camera={{ position: [0, CAM_Y, CAM_Z], fov: 30 }} gl={{ antialias: true, alpha: true }} onCreated={({ gl }) => colorTrue(gl)}>
             <ambientLight intensity={0.3} />
             <directionalLight position={[2.5, 4, 4]} intensity={1.6} />
             <directionalLight position={[-3, 2, 2]} intensity={0.5} />
@@ -192,11 +264,27 @@ export default function MannequinTryOn({ color, print = NO_PRINT, size, studio, 
               <Lightformer intensity={0.8} position={[-5, 0, 2]} scale={[3, 8, 1]} />
               <Lightformer intensity={0.8} position={[5, 0, 2]} scale={[3, 8, 1]} />
             </Environment>
+            <CameraRig view={view} />
             <Suspense fallback={null}>
-              <Figure key={id} id={id} color={color} print={print} size={size} drag={drag} studio={studio} />
+              <Figure key={id} id={id} color={color} print={print} size={size} drag={drag} studio={studio} onFocus={onFocus} />
             </Suspense>
           </Canvas>
         </Safe3D>
+      </div>
+      {/* Zoom buttons (pinch, trackpad pinch and double-click also zoom). */}
+      <div className="absolute right-3 top-3 grid gap-1.5">
+        {([["+", "Zoomer sur le t-shirt", 1.5], ["−", "Dézoomer", 1 / 1.5]] as const).map(([sign, label, k]) => (
+          <button
+            key={sign}
+            type="button"
+            onClick={() => zoomTo(view.current.target * k)}
+            disabled={sign === "−" && !zoomed}
+            aria-label={label}
+            className="grid size-9 place-items-center rounded-full bg-bg/85 text-lg leading-none text-ink shadow-[0_1px_4px_rgba(0,0,0,0.12)] transition-opacity disabled:opacity-35"
+          >
+            {sign}
+          </button>
+        ))}
       </div>
       {/* The picker: Homme / Femme / Duo, then that choice's looks. At the bottom, above the hint. */}
       <div className={`absolute inset-x-4 grid justify-items-center gap-2 bottom-14`}>
