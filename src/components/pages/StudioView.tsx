@@ -8,7 +8,7 @@ import { gsap } from "@/lib/gsap";
 import { TEE_COLORS } from "@/lib/data";
 import { cart, SIZES } from "@/lib/cart";
 import { available, type StockMap } from "@/lib/stock";
-import { getMyCredits, refundCredits, spendCredits, type MyCredits } from "@/server/my-credits";
+import { getMyCredits, refundSpend, spendCredits, type MyCredits } from "@/server/my-credits";
 import { presignDesignFile } from "@/server/design-upload";
 import { reportClientError } from "@/server/client-log";
 import { getMyDesign, presignMyDesignImage, saveMyDesign } from "@/server/my-designs";
@@ -64,6 +64,8 @@ const panelIn = (i: number) => fadeUp(0.15 + i * STAGGER.item);
 const DEFAULT_TEXT: Txt = { value: "Atelier", font: "italic", color: "#efe9df", x: 0.5, y: 0.27, size: 0.085, rot: 0 };
 const DEFAULT_IMAGE = { x: 0.5, y: 0.4, scale: 0.34, rot: 0 };
 const MAX_IMAGES = 8; // per side
+/** How long "Annuler" stays offered after images are added (the server allows a little more). */
+const UNDO_SECONDS = 15;
 
 // Print canvases live outside React (they are drawing surfaces, not state).
 let shared: Record<"front" | "back", HTMLCanvasElement> | null = null;
@@ -287,6 +289,10 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
   const [size, setSize] = useState("M");
   const [qty, setQty] = useState(1);
   const [toast, setToast] = useState<string | null>(null);
+  // Images picked but not added yet (checked before a credit is spent), and the last paid addition that
+  // "Annuler" can still take back.
+  const [picked, setPicked] = useState<{ files: File[]; urls: string[]; dropped: number } | null>(null);
+  const [undo, setUndo] = useState<{ entryId: string; side: SideId; ids: string[]; text: string; left: number } | null>(null);
   // Why a paid action stopped: not signed in, or not enough credits.
   const [gate, setGate] = useState<"signin" | "empty" | null>(null);
   const [quality, setQuality] = useState<PrintQuality>("STANDARD");
@@ -336,21 +342,24 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
       .catch(() => setCredits({ signedIn: false }));
   }, []);
 
-  /** Spends credits on the server (free when n is 0). False, with the reason shown, if it can't. */
-  const spend = async (n: number, reason: "IMAGE_UPLOAD" | "HD_PREVIEW"): Promise<boolean> => {
-    if (n <= 0) return true;
+  /**
+   * Spends credits on the server. Null, with the reason shown, if it can't; otherwise the ledger line of the
+   * spending (`entryId`, none when free), which is what a refund names.
+   */
+  const spend = async (n: number, reason: "IMAGE_UPLOAD" | "HD_PREVIEW"): Promise<{ entryId?: string } | null> => {
+    if (n <= 0) return {};
     if (!credits?.signedIn) {
       setGate("signin");
-      return false;
+      return null;
     }
     if (credits.balance < n) {
       setGate("empty");
-      return false;
+      return null;
     }
     const r = await spendCredits(n, reason).catch(() => null);
     if (r?.ok) {
       setCredits({ ...credits, balance: r.balance });
-      return true;
+      return { entryId: r.entryId };
     }
     if (r?.reason === "signed-out") setGate("signin");
     else if (r?.reason === "not-enough") {
@@ -358,8 +367,19 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
       setGate("empty");
     }
     else flash("Les crédits n'ont pas pu être utilisés : réessaie");
-    return false;
+    return null;
   };
+
+  /** Gives back the credits of one spending (`why`: it failed, or the customer pressed Annuler). */
+  const refund = (entryId: string | undefined, why: "failed" | "undo") =>
+    entryId
+      ? refundSpend(entryId, why)
+          .then((r) => {
+            if (r.ok) setCredits((c) => (c?.signedIn ? { ...c, balance: r.balance } : c));
+            return r.ok;
+          })
+          .catch(() => false)
+      : Promise.resolve(false);
 
   /** Changes the text ("text") or one image (by its id) on the current side. */
   const update = (layer: Layer, patch: Partial<Img> & Partial<Txt>) =>
@@ -487,8 +507,10 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
     }
   };
 
-  // Adds images to the current side, on top of what is there: 1 credit each. Several can be picked at once.
-  const onUpload = async (list: FileList | null) => {
+  // Images: picked, shown for a check before any credit is spent (a wrong file costs nothing), then added to the
+  // current side on top of what is there, 1 credit each. Right after, "Annuler" takes them off and gives the
+  // credits back for UNDO_SECONDS (the server allows it once per spending, and a few times a day).
+  const onPick = (list: FileList | null) => {
     const files = [...(list ?? [])];
     if (!files.length) return;
     if (files.some((f) => !/^image\/(png|jpeg|webp)$/.test(f.type))) return flash("Format accepté : PNG, JPG ou WEBP");
@@ -496,10 +518,20 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
     const room = MAX_IMAGES - design[side].images.length;
     if (room <= 0) return flash(`${MAX_IMAGES} images maximum par face`);
     const take = files.slice(0, room);
-    if (!(await spend(take.length, "IMAGE_UPLOAD"))) return;
+    setPicked({ files: take, urls: take.map((f) => URL.createObjectURL(f)), dropped: files.length - take.length });
+  };
+  const closePicked = () =>
+    setPicked((p) => {
+      p?.urls.forEach((u) => URL.revokeObjectURL(u));
+      return null;
+    });
+
+  const addImages = async (take: File[], dropped: number) => {
+    const paid = await spend(take.length, "IMAGE_UPLOAD");
+    if (!paid) return;
     const target = side;
-    const extra = files.length > take.length ? ` (${MAX_IMAGES} max par face)` : "";
-    let loaded = 0;
+    const extra = dropped > 0 ? ` (${MAX_IMAGES} max par face)` : "";
+    const ids: string[] = [];
     take.forEach((file) => {
       const reader = new FileReader();
       reader.onload = () => {
@@ -515,13 +547,39 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
             return { ...d, [target]: { ...d[target], images: [...d[target].images, img] } };
           });
           setSelected(id);
-          if (++loaded === take.length) flash(take.length > 1 ? `${take.length} images ajoutées · ${take.length} crédits utilisés${extra}` : `Image ajoutée · 1 crédit utilisé${extra}`);
+          ids.push(id);
+          if (ids.length === take.length) {
+            const text = take.length > 1 ? `${take.length} images ajoutées · ${take.length} crédits${extra}` : `Image ajoutée · 1 crédit${extra}`;
+            // Free images (no credit spent) have nothing to give back: a plain message.
+            if (paid.entryId) setUndo({ entryId: paid.entryId, side: target, ids: [...ids], text, left: UNDO_SECONDS });
+            else flash(text);
+          }
         };
         el.src = src;
       };
       reader.readAsDataURL(file);
     });
   };
+
+  const undoImages = async () => {
+    const u = undo;
+    if (!u) return;
+    setUndo(null);
+    const drop = (s: Side): Side => ({ ...s, images: s.images.filter((i) => !u.ids.includes(i.id)) });
+    setDesign((d) => ({ ...d, [u.side]: drop(d[u.side]) }));
+    if (u.side === side) setSelected(topLayer(drop(design[u.side])));
+    const back = await refund(u.entryId, "undo");
+    const n = u.ids.length;
+    flash(back ? `${n > 1 ? "Images retirées" : "Image retirée"} · ${n > 1 ? `${n} crédits rendus` : "crédit rendu"}` : `${n > 1 ? "Images retirées" : "Image retirée"} · le crédit n'a pas pu être rendu`);
+  };
+
+  // The "Annuler" countdown.
+  useEffect(() => {
+    if (!undo) return;
+    if (undo.left <= 0) return setUndo(null);
+    const t = setTimeout(() => setUndo((u) => (u ? { ...u, left: u.left - 1 } : u)), 1000);
+    return () => clearTimeout(t);
+  }, [undo]);
 
   // Stacking order and removal of the selected layer.
   const restack = (id: string, by: -1 | 1) =>
@@ -598,7 +656,8 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
     const sides = (["front", "back"] as SideId[]).filter((id) => hasContent(design[id]));
     if (!sides.length) return flash("Ajoute une image ou un texte avant de commander");
     if (adding) return;
-    if (!(await spend(q.credits, "HD_PREVIEW"))) return;
+    const paid = await spend(q.credits, "HD_PREVIEW");
+    if (!paid) return;
     const files: { side: "front" | "back"; url: string }[] = [];
     try {
       for (const [i, id] of sides.entries()) {
@@ -622,7 +681,7 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
       // "Failed to fetch" here is most often the storage's CORS rule (see the README). A refusal is not a bug.
       if (!refused) void reportClientError("studio.upload", err instanceof Error ? err.message : String(err), { path: location.pathname }).catch(() => {});
       setAdding(null);
-      if (q.credits) refundCredits(q.credits).then((r) => r.ok && setCredits((c) => (c?.signedIn ? { ...c, balance: r.balance } : c)));
+      void refund(paid.entryId, "failed");
       return flash(refused ? (err as Error).message : "Le fichier d'impression n'a pas pu être envoyé : vérifie ta connexion et réessaie");
     }
     setAdding(null);
@@ -636,7 +695,8 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
   // flat print file of each printed side, all at the chosen quality.
   const exportDesign = async () => {
     const sides = (["front", "back"] as SideId[]).filter((id) => hasContent(design[id]));
-    if (!(await spend(q.credits, "HD_PREVIEW"))) return;
+    const paid = await spend(q.credits, "HD_PREVIEW");
+    if (!paid) return;
     setExporting(true);
     const tag = q.label.toLowerCase().replace(/\s+/g, "-");
     const save = (blob: Blob, name: string) => {
@@ -673,7 +733,7 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
       flash(q.credits ? `Visuel ${q.label} téléchargé · ${creditsLabel(q.credits)} utilisé${q.credits > 1 ? "s" : ""}` : "Visuel téléchargé");
     } catch (err) {
       console.error("Studio export failed", err);
-      if (q.credits) refundCredits(q.credits).then((r) => r.ok && setCredits((c) => (c?.signedIn ? { ...c, balance: r.balance } : c)));
+      void refund(paid.entryId, "failed");
       flash(quality === "STANDARD" ? "Trop lourd pour cet appareil : essaie depuis un ordinateur" : "Trop lourd pour cet appareil : choisis une qualité plus basse");
     } finally {
       setExporting(false);
@@ -791,7 +851,7 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
                   <label className="flex cursor-pointer flex-col items-center gap-2 rounded-2xl border border-dashed border-line bg-bg px-6 py-10 text-center transition-colors duration-300 hover:border-accent">
                     <span className="text-[17px] font-semibold text-link">{cur.images.length ? "Ajouter des images" : "Importer des images"}</span>
                     <span className="text-xs text-muted">PNG, JPG ou WEBP · 1 crédit par image · {MAX_IMAGES} max sur le {side === "front" ? "devant" : "dos"}</span>
-                    <input type="file" multiple accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => (onUpload(e.target.files), (e.target.value = ""))} />
+                    <input type="file" multiple accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => (onPick(e.target.files), (e.target.value = ""))} />
                   </label>
                   {cur.images.length > 0 && (
                     <div>
@@ -1035,7 +1095,74 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
       </div>
 
       <AnimatePresence>
-        {toast && (
+        {undo && (
+          <motion.div
+            role="status"
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 24 }}
+            transition={{ duration: DUR.base, ease: EASE.out }}
+            className="fixed bottom-6 left-1/2 z-50 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-6 bg-ink px-6 py-4 text-sm text-on-ink"
+          >
+            <span>{undo.text}</span>
+            <button type="button" onClick={undoImages} className="shrink-0 text-[11px] tracking-[0.2em] uppercase underline underline-offset-4">
+              Annuler ({undo.left} s)
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {picked && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[80] grid place-items-center bg-ink/50 p-5 backdrop-blur-sm" onClick={closePicked}>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              transition={{ duration: DUR.base, ease: EASE.out }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md rounded-[28px] bg-bg p-8 text-center"
+              role="dialog"
+              aria-modal
+              aria-labelledby="picked-title"
+            >
+              <p className="eyebrow">Vérifie avant d&apos;ajouter</p>
+              <h2 id="picked-title" className="display mt-2 text-3xl">
+                {picked.files.length > 1 ? `Ces ${picked.files.length} images ?` : "Cette image ?"}
+              </h2>
+              <div className={`mt-6 grid gap-3 ${picked.files.length > 1 ? "grid-cols-3" : "grid-cols-1"}`}>
+                {picked.urls.map((u, i) => (
+                  // eslint-disable-next-line @next/next/no-img-element -- a local preview of the picked file
+                  <img key={u} src={u} alt={picked.files[i]?.name ?? ""} className={`w-full rounded-2xl bg-surface object-contain ${picked.files.length > 1 ? "aspect-square" : "max-h-64"}`} />
+                ))}
+              </div>
+              {picked.dropped > 0 && <p className="mt-3 text-xs text-muted">{MAX_IMAGES} images maximum par face : {picked.dropped} n&apos;ont pas été retenues.</p>}
+              <p className="mt-4 text-sm text-muted">
+                {picked.files.length > 1 ? `${picked.files.length} crédits` : "1 crédit"} sur le {side === "front" ? "devant" : "dos"}. Tu pourras encore annuler pendant {UNDO_SECONDS} secondes.
+              </p>
+              <div className="mt-8 flex flex-col items-center gap-4">
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => {
+                    const p = picked;
+                    closePicked();
+                    void addImages(p.files, p.dropped);
+                  }}
+                >
+                  Ajouter au t-shirt · {picked.files.length > 1 ? `${picked.files.length} crédits` : "1 crédit"}
+                </button>
+                <button type="button" onClick={closePicked} className="link-line">
+                  Choisir d&apos;autres images
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {toast && !undo && (
           <motion.div
             role="status"
             initial={{ opacity: 0, y: 24 }}
