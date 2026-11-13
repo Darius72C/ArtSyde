@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useActionState, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Field } from "../pages/CheckoutView";
 import { ColorPicker } from "../ColorPicker";
@@ -109,11 +109,15 @@ export function ProductForm({ product, uploads = false }: FormProps) {
       setGeneration((g) => g + 1);
     };
   }, [isNew]);
+  // The form tells whether its creation is under way (sent) or not (refused); the ref stays owned here.
+  const markSubmitted = useCallback((sent: boolean) => {
+    submitted.current = sent;
+  }, []);
 
-  return <ProductFormBody key={generation} product={product} uploads={uploads} submitted={isNew ? submitted : undefined} />;
+  return <ProductFormBody key={generation} product={product} uploads={uploads} onSubmitted={isNew ? markSubmitted : undefined} />;
 }
 
-function ProductFormBody({ product, uploads = false, submitted }: FormProps & { submitted?: RefObject<boolean> }) {
+function ProductFormBody({ product, uploads = false, onSubmitted }: FormProps & { onSubmitted?: (sent: boolean) => void }) {
   const [state, action, pending] = useActionState<ProductFormState, FormData>(saveProduct, {});
   const e = state.errors ?? {};
   const isNew = !product.id;
@@ -124,8 +128,8 @@ function ProductFormBody({ product, uploads = false, submitted }: FormProps & { 
 
   // Refused (field errors, or the save failed): the admin stays on the form, which is not a finished creation.
   useEffect(() => {
-    if (submitted && (state.errors || state.message)) submitted.current = false;
-  }, [state, submitted]);
+    if (state.errors || state.message) onSubmitted?.(false);
+  }, [state, onSubmitted]);
 
   // Once the product is created: upload what was picked, one file after the other, then open the product.
   // Effects run again each time a hidden page is shown again: `uploadedFor` keeps this to once per product,
@@ -167,7 +171,7 @@ function ProductFormBody({ product, uploads = false, submitted }: FormProps & { 
     <form
       action={(fd) => {
         if (isNew && toSend) fd.set("then", "upload");
-        if (submitted) submitted.current = true;
+        onSubmitted?.(true);
         action(fd);
       }}
       noValidate
