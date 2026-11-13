@@ -219,7 +219,9 @@ export default function MannequinTryOn({ color, print = NO_PRINT, size, studio, 
     const [a, b] = [...pointers.current.values()];
     return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
   };
-  const panFrom = useRef<{ x: number; y: number } | null>(null); // one finger / the mouse, while zoomed
+  // While zoomed, one finger / the mouse still turns the mannequin and moves the view up and down
+  // (`free`: Shift + drag moves it any way, without turning).
+  const panFrom = useRef<{ x: number; y: number; free: boolean } | null>(null);
   // Trackpad pinch (or Ctrl + wheel) zooms; a plain wheel still scrolls the page.
   const area = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -254,10 +256,11 @@ export default function MannequinTryOn({ color, print = NO_PRINT, size, studio, 
             return;
           }
           if (view.current.target > 1.05) {
-            // zoomed: one finger (or the mouse) moves the view; − or a double-click to turn it again
-            panFrom.current = { x: e.clientX, y: e.clientY };
-            e.stopPropagation();
-            return;
+            panFrom.current = { x: e.clientX, y: e.clientY, free: e.shiftKey };
+            if (e.shiftKey) {
+              e.stopPropagation(); // a pure move: the studio's stage does not turn either
+              return;
+            }
           }
           if (studio) return; // the studio's stage turns it
           drag.current.active = true;
@@ -275,10 +278,13 @@ export default function MannequinTryOn({ color, print = NO_PRINT, size, studio, 
             return;
           }
           if (panFrom.current) {
-            e.stopPropagation();
-            panBy(e.clientX - panFrom.current.x, e.clientY - panFrom.current.y, h);
-            panFrom.current = { x: e.clientX, y: e.clientY };
-            return;
+            const { x, y, free } = panFrom.current;
+            panBy(free ? e.clientX - x : 0, e.clientY - y, h);
+            panFrom.current = { x: e.clientX, y: e.clientY, free };
+            if (free) {
+              e.stopPropagation();
+              return;
+            }
           }
           if (!drag.current.active) return;
           drag.current.rot += (e.clientX - last.current) * 0.01;
@@ -298,7 +304,7 @@ export default function MannequinTryOn({ color, print = NO_PRINT, size, studio, 
         }}
         onDoubleClick={() => zoomTo(view.current.target > 1.05 ? 1 : 2.2)}
         role="img"
-        aria-label={`T-shirt porté par ${current.gender === "duo" ? "deux mannequins, homme et femme" : `un mannequin ${current.gender}, look ${current.look.toLowerCase()}`}, taille ${size}. Fais glisser pour le tourner, pince pour zoomer ; zoomé, fais glisser pour te déplacer.`}
+        aria-label={`T-shirt porté par ${current.gender === "duo" ? "deux mannequins, homme et femme" : `un mannequin ${current.gender}, look ${current.look.toLowerCase()}`}, taille ${size}. Fais glisser pour le tourner, pince pour zoomer ; zoomé, deux doigts pour te déplacer.`}
       >
         <Safe3D>
           <Canvas dpr={[1, 1.5]} camera={{ position: [0, CAM_Y, CAM_Z], fov: 30 }} gl={{ antialias: true, alpha: true }} onCreated={({ gl }) => colorTrue(gl)}>
