@@ -60,9 +60,23 @@ type Drag = { rot: number; active: boolean };
 export type StudioCanvases = { front: HTMLCanvasElement; back: HTMLCanvasElement };
 const NO_PRINT: Print3D = {};
 
+const modelUrl = (id: Mannequin) => `/models/mannequins/${id}.glb`;
+const maskUrl = (id: Mannequin) => `/models/mannequins/${id}-mask.webp`;
+/** Starts downloading a mannequin (model + mask) so it shows at once when asked for. */
+export function preloadMannequin(id: Mannequin = "homme-baggy") {
+  useGLTF.preload(modelUrl(id));
+  useLoader.preload(THREE.TextureLoader, maskUrl(id));
+}
+
 function Figure({ id, color, print, size, drag, studio }: { id: Mannequin; color: string; print: Print3D; size: string; drag: React.RefObject<Drag>; studio?: StudioCanvases }) {
-  const { scene } = useGLTF(`/models/mannequins/${id}.glb`);
-  const mask = useLoader(THREE.TextureLoader, `/models/mannequins/${id}-mask.webp`);
+  const { scene } = useGLTF(modelUrl(id));
+  const mask = useLoader(THREE.TextureLoader, maskUrl(id));
+  // Once this one shows, fetch the other looks of the same mannequin, so switching look is instant.
+  useEffect(() => {
+    const idle = window.requestIdleCallback ?? ((f: () => void) => window.setTimeout(f, 1200));
+    const gender = id.startsWith("homme") ? "homme" : "femme";
+    idle(() => MANNEQUINS.filter((m) => m.gender === gender && m.id !== id).forEach((m) => preloadMannequin(m.id)));
+  }, [id]);
   const images = usePrintImages(print);
   const group = useRef<THREE.Group>(null);
 

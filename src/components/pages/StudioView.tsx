@@ -24,7 +24,9 @@ import { zipFiles } from "@/lib/zip";
 import { embedTrace, protectImage, stampWatermark } from "@/lib/watermark";
 
 // "Porté": the design in progress on a shop mannequin, loaded only when chosen.
-const MannequinTryOn = dynamic(() => import("../MannequinTryOn"), { ssr: false, loading: () => <div className="absolute inset-0 m-auto h-px w-24 animate-pulse bg-ink/40" aria-hidden /> });
+const loadWorn = () => import("../MannequinTryOn");
+const preloadWorn = () => void loadWorn().then((m) => m.preloadMannequin());
+const MannequinTryOn = dynamic(loadWorn, { ssr: false, loading: () => <div className="absolute inset-0 m-auto h-px w-24 animate-pulse bg-ink/40" aria-hidden /> });
 const TeeScene = dynamic(() => import("../story/TeeScene"), {
   ssr: false,
   loading: () => <div className="absolute inset-0 m-auto h-px w-24 animate-pulse bg-ink/40" aria-hidden />,
@@ -758,7 +760,7 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
           </div>
           <div className="absolute left-1/2 top-14 flex -translate-x-1/2 rounded-full bg-bg/80 p-0.5 text-[12px]" role="group" aria-label="Affichage">
             {([false, true] as const).map((w) => (
-              <button key={String(w)} type="button" onClick={() => setWorn(w)} aria-pressed={worn === w} className={`rounded-full px-3 py-1 transition-colors ${worn === w ? "bg-ink text-on-ink" : "text-muted hover:text-ink"}`}>
+              <button key={String(w)} type="button" onClick={() => setWorn(w)} onPointerEnter={w ? preloadWorn : undefined} onPointerDown={w ? preloadWorn : undefined} onFocus={w ? preloadWorn : undefined} aria-pressed={worn === w} className={`rounded-full px-3 py-1 transition-colors ${worn === w ? "bg-ink text-on-ink" : "text-muted hover:text-ink"}`}>
                 {w ? "Porté" : "T-shirt"}
               </button>
             ))}

@@ -27,7 +27,9 @@ const PICTURE: Record<View, string> = { photos: "photo", mockup: "mockup", "3d":
 const loadTee3D = () => import("../ProductTee3D");
 const ProductTee3D = dynamic(loadTee3D, { ssr: false, loading: () => <div className="h-full w-full animate-pulse bg-surface" /> });
 // The "Porté" tab: the tee on a shop mannequin, in the size chosen on the page. Loaded only when opened.
-const MannequinTryOn = dynamic(() => import("../MannequinTryOn"), { ssr: false, loading: () => <div className="h-full w-full animate-pulse bg-surface" /> });
+const loadWorn = () => import("../MannequinTryOn");
+const preloadWorn = () => void loadWorn().then((m) => m.preloadMannequin());
+const MannequinTryOn = dynamic(loadWorn, { ssr: false, loading: () => <div className="h-full w-full animate-pulse bg-surface" /> });
 
 /** A product's own page (/boutique/[slug]). `others` (the suggestions) come from the same catalogue. */
 export function ProductView({ product: p, others }: { product: Product; others: Product[] }) {
@@ -45,7 +47,7 @@ export function ProductView({ product: p, others }: { product: Product; others: 
   useEffect(() => {
     for (const url of printKey.split("|")) if (url) loadPrint(url);
     const idle = window.requestIdleCallback ?? ((f: () => void) => window.setTimeout(f, 1500));
-    idle(() => void loadTee3D());
+    idle(() => void loadTee3D().then(() => idle(preloadWorn))); // then the default mannequin of the "Porté" tab
   }, [printKey]);
 
   const pictures = view === "photos" ? p.photos : view === "mockup" ? p.flats : [];
@@ -84,7 +86,7 @@ export function ProductView({ product: p, others }: { product: Product; others: 
           <LayoutGroup id="product-views">
             <div className="mb-4 flex w-fit rounded-full bg-surface p-1" role="tablist" aria-label="Voir le t-shirt">
               {views.map((v) => (
-                <button key={v} id={`view-${v}`} type="button" role="tab" aria-selected={view === v} aria-controls="product-view" onClick={() => show(v)} className="relative rounded-full px-4 py-1.5 text-[14px]">
+                <button key={v} id={`view-${v}`} type="button" role="tab" aria-selected={view === v} aria-controls="product-view" onClick={() => show(v)} onPointerEnter={v === "worn" ? preloadWorn : undefined} onPointerDown={v === "worn" ? preloadWorn : undefined} onFocus={v === "worn" ? preloadWorn : undefined} className="relative rounded-full px-4 py-1.5 text-[14px]">
                   {view === v && <motion.span layoutId="seg" className="absolute inset-0 rounded-full bg-bg shadow-[0_1px_4px_rgba(0,0,0,0.12)]" transition={SPRING.snappy} />}
                   <span className={`relative whitespace-nowrap ${view === v ? "font-medium" : "text-muted"}`}>{VIEW_LABEL[v]}</span>
                 </button>

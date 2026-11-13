@@ -8,6 +8,11 @@ const nextConfig: NextConfig = {
   // everyone on their next visit; scripts from this site only.
   async headers() {
     return [
+      // The mannequins (/models): kept a day, then refreshed in the background, instead of re-checked on every visit.
+      {
+        source: "/models/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }],
+      },
       {
         source: "/sw.js",
         headers: [
