@@ -20,6 +20,7 @@ import { DUR, EASE, STAGGER } from "@/lib/motion";
 import { DESIGN_SAVE_CREDITS, FREE_DESIGNS, PRINT_QUALITIES, PRINT_QUALITY, PRINT_WIDTH_CM, STANDARD_PREVIEW_PX, downloadWidth, type PrintQuality } from "@/lib/studio";
 import { TEE_ASPECT, TEE_PATH_01, teePath2D } from "../story/teeOutline";
 import { teeSnapshot, wornSnapshot } from "../story/snapshot";
+import { onBackdrop } from "@/lib/backdrop";
 import { zipFiles } from "@/lib/zip";
 import { embedTrace, protectImage, stampWatermark } from "@/lib/watermark";
 
@@ -721,8 +722,9 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
       // In the "Porté" view: the chosen mannequin wearing it too, front and back, at the same size.
       if (worn && wornSnapshot.current) {
         for (const face of ["front", "back"] as const) {
-          const view = await wornSnapshot.current(size.view, face);
-          if (!view) throw new Error("worn view unavailable");
+          const shot = await wornSnapshot.current(size.view, face);
+          if (!shot) throw new Error("worn view unavailable");
+          const view = await onBackdrop(shot); // on a studio backdrop (the tee views stay transparent)
           files.push({ name: `artsyde-porte-${face === "front" ? "devant" : "dos"}-${tag}.png`, data: await protectImage(view, { watermark: free, trace }) });
         }
       }
@@ -1002,7 +1004,7 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
               {quality === "STANDARD"
                 ? `Un aperçu de ${STANDARD_PREVIEW_PX.toLocaleString("fr-FR")} px avec filigrane : le t-shirt en 3D de face et de dos, et ton design. Pour un fichier imprimable, choisis HD ou Ultra HD.`
                 : `Le t-shirt en 3D vu de face et de dos (${q.view.toLocaleString("fr-FR")} px), et le fichier d'impression à ${q.dpi} DPI (${q.px.toLocaleString("fr-FR")} × ${Math.round(q.px / TEE_ASPECT).toLocaleString("fr-FR")} px), sans filigrane.`}{" "}
-              {worn ? "En vue Porté, le mannequin choisi est inclus aussi, de face et de dos. " : ""}La qualité choisie est aussi celle du fichier d&apos;impression envoyé avec ta commande{q.credits ? ` : ${creditsLabel(q.credits)} à l'ajout au panier` : ""}.
+              {worn ? "En vue Porté, le mannequin choisi est inclus aussi, de face et de dos, sur un fond studio. " : ""}La qualité choisie est aussi celle du fichier d&apos;impression envoyé avec ta commande{q.credits ? ` : ${creditsLabel(q.credits)} à l'ajout au panier` : ""}.
             </p>
             <button type="button" onClick={() => setCompare((v) => !v)} aria-expanded={compare} className="link-line mt-3 !text-[15px]">
               {compare ? "Masquer la comparaison" : "Voir la différence entre les qualités"} <span className="arrow">›</span>
