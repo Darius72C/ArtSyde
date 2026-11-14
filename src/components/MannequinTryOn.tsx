@@ -373,8 +373,8 @@ export default function MannequinTryOn({ color, print = NO_PRINT, size, studio, 
           </button>
         ))}
       </div>
-      {/* The picker: Homme / Femme / Duo, then that choice's looks. At the bottom, above the hint. */}
-      <div className={`absolute inset-x-4 grid justify-items-center gap-2 bottom-14`}>
+      {/* The picker: Homme / Femme / Duo, then that choice's looks. At the bottom, above the hint; hidden while zoomed. */}
+      <div className={`absolute inset-x-4 bottom-14 grid justify-items-center gap-2 transition-opacity duration-300 ${zoomed ? "pointer-events-none opacity-0" : ""}`} aria-hidden={zoomed || undefined}>
         <div className="flex gap-1 rounded-full bg-bg/80 p-0.5 text-[12px]" role="group" aria-label="Mannequin">
           {(["homme", "femme", "duo"] as const).map((g) => (
             <button key={g} type="button" onClick={() => current.gender !== g && setId(MANNEQUINS.find((m) => m.gender === g)!.id)} aria-pressed={current.gender === g} className={`rounded-full px-3 py-1 transition-colors ${current.gender === g ? "bg-ink text-on-ink" : "text-muted hover:text-ink"}`}>

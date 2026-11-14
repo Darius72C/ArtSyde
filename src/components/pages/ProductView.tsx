@@ -36,6 +36,11 @@ const ProductTee3D = dynamic(loadTee3D, { ssr: false, loading: () => <div classN
 // The "Porté" tab: the tee on a shop mannequin, in the size chosen on the page. Loaded only when opened.
 const loadWorn = () => import("../MannequinTryOn");
 const preloadWorn = () => void loadWorn().then((m) => m.preloadMannequin());
+/** A phone with little memory, or data saving on: heavy 3D waits until asked. */
+const isLiteDevice = () => {
+  const nav = navigator as Navigator & { deviceMemory?: number; connection?: { saveData?: boolean } };
+  return (nav.deviceMemory !== undefined && nav.deviceMemory <= 2) || Boolean(nav.connection?.saveData);
+};
 const MannequinTryOn = dynamic(loadWorn, { ssr: false, loading: () => <div className="h-full w-full animate-pulse bg-surface" /> });
 
 /** A product's own page (/boutique/[slug]). `others` (the suggestions) come from the same catalogue. */
@@ -55,7 +60,7 @@ export function ProductView({ product: p, others }: { product: Product; others: 
   useEffect(() => {
     for (const url of printKey.split("|")) if (url) loadPrint(url);
     const idle = window.requestIdleCallback ?? ((f: () => void) => window.setTimeout(f, 1500));
-    idle(() => void loadTee3D().then(() => idle(preloadWorn))); // then the default mannequin of the "Porté" tab
+    idle(() => void loadTee3D().then(() => !isLiteDevice() && idle(preloadWorn))); // then the default mannequin of the "Porté" tab
   }, [printKey]);
 
   const pictures = view === "photos" ? p.photos : view === "mockup" ? p.flats : [];
@@ -64,6 +69,14 @@ export function ProductView({ product: p, others }: { product: Product; others: 
     setView(v);
     setShown(0);
   };
+  // Light mode: on a phone with little memory or with data saving on, the 3D mannequin loads only when asked.
+  const [lite, setLite] = useState(false);
+  const [want3d, setWant3d] = useState(false);
+  useEffect(() => {
+    if (!isLiteDevice()) return;
+    const id = requestAnimationFrame(() => setLite(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
   // A link with ?vue=porte (shared, or "Voir porté" in the shop) opens the worn view.
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("vue") !== "porte") return;
@@ -138,13 +151,21 @@ export function ProductView({ product: p, others }: { product: Product; others: 
                 {view === "3d" ? (
                   <ProductTee3D color={color} print={p.print3d} className="h-full w-full" />
                 ) : view === "worn" ? (
-                  <MannequinTryOn color={color} print={p.print3d} size={size} className="h-full w-full" onZoomChange={setWornZoomed} />
+                  lite && !want3d ? (
+                    <div className="flex h-full w-full flex-col items-center justify-center gap-4 p-6 text-center">
+                      <ProductImage color={color} art={p.art} photo={p.photo} alt={p.name} bg="transparent" className="aspect-square w-1/2 rounded-[22px]" zoom={false} />
+                      <p className="max-w-xs text-sm text-muted">Mode économie de données : le mannequin en 3D se charge seulement si tu le demandes.</p>
+                      <button type="button" onClick={() => setWant3d(true)} className="btn !px-5 !py-2 text-sm">Voir le mannequin en 3D (≈ 0,5 Mo)</button>
+                    </div>
+                  ) : (
+                    <MannequinTryOn color={color} print={p.print3d} size={size} className="h-full w-full" onZoomChange={setWornZoomed} />
+                  )
                 ) : (
                   <ProductImage color={color} art={p.art} photo={picture} alt={`${p.name}, ${PICTURE[view]} ${shown + 1}`} bg="transparent" className="h-full w-full" zoom={false} fit="contain" />
                 )}
               </motion.div>
             </AnimatePresence>
-            {view === "worn" && (
+            {view === "worn" && !(lite && !want3d) && (
               <button type="button" onClick={shareWorn} disabled={sharing === "busy"} className="absolute left-3 top-3 flex h-9 items-center gap-1.5 rounded-full bg-bg/85 px-3.5 text-sm text-ink shadow-[0_1px_4px_rgba(0,0,0,0.12)] disabled:opacity-60">
                 {sharing === "busy" ? "Préparation…" : sharing === "done" ? "Prêt ✓" : (
                   <>
