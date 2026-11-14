@@ -22,6 +22,11 @@ export const COMPANY = {
   phone: "+225 07 02 88 84 56",
   /** WhatsApp Business: the shop's chat link (wa.me/message/… or wa.me/<number>), or "" for none. */
   whatsapp: "https://wa.me/message/X6J6AFAIGRTAC1",
+  /**
+   * The WhatsApp Business number, digits only with the country code, for chats opened with a ready message
+   * (a wa.me/message/… link can't carry one). "" to fall back to `whatsapp`.
+   */
+  whatsappNumber: "2250702888456",
   /** Opening hours of the workshop for pickup. */
   hours: TODO,
   /** Person responsible for the site's content (directeur de la publication). */
@@ -50,3 +55,9 @@ export const SIZE_GUIDE_CONFIRMED = false;
 
 /** Date shown under the legal pages ("Dernière mise à jour"). Change it when a text changes. */
 export const LEGAL_UPDATED = "5 novembre 2026";
+
+/** A WhatsApp chat with the shop, opened with `text` ready to send (or the plain chat link without a number). */
+export function whatsappWith(text: string): string {
+  if (COMPANY.whatsappNumber) return `https://wa.me/${COMPANY.whatsappNumber}?text=${encodeURIComponent(text)}`;
+  return COMPANY.whatsapp;
+}

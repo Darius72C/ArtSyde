@@ -11,6 +11,7 @@ import { canvasTexture, colorTrue } from "./story/teeModel";
 import { PRINT_H, PRINT_W, drawPrint, usePrintImages } from "./ProductTee3D";
 import { teeState } from "./story/teeState";
 import { wornSnapshot } from "./story/snapshot";
+import { CHEST } from "@/lib/sizing"; // body chest by size; the models are made in L
 
 /*
  * The product worn by a shop mannequin (the "Porté" tab of a product page).
@@ -36,11 +37,6 @@ export const MANNEQUINS: { id: Mannequin; gender: "homme" | "femme" | "duo"; loo
   { id: "duo", gender: "duo", look: "Ensemble", y: -0.92 },
 ];
 
-// Body chest by size (cm, common size charts); the models are made in L.
-const CHEST: Record<"homme" | "femme", Record<string, number>> = {
-  homme: { XS: 86, S: 92, M: 98, L: 104, XL: 110, XXL: 116 },
-  femme: { XS: 78, S: 82, M: 86, L: 91, XL: 97, XXL: 103 },
-};
 const SKIN = "#1c1c1f";
 
 const VERT_HEAD = "#include <common>\nattribute vec2 uv1;\nvarying vec2 vPU;\nvarying vec3 vPN;\nvarying vec2 vMU;";
@@ -344,7 +340,7 @@ export default function MannequinTryOn({ color, print = NO_PRINT, size, studio, 
         aria-label={`T-shirt porté par ${current.gender === "duo" ? "deux mannequins, homme et femme" : `un mannequin ${current.gender}, look ${current.look.toLowerCase()}`}, taille ${size}. Fais glisser pour le tourner, pince pour zoomer ; zoomé, deux doigts pour te déplacer.`}
       >
         <Safe3D>
-          <Canvas dpr={[1, 1.5]} camera={{ position: [0, CAM_Y, CAM_Z], fov: 30 }} gl={{ antialias: true, alpha: true, preserveDrawingBuffer: !!studio }} onCreated={({ gl }) => colorTrue(gl)}>
+          <Canvas dpr={[1, 1.5]} camera={{ position: [0, CAM_Y, CAM_Z], fov: 30 }} gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true }} onCreated={({ gl }) => colorTrue(gl)}>
             <ambientLight intensity={0.3} />
             <directionalLight position={[2.5, 4, 4]} intensity={1.6} />
             <directionalLight position={[-3, 2, 2]} intensity={0.5} />
@@ -355,7 +351,7 @@ export default function MannequinTryOn({ color, print = NO_PRINT, size, studio, 
               <Lightformer intensity={0.8} position={[5, 0, 2]} scale={[3, 8, 1]} />
             </Environment>
             <CameraRig view={view} />
-            {studio && <WornSnapshot />}
+            <WornSnapshot />
             <Suspense fallback={null}>
               <Figure key={id} id={id} color={color} print={print} size={size} drag={drag} studio={studio} onFocus={onFocus} />
             </Suspense>

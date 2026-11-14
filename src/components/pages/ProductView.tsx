@@ -8,9 +8,16 @@ import { cart } from "@/lib/cart";
 import { available, defaultSize } from "@/lib/stock";
 import { flyToCart } from "@/lib/flyToCart";
 import { DELIVERY, DELIVERY_METHODS } from "@/lib/orders";
-import { PRINT_SIDES, formatFCFA, type Product } from "@/lib/products";
+import { PRINT_SIDES, formatFCFA, productHref, type Product } from "@/lib/products";
+import { PRODUCTION_URL } from "@/lib/site";
 import { loadPrint } from "@/lib/printImages";
 import { colorLabel } from "@/lib/admin/labels";
+import { COMPANY, whatsappWith } from "@/lib/company";
+import { PAYMENT_METHODS, PAYMENT_METHOD_IDS } from "@/lib/credits";
+import { WhatsAppMark } from "../WhatsAppButton";
+import { SizeHelper } from "../SizeHelper";
+import { wornSnapshot } from "../story/snapshot";
+import { shareCard, shareOrDownload } from "@/lib/shareCard";
 import { DUR, EASE, SPRING } from "@/lib/motion";
 import { ProductImage } from "../ProductImage";
 import { RevealLines } from "../Reveal";
@@ -56,6 +63,30 @@ export function ProductView({ product: p, others }: { product: Product; others: 
   const show = (v: View) => {
     setView(v);
     setShown(0);
+  };
+  // A link with ?vue=porte (shared, or "Voir porté" in the shop) opens the worn view.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("vue") !== "porte") return;
+    const id = requestAnimationFrame(() => setView("worn"));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  // Share the worn view: the mannequin on the studio backdrop, with the name and price, to WhatsApp, Instagram…
+  const [sharing, setSharing] = useState<"idle" | "busy" | "done">("idle");
+  const shareWorn = async () => {
+    if (!wornSnapshot.current || sharing === "busy") return;
+    setSharing("busy");
+    try {
+      const render = await wornSnapshot.current(1080, "front");
+      if (!render) throw new Error("no render");
+      const card = await shareCard(render, { title: p.name, price: formatFCFA(p.price), site: "artsyde.store" });
+      const link = `${PRODUCTION_URL}${productHref(p)}?vue=porte`;
+      const res = await shareOrDownload(card, `artsyde-${p.slug}-porte.png`, `${p.name} sur ArtSyde : ${link}`);
+      setSharing(res === "cancelled" ? "idle" : "done");
+      if (res !== "cancelled") window.setTimeout(() => setSharing("idle"), 2500);
+    } catch (err) {
+      console.error("Share failed", err);
+      setSharing("idle");
+    }
   };
 
   // Blank t-shirts left in this colour and size (Infinity when the colour isn't tracked in the stock).
@@ -113,6 +144,16 @@ export function ProductView({ product: p, others }: { product: Product; others: 
                 )}
               </motion.div>
             </AnimatePresence>
+            {view === "worn" && (
+              <button type="button" onClick={shareWorn} disabled={sharing === "busy"} className="absolute left-3 top-3 flex h-9 items-center gap-1.5 rounded-full bg-bg/85 px-3.5 text-sm text-ink shadow-[0_1px_4px_rgba(0,0,0,0.12)] disabled:opacity-60">
+                {sharing === "busy" ? "Préparation…" : sharing === "done" ? "Prêt ✓" : (
+                  <>
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><path d="M12 3v12M7 8l5-5 5 5M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5" /></svg>
+                    Partager
+                  </>
+                )}
+              </button>
+            )}
             {view === "worn" && <p className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-bg/85 px-3 py-1 text-sm text-muted">Taille {size} · {wornZoomed ? "glisse pour tourner · 2 doigts pour bouger" : "fais glisser pour tourner"}</p>}
             {view === "3d" && <p className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-bg/85 px-3 py-1 text-sm text-muted">Fais glisser pour tourner le t-shirt</p>}
           </div>
@@ -197,6 +238,14 @@ export function ProductView({ product: p, others }: { product: Product; others: 
                 );
               })}
             </div>
+            <SizeHelper
+              sizes={p.sizes.filter((s) => available(p.stock, color, s) > 0)}
+              current={size}
+              onPick={(s) => {
+                setSize(s);
+                setQty((q) => Math.max(1, Math.min(q, MAX_QTY, available(p.stock, color, s))));
+              }}
+            />
           </div>
 
           <div className="mt-6 flex items-center justify-between">
@@ -229,6 +278,32 @@ export function ProductView({ product: p, others }: { product: Product; others: 
           ) : (
             <Link href="/#boutique" className="mt-5 block text-center text-sm text-muted underline-offset-4 hover:text-ink hover:underline">Continuer mes achats</Link>
           )}
+
+          {/* What people ask before buying: delivery, payment, and a question to the shop with the product filled in. */}
+          <div className="mt-6 space-y-3 border-t border-line pt-6 text-sm">
+            <p className="flex gap-3">
+              <span aria-hidden>🚚</span>
+              <span>
+                Imprimé à la commande, prêt en 1 à 2 jours ouvrés. Livraison {DELIVERY.EXPRESS.note} ({formatFCFA(DELIVERY.EXPRESS.price)}) ou {DELIVERY.STANDARD.note} ({formatFCFA(DELIVERY.STANDARD.price)}), retrait à l&apos;atelier gratuit.{" "}
+                <Link href="/livraison" className="text-muted underline underline-offset-4 hover:text-ink">Détails</Link>
+              </span>
+            </p>
+            <p className="flex gap-3">
+              <span aria-hidden>💳</span>
+              <span>Paiement {PAYMENT_METHOD_IDS.map((m) => PAYMENT_METHODS[m]).join(", ").replace(/, ([^,]*)$/, " ou $1")}.</span>
+            </p>
+            {(COMPANY.whatsappNumber || COMPANY.whatsapp) && (
+              <a
+                href={whatsappWith(`Bonjour ArtSyde ! J'ai une question sur le t-shirt « ${p.name} » (${colorLabel(color)}, taille ${size}) : ${PRODUCTION_URL}${productHref(p)}`)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 font-medium text-[#128C7E] hover:underline"
+              >
+                <WhatsAppMark className="h-5 w-5" />
+                Une question sur ce t-shirt ? Écris-nous
+              </a>
+            )}
+          </div>
         </aside>
 
         <div className="space-y-16 lg:col-start-1">

@@ -34,6 +34,7 @@ function Card({ p, i, onAdd }: { p: Product; i: number; onAdd: (p: Product, colo
       <Tilt className="tile flex h-full flex-col p-5 md:p-6" max={6}>
       <div className="flex h-5 items-center justify-between">
         {p.tag ? <span className="eyebrow !text-[12px]">{p.tag === "Promo" ? "Offre" : p.tag}</span> : <span />}
+        <Link href={`${productHref(p)}?vue=porte`} className="text-[12px] text-muted underline-offset-4 hover:text-ink hover:underline">Voir porté</Link>
       </div>
       {/* Colour swap: the old tee fades out while the new one settles in. */}
       <div ref={art} className="relative my-4 aspect-square" style={{ transform: "translateZ(30px)" }}>

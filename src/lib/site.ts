@@ -1,5 +1,5 @@
-/** The production domain (www: artsyde.store redirects to it). */
-const PRODUCTION_URL = "https://www.artsyde.store";
+/** The production domain (www: artsyde.store redirects to it). Safe in client code (no environment). */
+export const PRODUCTION_URL = "https://www.artsyde.store";
 
 /** True on the live Vercel deployment (not on previews or in local development). */
 export const IS_PRODUCTION = process.env.VERCEL_ENV === "production";
