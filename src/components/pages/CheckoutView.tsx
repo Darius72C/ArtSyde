@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { track } from "@/lib/metrics";
 import { AnimatePresence, motion } from "motion/react";
 import { cart, cartSubtotal, useCart } from "@/lib/cart";
 import { DELIVERY, DELIVERY_METHODS, checkFields, orderHref, type CheckoutFields } from "@/lib/orders";
@@ -54,6 +55,7 @@ function Steps({ current }: { current: number }) {
 /** `online`: GeniusPay is set up: the customer pays right after ordering, on its page. */
 export function CheckoutView({ online = false }: { online?: boolean }) {
   const items = useCart();
+  useEffect(() => track("checkout.open"), []);
   const [method, setMethod] = useState<PaymentMethodId>("WAVE");
   const router = useRouter();
   const [delivery, setDelivery] = useState<DeliveryMethod>("STANDARD");

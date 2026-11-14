@@ -5,6 +5,7 @@ import { ORDER_FLOW, ORDER_STATUS, plural, shortDate } from "@/lib/admin/labels"
 import { getOverview, load } from "@/server/admin/queries";
 import { OrderTable } from "./OrderTable";
 import { DbNotice, Delta, MoreLink, Panel, Stat, StatusLabel, Swatch } from "./ui";
+import { METRICS, type Metric } from "@/lib/metrics";
 
 export async function OverviewView() {
   const r = await load(getOverview);
@@ -46,6 +47,30 @@ export async function OverviewView() {
           </ul>
         </Panel>
       </div>
+
+      <Panel title="Parcours des visiteurs · 30 jours">
+        {Object.keys(d.funnel).length ? (
+          <ul className="grid gap-x-10 border-t border-line sm:grid-cols-2">
+            {(Object.keys(METRICS) as Metric[]).map((k) => (
+              <li key={k} className="flex items-center justify-between gap-4 border-b border-line py-3 text-[15px]">
+                <span>{METRICS[k]}</span>
+                <span className={`tabular-nums ${d.funnel[k] ? "font-semibold" : "text-muted"}`}>
+                  {(d.funnel[k] ?? 0).toLocaleString("fr-FR")}
+                  {k !== "product.view" && d.funnel["product.view"] && ["worn.open", "cart.add", "whatsapp.question"].includes(k) ? (
+                    <span className="ml-2 text-xs font-normal text-muted">{Math.round(((d.funnel[k] ?? 0) / d.funnel["product.view"]) * 100)} % des vues</span>
+                  ) : null}
+                </span>
+              </li>
+            ))}
+            <li className="flex items-center justify-between gap-4 border-b border-line py-3 text-[15px]">
+              <span>Commandes payées</span>
+              <span className="font-semibold tabular-nums">{d.paidOrders.toLocaleString("fr-FR")}</span>
+            </li>
+          </ul>
+        ) : (
+          <p className="text-muted">Les chiffres arrivent dès les premières visites : pages produit vues, vue Porté, conseil de taille, partages, ajouts au panier, paiement…</p>
+        )}
+      </Panel>
 
       <div className="grid items-start gap-5 lg:grid-cols-2">
         <Panel title="Stock bas" action={<MoreLink href="/admin/produits">Produits et stock</MoreLink>}>

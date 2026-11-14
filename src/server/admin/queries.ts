@@ -103,7 +103,7 @@ export async function getOrder(reference: string) {
 // ---------- Overview ----------
 
 export async function getOverview() {
-  const [sales30, salesBefore, counts, customers, newCustomers, packs30, recent, lowStock, designs] = await Promise.all([
+  const [sales30, salesBefore, counts, customers, newCustomers, packs30, recent, lowStock, designs, metricRows] = await Promise.all([
     db.order.aggregate({ where: { ...PAID, createdAt: { gte: since(30) } }, _sum: { totalXof: true }, _count: { _all: true } }),
     db.order.aggregate({ where: { ...PAID, createdAt: { gte: since(60), lt: since(30) } }, _sum: { totalXof: true } }),
     statusCounts(),
@@ -113,6 +113,8 @@ export async function getOverview() {
     db.order.findMany({ orderBy: { createdAt: "desc" }, take: 6, select: orderRow }),
     db.colorStock.findMany({ where: { quantity: { lte: db.colorStock.fields.lowAt } }, orderBy: [{ quantity: "asc" }, { colorName: "asc" }] }),
     db.savedDesign.findMany({ orderBy: { createdAt: "desc" }, take: 4, include: { customer: { select: { name: true } } } }),
+    // the visit counters of the last 30 days (src/server/metrics.ts): one line per day
+    db.siteSetting.findMany({ where: { key: { gte: `metrics.${since(29).toISOString().slice(0, 10)}`, lt: "metrics.~" } }, select: { value: true } }),
   ]);
   const revenue = sales30._sum.totalXof ?? 0;
   return {
@@ -129,6 +131,11 @@ export async function getOverview() {
     recent,
     lowStock,
     designs,
+    // counters summed over the 30 days (unknown or bad values ignored)
+    funnel: metricRows.reduce<Record<string, number>>((sum, r) => {
+      for (const [k, v] of Object.entries((r.value ?? {}) as Record<string, unknown>)) if (typeof v === "number") sum[k] = (sum[k] ?? 0) + v;
+      return sum;
+    }, {}),
   };
 }
 

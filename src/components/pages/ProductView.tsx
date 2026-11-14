@@ -18,6 +18,7 @@ import { WhatsAppMark } from "../WhatsAppButton";
 import { SizeHelper } from "../SizeHelper";
 import { wornSnapshot } from "../story/snapshot";
 import { shareCard, shareOrDownload } from "@/lib/shareCard";
+import { track } from "@/lib/metrics";
 import { DUR, EASE, SPRING } from "@/lib/motion";
 import { ProductImage } from "../ProductImage";
 import { RevealLines } from "../Reveal";
@@ -68,7 +69,9 @@ export function ProductView({ product: p, others }: { product: Product; others: 
   const show = (v: View) => {
     setView(v);
     setShown(0);
+    if (v === "worn") track("worn.open");
   };
+  useEffect(() => track("product.view"), [p.id]);
   // Light mode: on a phone with little memory or with data saving on, the 3D mannequin loads only when asked.
   const [lite, setLite] = useState(false);
   const [want3d, setWant3d] = useState(false);
@@ -80,6 +83,7 @@ export function ProductView({ product: p, others }: { product: Product; others: 
   // A link with ?vue=porte (shared, or "Voir porté" in the shop) opens the worn view.
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("vue") !== "porte") return;
+    track("worn.open");
     const id = requestAnimationFrame(() => setView("worn"));
     return () => cancelAnimationFrame(id);
   }, []);
@@ -95,6 +99,7 @@ export function ProductView({ product: p, others }: { product: Product; others: 
       const link = `${PRODUCTION_URL}${productHref(p)}?vue=porte`;
       const res = await shareOrDownload(card, `artsyde-${p.slug}-porte.png`, `${p.name} sur ArtSyde : ${link}`);
       setSharing(res === "cancelled" ? "idle" : "done");
+      if (res !== "cancelled") track("worn.share");
       if (res !== "cancelled") window.setTimeout(() => setSharing("idle"), 2500);
     } catch (err) {
       console.error("Share failed", err);
@@ -110,6 +115,7 @@ export function ProductView({ product: p, others }: { product: Product; others: 
   function add() {
     if (soldOut) return;
     flyToCart(art.current);
+    track("cart.add");
     cart.add({ productId: p.id, name: p.name, price: p.price, color, size, qty, art: p.art, bg: p.bg, photo: p.photo });
     setAdded(true);
     window.clearTimeout(timer.current);
@@ -263,6 +269,7 @@ export function ProductView({ product: p, others }: { product: Product; others: 
               sizes={p.sizes.filter((s) => available(p.stock, color, s) > 0)}
               current={size}
               onPick={(s) => {
+                track("size.advice");
                 setSize(s);
                 setQty((q) => Math.max(1, Math.min(q, MAX_QTY, available(p.stock, color, s))));
               }}
@@ -318,6 +325,7 @@ export function ProductView({ product: p, others }: { product: Product; others: 
                 href={whatsappWith(`Bonjour ArtSyde ! J'ai une question sur le t-shirt « ${p.name} » (${colorLabel(color)}, taille ${size}) : ${PRODUCTION_URL}${productHref(p)}`)}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => track("whatsapp.question")}
                 className="flex items-center gap-3 font-medium text-[#128C7E] hover:underline"
               >
                 <WhatsAppMark className="h-5 w-5" />

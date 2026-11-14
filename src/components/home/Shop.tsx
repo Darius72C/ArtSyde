@@ -1,5 +1,6 @@
 "use client";
 
+import { track } from "@/lib/metrics";
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
@@ -93,6 +94,7 @@ export function Shop({ products }: { products: Product[] }) {
   const list = tab === "all" ? products : products.filter((p) => p.tag === tab);
 
   const add = (p: Product, color: string, from: Element | null) => {
+    track("cart.add");
     flyToCart(from);
     cart.add({ productId: p.id, name: p.name, price: p.price, color, size: defaultSize(p.stock, color, p.sizes), art: p.art, bg: p.bg, photo: p.photo });
     setToast(p.name);

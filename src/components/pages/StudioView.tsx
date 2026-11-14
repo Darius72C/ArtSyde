@@ -22,6 +22,7 @@ import { TEE_ASPECT, TEE_PATH_01, teePath2D } from "../story/teeOutline";
 import { teeSnapshot, wornSnapshot } from "../story/snapshot";
 import { onBackdrop } from "@/lib/backdrop";
 import { clearDraft, loadDraft, saveDraft } from "@/lib/studioDraft";
+import { track } from "@/lib/metrics";
 import { zipFiles } from "@/lib/zip";
 import { embedTrace, protectImage, stampWatermark } from "@/lib/watermark";
 
@@ -534,6 +535,7 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
     setRestored(false);
     setSelected("text");
   };
+  useEffect(() => track("studio.open"), []);
   useEffect(() => {
     let seen = true;
     try {
@@ -791,6 +793,7 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
     setAdding(null);
     const thumb = snapshot3d();
     const name = quality === "STANDARD" ? "T-shirt personnalisé" : `T-shirt personnalisé · ${q.label}`;
+    track("studio.cart");
     cart.add({ key: cartKey(), productId: null, name, price, color: teeHex, size, qty, preview: thumb, bg: "#e7e0d3", quality, files });
     flash(q.credits ? `Ajouté au panier · ${creditsLabel(q.credits)} utilisé${q.credits > 1 ? "s" : ""}` : "Ajouté au panier");
   };
@@ -843,6 +846,7 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
         files.push({ name: `artsyde-${free ? "apercu" : "impression"}-${id === "front" ? "devant" : "dos"}-${tag}.png`, data: blob });
       }
       save(await zipFiles(files), `artsyde-${tag}.zip`);
+      track("studio.download");
       flash(q.credits ? `Visuel ${q.label} téléchargé · ${creditsLabel(q.credits)} utilisé${q.credits > 1 ? "s" : ""}` : "Visuel téléchargé");
     } catch (err) {
       console.error("Studio export failed", err);
