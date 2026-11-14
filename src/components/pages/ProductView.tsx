@@ -322,7 +322,7 @@ export function ProductView({ product: p, others }: { product: Product; others: 
             </p>
             {(COMPANY.whatsappNumber || COMPANY.whatsapp) && (
               <a
-                href={whatsappWith(`Bonjour ArtSyde ! J'ai une question sur le t-shirt « ${p.name} » (${colorLabel(color).startsWith("#") ? "" : `${colorLabel(color)}, `}taille ${size}) : ${PRODUCTION_URL}${productHref(p)}`)}
+                href={whatsappWith(`Bonjour ArtSyde ! J'ai une question sur le t-shirt « ${p.name} » (${colorLabel(color).toLowerCase()}, taille ${size}) : ${PRODUCTION_URL}${productHref(p)}`)}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => track("whatsapp.question")}

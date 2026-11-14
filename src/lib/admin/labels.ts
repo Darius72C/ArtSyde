@@ -4,7 +4,42 @@ import { TEE_COLORS } from "@/lib/data";
 /** "Noir" for "#1C1C1E"; "Couleur libre" for a colour the shop does not list (as in the cart). */
 export const colorName = (hex: string) => TEE_COLORS.find((c) => c.hex.toLowerCase() === hex.toLowerCase())?.name ?? "Couleur libre";
 /** Like colorName, but a colour outside the palette shows its code: needed where several such colours sit side by side. */
-export const colorLabel = (hex: string) => TEE_COLORS.find((c) => c.hex.toLowerCase() === hex.toLowerCase())?.name ?? hex.toUpperCase();
+// Other everyday colour names, for tints outside the workshop's palette (a product in pure black, in green…).
+const MORE_COLORS = [
+  { name: "Blanc", hex: "#FFFFFF" },
+  { name: "Gris", hex: "#808080" },
+  { name: "Gris foncé", hex: "#4A4A4D" },
+  { name: "Vert", hex: "#1E8A4C" },
+  { name: "Vert foncé", hex: "#1F4D36" },
+  { name: "Bleu", hex: "#1F5FBF" },
+  { name: "Bleu ciel", hex: "#8EC5E8" },
+  { name: "Turquoise", hex: "#1AA6A6" },
+  { name: "Jaune", hex: "#F2C230" },
+  { name: "Orange", hex: "#E8742A" },
+  { name: "Bordeaux", hex: "#6E1A2C" },
+  { name: "Violet", hex: "#6A3D9A" },
+  { name: "Marron", hex: "#6B4428" },
+  { name: "Beige", hex: "#E6D8BE" },
+] as const;
+const rgb = (hex: string) => {
+  const n = parseInt(hex.replace("#", "").padEnd(6, "0").slice(0, 6), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+};
+/** The colour's name: the palette's own name when it is one of them, else the nearest everyday name. */
+export const colorLabel = (hex: string) => {
+  const exact = TEE_COLORS.find((c) => c.hex.toLowerCase() === hex.toLowerCase());
+  if (exact) return exact.name;
+  if (!/^#?[0-9a-f]{6}$/i.test(hex)) return hex;
+  const [r, g, b] = rgb(hex);
+  let best: string = hex.toUpperCase(), dist = Infinity;
+  for (const c of [...TEE_COLORS, ...MORE_COLORS]) {
+    const [r2, g2, b2] = rgb(c.hex);
+    const rm = (r + r2) / 2; // "redmean": a cheap distance close to what the eye sees
+    const d = (2 + rm / 256) * (r - r2) ** 2 + 4 * (g - g2) ** 2 + (2 + (255 - rm) / 256) * (b - b2) ** 2;
+    if (d < dist) [best, dist] = [c.name, d];
+  }
+  return best;
+};
 
 /**
  * French labels for the admin, safe to import from server and client code
