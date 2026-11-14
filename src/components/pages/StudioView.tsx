@@ -21,6 +21,7 @@ import { DESIGN_SAVE_CREDITS, FREE_DESIGNS, PRINT_QUALITIES, PRINT_QUALITY, PRIN
 import { TEE_ASPECT, TEE_PATH_01, teePath2D } from "../story/teeOutline";
 import { teeSnapshot, wornSnapshot } from "../story/snapshot";
 import { onBackdrop } from "@/lib/backdrop";
+import { clearDraft, loadDraft, saveDraft } from "@/lib/studioDraft";
 import { zipFiles } from "@/lib/zip";
 import { embedTrace, protectImage, stampWatermark } from "@/lib/watermark";
 
@@ -65,6 +66,23 @@ const panelIn = (i: number) => fadeUp(0.15 + i * STAGGER.item);
 const DEFAULT_TEXT: Txt = { value: "Atelier", font: "italic", color: "#efe9df", x: 0.5, y: 0.27, size: 0.085, rot: 0 };
 const DEFAULT_IMAGE = { x: 0.5, y: 0.4, scale: 0.34, rot: 0 };
 const MAX_IMAGES = 8; // per side
+
+/** Ready-made layouts to start from: one text placed on a side (the colour chosen stays). */
+const TEMPLATES: { label: string; side: SideId; text: Omit<Txt, "color" | "rot"> }[] = [
+  { label: "Prénom en grand", side: "front", text: { value: "TON PRÉNOM", font: "sans", x: 0.5, y: 0.3, size: 0.1 } },
+  { label: "Petit logo poitrine", side: "front", text: { value: "Atelier", font: "italic", x: 0.66, y: 0.25, size: 0.045 } },
+  { label: "Phrase au dos", side: "back", text: { value: "Ta phrase ici", font: "serif", x: 0.5, y: 0.36, size: 0.065 } },
+  { label: "Numéro au dos", side: "back", text: { value: "10", font: "sans", x: 0.5, y: 0.45, size: 0.3 } },
+];
+
+/** What the browser keeps of the design in progress (see src/lib/studioDraft.ts). */
+type Draft = { v: 1; design: Record<SideId, Side>; teeHex: string; savedAs: { id: string; name: string } | null };
+const GUIDE_KEY = "artsyde:studio-guide-vu";
+const GUIDE = [
+  { title: "1 · La couleur", body: "Choisis la teinte du t-shirt dans l'onglet Couleur." },
+  { title: "2 · Ton design", body: "Ajoute un texte (ou pars d'un modèle) et tes images, devant et dos. Fais-les glisser sur le t-shirt pour les placer." },
+  { title: "3 · Vois-le porté", body: "Passe en vue Porté pour le voir sur un mannequin, puis télécharge le visuel ou commande-le." },
+];
 /** How long "Annuler" stays offered after images are added (the server allows a little more). */
 const UNDO_SECONDS = 15;
 
@@ -304,6 +322,11 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
   const [savedAs, setSavedAs] = useState<{ id: string; name: string } | null>(null);
   const [naming, setNaming] = useState<string | null>(null); // the name being typed before the first save
   const [saving, setSaving] = useState(false);
+  // Draft kept in this browser: restored on arrival (unless a saved creation is opened), saved on each change.
+  const draftReady = useRef(false);
+  const [restored, setRestored] = useState(false);
+  // First visit: a three-step guide over the stage.
+  const [guide, setGuide] = useState<number | null>(null);
   const preview = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const veiled = useCaptureVeil();
@@ -455,6 +478,86 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
       live = false;
     };
   }, []);
+
+  // The draft: restored once on arrival, unless /studio?design= opens a saved creation.
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get("design")) {
+      draftReady.current = true;
+      return;
+    }
+    let live = true;
+    (async () => {
+      const d = await loadDraft<Draft>();
+      const all = d ? [...d.design.front.images, ...d.design.back.images] : [];
+      // Nothing worth restoring: no image, and no text but the studio's default one.
+      const untouched = (t?: Txt) => !t?.value || (t.value === DEFAULT_TEXT.value && t.x === DEFAULT_TEXT.x && t.y === DEFAULT_TEXT.y);
+      const empty = !d || (!all.length && untouched(d.design.front.text) && untouched(d.design.back.text));
+      if (!live) return;
+      if (empty) {
+        draftReady.current = true;
+        return;
+      }
+      await Promise.all(
+        [...new Set(all.map((i) => i.src))].map(
+          (src) =>
+            new Promise<void>((done) => {
+              const el = new Image();
+              if (!src.startsWith("data:")) el.crossOrigin = "anonymous";
+              el.onload = () => (images.current.set(src, el), done());
+              el.onerror = () => done();
+              el.src = src;
+            }),
+        ),
+      );
+      if (!live) return;
+      const keep = (sd: Side): Side => ({ ...sd, images: sd.images.filter((i) => images.current.has(i.src)) });
+      setDesign({ front: keep(d.design.front), back: keep(d.design.back) });
+      pickColor(d.teeHex);
+      setSavedAs(d.savedAs);
+      setSelected(d.design.front.images.at(-1)?.id ?? (d.design.front.text ? "text" : null));
+      setRestored(true);
+      draftReady.current = true;
+    })();
+    return () => {
+      live = false;
+    };
+  }, []);
+  useEffect(() => {
+    if (!draftReady.current) return;
+    const t = window.setTimeout(() => void saveDraft<Draft>({ v: 1, design, teeHex, savedAs }), 600);
+    return () => window.clearTimeout(t);
+  }, [design, teeHex, savedAs]);
+  const startOver = () => {
+    void clearDraft();
+    setDesign({ front: { images: [], text: DEFAULT_TEXT }, back: { images: [] } });
+    setSavedAs(null);
+    setRestored(false);
+    setSelected("text");
+  };
+  useEffect(() => {
+    let seen = true;
+    try {
+      seen = localStorage.getItem(GUIDE_KEY) === "1";
+    } catch {
+      // storage blocked: no guide rather than one on every visit
+    }
+    if (seen) return;
+    const id = requestAnimationFrame(() => setGuide(0));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  const closeGuide = () => {
+    setGuide(null);
+    try {
+      localStorage.setItem(GUIDE_KEY, "1");
+    } catch {
+      // shown again next time: fine
+    }
+  };
+  const applyTemplate = (t: (typeof TEMPLATES)[number]) => {
+    setDesign((d) => ({ ...d, [t.side]: { ...d[t.side], text: { ...t.text, rot: 0, color: d[t.side].text?.color ?? DEFAULT_TEXT.color } } }));
+    if (t.side !== side) flip(t.side);
+    setSelected("text");
+  };
 
   /**
    * Saves the design in the customer's account (free): images still only in this page are sent to the
@@ -838,11 +941,36 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
           <Watermark />
           <p className="eyebrow pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap">Glisse pour tourner</p>
           <Veil on={veiled} />
+          {guide !== null && (
+            <div className="absolute inset-x-4 bottom-4 z-20 rounded-2xl bg-bg/95 p-5 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.35)]" role="dialog" aria-label="Guide du studio">
+              <p className="text-[15px] font-semibold">{GUIDE[guide].title}</p>
+              <p className="mt-1 text-sm text-muted">{GUIDE[guide].body}</p>
+              <div className="mt-4 flex items-center justify-between">
+                <span className="flex gap-1.5" aria-hidden>
+                  {GUIDE.map((_, i) => (
+                    <span key={i} className={`h-1.5 w-1.5 rounded-full ${i === guide ? "bg-ink" : "bg-line"}`} />
+                  ))}
+                </span>
+                <span className="flex gap-4 text-sm">
+                  <button type="button" onClick={closeGuide} className="text-muted hover:text-ink">Passer</button>
+                  <button type="button" onClick={() => (guide < GUIDE.length - 1 ? setGuide(guide + 1) : closeGuide())} className="font-medium text-link">
+                    {guide < GUIDE.length - 1 ? "Suivant" : "C'est parti"}
+                  </button>
+                </span>
+              </div>
+            </div>
+          )}
         </motion.section>
 
         {/* Tools */}
         {/* `!`: `.tile` (unlayered in globals.css) sets overflow: hidden, which beats a plain utility and cropped the panel. */}
         <motion.aside {...panelIn(1)} data-lenis-prevent className="tile order-2 p-6 lg:order-1 lg:max-h-[calc(100svh-200px)] lg:!overflow-y-auto lg:overscroll-contain">
+          {restored && (
+            <p className="mb-4 flex items-center justify-between gap-3 rounded-xl bg-surface px-3 py-2 text-[13px]">
+              <span>Ton brouillon a été retrouvé.</span>
+              <button type="button" onClick={startOver} className="shrink-0 text-muted underline underline-offset-4 hover:text-ink">Recommencer à zéro</button>
+            </p>
+          )}
           <div className="flex gap-6 border-b border-line" role="tablist">
             {(["couleur", "image", "texte"] as const).map(tabBtn)}
           </div>
@@ -896,6 +1024,16 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
 
               {tab === "texte" && (
                 <>
+                  <div>
+                    <p className="mb-2 text-[14px] text-muted">Pour démarrer</p>
+                    <div className="flex flex-wrap gap-2">
+                      {TEMPLATES.map((t) => (
+                        <button key={t.label} type="button" onClick={() => applyTemplate(t)} className="rounded-full border border-line px-3 py-1.5 text-[13px] transition-colors hover:border-muted">
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <label className="block">
                     <span className="mb-1.5 block text-[14px] text-muted">Ton texte</span>
                     <textarea
