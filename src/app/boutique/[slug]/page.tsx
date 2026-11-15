@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { PageShell } from "@/components/PageShell";
 import { ProductView } from "@/components/pages/ProductView";
 import { getCatalog, getProduct } from "@/server/catalog";
+import { formatFCFA } from "@/lib/products";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { AdSlot } from "@/components/AdSlot";
 
@@ -16,7 +17,16 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: PageProps<"/boutique/[slug]">): Promise<Metadata> {
   const p = await getProduct((await params).slug);
-  return p ? { title: `${p.name} — ArtSyde`, description: p.description || undefined } : { title: "Produit introuvable — ArtSyde" };
+  if (!p) return { title: "Produit introuvable — ArtSyde" };
+  // The share card (src/app/boutique/[slug]/carte): what WhatsApp, Facebook, X… show when the link is pasted.
+  const summary = `${formatFCFA(p.price)} · Tailles ${p.sizes.join(", ")} · imprimé à la commande dans notre atelier.`;
+  const card = { url: `/boutique/${p.slug}/carte?format=og`, width: 1200, height: 630, alt: `${p.name}, t-shirt ArtSyde` };
+  return {
+    title: `${p.name} — ArtSyde`,
+    description: p.description || summary,
+    openGraph: { title: `${p.name} — ArtSyde`, description: summary, url: `/boutique/${p.slug}`, images: [card] },
+    twitter: { card: "summary_large_image", title: `${p.name} — ArtSyde`, description: summary, images: [card.url] },
+  };
 }
 
 async function Product({ params }: Pick<PageProps<"/boutique/[slug]">, "params">) {

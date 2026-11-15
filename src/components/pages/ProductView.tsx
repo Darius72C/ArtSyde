@@ -16,6 +16,7 @@ import { COMPANY, whatsappWith } from "@/lib/company";
 import { PAYMENT_METHODS, PAYMENT_METHOD_IDS } from "@/lib/credits";
 import { WhatsAppMark } from "../WhatsAppButton";
 import { SizeHelper } from "../SizeHelper";
+import { ShareProduct } from "../ShareProduct";
 import { wornSnapshot } from "../story/snapshot";
 import { shareCard, shareOrDownload } from "@/lib/shareCard";
 import { track } from "@/lib/metrics";
@@ -203,7 +204,12 @@ export function ProductView({ product: p, others }: { product: Product; others: 
         </section>
 
         <aside className="tile p-8 lg:sticky lg:top-20 lg:col-start-2 lg:row-span-2 lg:row-start-1">
-          <p className="text-[21px] font-semibold">Ton t-shirt</p>
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-[21px] font-semibold">Ton t-shirt</p>
+          </div>
+          <div className="mt-3">
+            <ShareProduct name={p.name} price={formatFCFA(p.price)} slug={p.slug} url={`${PRODUCTION_URL}${productHref(p)}`} />
+          </div>
           <dl className="mt-6 space-y-3 text-sm">
             <div className="flex justify-between">
               <dt className="text-muted">Prix</dt>

@@ -7,6 +7,7 @@ export const METRICS = {
   "worn.open": "Vue Porté ouverte",
   "size.advice": "Conseil de taille appliqué",
   "worn.share": "Visuels Porté partagés",
+  "product.share": "Produits partagés (lien ou carte)",
   "whatsapp.question": "Questions WhatsApp depuis un produit",
   "cart.add": "Ajouts au panier (boutique)",
   "studio.open": "Studio ouvert",
