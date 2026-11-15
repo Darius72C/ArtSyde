@@ -18,7 +18,7 @@ import { WhatsAppMark } from "../WhatsAppButton";
 import { SizeHelper } from "../SizeHelper";
 import { ShareProduct } from "../ShareProduct";
 import { wornSnapshot } from "../story/snapshot";
-import { shareCard, shareOrDownload } from "@/lib/shareCard";
+import { shareOrDownload, wornShareCard } from "@/lib/shareCard";
 import { track } from "@/lib/metrics";
 import { DUR, EASE, SPRING } from "@/lib/motion";
 import { ProductImage } from "../ProductImage";
@@ -94,10 +94,11 @@ export function ProductView({ product: p, others }: { product: Product; others: 
     if (!wornSnapshot.current || sharing === "busy") return;
     setSharing("busy");
     try {
-      const render = await wornSnapshot.current(1080, "front");
-      if (!render) throw new Error("no render");
-      const card = await shareCard(render, { title: p.name, price: formatFCFA(p.price), site: "artsyde.store" });
+      const front = await wornSnapshot.current(1000, "front");
+      const back = await wornSnapshot.current(1000, "back");
+      if (!front || !back) throw new Error("no render");
       const link = `${PRODUCTION_URL}${productHref(p)}?vue=porte`;
+      const card = await wornShareCard({ front, back, photo: p.photo ?? p.photos[0], title: p.name, price: formatFCFA(p.price), sizes: `Tailles ${p.sizes.join(", ")}`, link });
       const res = await shareOrDownload(card, `artsyde-${p.slug}-porte.png`, `${p.name} sur ArtSyde : ${link}`);
       setSharing(res === "cancelled" ? "idle" : "done");
       if (res !== "cancelled") track("worn.share");
