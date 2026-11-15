@@ -3,7 +3,6 @@ import { Footer } from "@/components/Footer";
 import { WhatsAppButton } from "@/components/WhatsAppButton";
 import { PageTransition } from "@/components/PageShell";
 import { Hero } from "@/components/home/Hero";
-import { ScrollStory } from "@/components/home/ScrollStory";
 import { NewArrivals } from "@/components/home/NewArrivals";
 import { Bento } from "@/components/home/Bento";
 import { Shop } from "@/components/home/Shop";
@@ -28,14 +27,14 @@ export default async function Home() {
         <Hero products={products} cards={heroCards} />
         {/* Banner places (Admin > Accueil > Bannières): each shows nothing unless a banner is set for it. */}
         <AdSlot placement="home.afterHero" />
-        <ScrollStory />
+        {/* The shop right after the hero: visitors who scrolled past the 3D story left before seeing the products. */}
+        <Shop products={products} />
+        <AdSlot placement="home.afterShop" />
+        <StockWatch />
         <NewArrivals products={products} />
         <AdSlot placement="home.afterNew" />
         <Bento />
         <AdSlot placement="home.afterWhy" />
-        <Shop products={products} />
-        <AdSlot placement="home.afterShop" />
-        <StockWatch />
         <Teams />
         <Credits />
         <AdSlot placement="home.beforeFaq" />
