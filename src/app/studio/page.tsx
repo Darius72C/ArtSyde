@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { PageShell } from "@/components/PageShell";
 import { StudioView } from "@/components/pages/StudioView";
 import { getStock, getStockColours } from "@/server/stock";
-import { LiveRefresh } from "@/components/LiveRefresh";
+import { StockWatch } from "@/components/StockWatch";
 import { AdSlot } from "@/components/AdSlot";
 
 export const metadata: Metadata = { title: "Studio 3D — ArtSyde" };
@@ -15,7 +15,7 @@ export default async function Page() {
     <PageShell footer={false}>
       <StudioView stock={stock} stockColours={stockColours} />
       <AdSlot placement="studio" />
-      <LiveRefresh src="/api/live/stock" events={["stock"]} />
+      <StockWatch />
     </PageShell>
   );
 }

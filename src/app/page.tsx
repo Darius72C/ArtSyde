@@ -13,7 +13,7 @@ import { Faq } from "@/components/home/Faq";
 import { Newsletter } from "@/components/home/Newsletter";
 import { getCatalog } from "@/server/catalog";
 import { getHeroCards } from "@/server/hero";
-import { LiveRefresh } from "@/components/LiveRefresh";
+import { StockWatch } from "@/components/StockWatch";
 import { AdSlot } from "@/components/AdSlot";
 
 export default async function Home() {
@@ -35,7 +35,7 @@ export default async function Home() {
         <AdSlot placement="home.afterWhy" />
         <Shop products={products} />
         <AdSlot placement="home.afterShop" />
-        <LiveRefresh src="/api/live/stock" events={["stock"]} />
+        <StockWatch />
         <Teams />
         <Credits />
         <AdSlot placement="home.beforeFaq" />

@@ -5,7 +5,7 @@ import { PageShell } from "@/components/PageShell";
 import { ProductView } from "@/components/pages/ProductView";
 import { getCatalog, getProduct } from "@/server/catalog";
 import { formatFCFA } from "@/lib/products";
-import { LiveRefresh } from "@/components/LiveRefresh";
+import { StockWatch } from "@/components/StockWatch";
 import { AdSlot } from "@/components/AdSlot";
 
 /** Every product is prerendered; one added later in the admin renders on its first visit. */
@@ -38,7 +38,7 @@ async function Product({ params }: Pick<PageProps<"/boutique/[slug]">, "params">
       <ProductView product={product} others={all.filter((p) => p.id !== product.id)} />
       <AdSlot placement="product" />
       {/* Sizes sold out elsewhere go "Épuisé" here without reloading. */}
-      <LiveRefresh src="/api/live/stock" events={["stock"]} />
+      <StockWatch />
     </>
   );
 }
