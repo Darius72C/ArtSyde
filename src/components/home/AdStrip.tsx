@@ -1,3 +1,4 @@
+import { optimizedSrc, optimizedSrcSet } from "@/lib/imageUrl";
 import Link from "next/link";
 import { external, type AdBanner } from "@/lib/ad";
 
@@ -13,7 +14,7 @@ export function AdStrip({ ad, preview = false }: { ad: AdBanner; preview?: boole
   const inner = (
     <div className="group relative overflow-hidden rounded-[22px] bg-surface sm:h-[180px]">
       {/* eslint-disable-next-line @next/next/no-img-element -- R2's public domain is set per deployment */}
-      <img src={ad.image} alt={ad.title ?? ""} loading="lazy" decoding="async" className="block aspect-[5/1] w-full object-cover transition-transform duration-700 group-hover:scale-[1.03] sm:absolute sm:inset-0 sm:aspect-auto sm:h-full" />
+      <img src={optimizedSrc(ad.image, 1200)} srcSet={optimizedSrcSet(ad.image)} sizes="100vw" alt={ad.title ?? ""} loading="lazy" decoding="async" className="block aspect-[5/1] w-full object-cover transition-transform duration-700 group-hover:scale-[1.03] sm:absolute sm:inset-0 sm:aspect-auto sm:h-full" />
       {(ad.title || ad.text) && <div aria-hidden className={`absolute inset-0 hidden sm:block ${light ? "bg-gradient-to-r from-black/60 via-black/20 to-transparent" : "bg-gradient-to-r from-white/70 via-white/25 to-transparent"}`} />}
       {words && <div className="relative flex items-center justify-between gap-4 px-4 py-3 sm:h-full sm:px-10 sm:py-0">
         <div className={`min-w-0 sm:max-w-[60%] ${ink}`}>

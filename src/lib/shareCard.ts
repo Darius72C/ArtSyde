@@ -1,5 +1,6 @@
 import qrcode from "qrcode-generator";
 import { onBackdrop } from "./backdrop";
+import { optimizedSrc } from "./imageUrl";
 
 /**
  * The image shared from the "Porté" view: the mannequin on the studio backdrop, with the product's name and
@@ -116,7 +117,7 @@ export async function wornShareCard(o: { front: Blob; back: Blob; photo?: string
   const [front, back, photo] = await Promise.all([
     cropToSubject(o.front, 0.8).then(onBackdrop).then(createImageBitmap),
     cropToSubject(o.back, 0.8).then(onBackdrop).then(createImageBitmap),
-    o.photo ? loadImage(o.photo) : Promise.resolve(null),
+    o.photo ? loadImage(optimizedSrc(o.photo, 828)) : Promise.resolve(null),
   ]);
   await document.fonts?.ready;
   const font = '"Inter Display", Inter, system-ui, sans-serif';

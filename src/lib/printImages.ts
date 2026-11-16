@@ -4,6 +4,8 @@
  * back and forth doesn't load them again. No three.js here, so the page can import it freely.
  */
 
+import { optimizedSrc } from "./imageUrl";
+
 const loaded = new Map<string, HTMLImageElement>();
 const pending = new Map<string, Promise<HTMLImageElement | null>>();
 
@@ -29,7 +31,7 @@ export function loadPrint(url: string): Promise<HTMLImageElement | null> {
         pending.delete(url);
         resolve(null);
       };
-      img.src = url;
+      img.src = optimizedSrc(url, 1080); // the 3D view draws a print 1024 px wide at most: never the 10+ MB original
     });
     pending.set(url, p);
   }

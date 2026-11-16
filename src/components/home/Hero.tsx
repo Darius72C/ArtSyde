@@ -6,6 +6,7 @@ import { motion, useMotionValue, useReducedMotion, useScroll, useSpring, useTran
 import type { Product } from "@/lib/products";
 import type { HeroCardView } from "@/server/hero";
 import { RevealLines } from "../Reveal";
+import { optimizedSrc, optimizedSrcSet } from "@/lib/imageUrl";
 import { DUR, EASE, SPRING, STAGGER } from "@/lib/motion";
 
 /*
@@ -75,7 +76,7 @@ function HeroCard({ card, slot, spread, px, py, still }: { card: Card; slot: (ty
         >
           <div className="h-full w-full overflow-hidden rounded-[28px] shadow-[0_30px_80px_-20px_rgba(0,0,0,0.45)] ring-1 ring-ink/10">
             {/* eslint-disable-next-line @next/next/no-img-element -- photos live on R2, whose public domain is set per deployment */}
-            <img src={card.photo} alt="" draggable={false} loading="eager" fetchPriority={slot.z === 3 ? "high" : "auto"} decoding="async" className="h-full w-full bg-surface object-cover" />
+            <img src={optimizedSrc(card.photo, 828)} srcSet={optimizedSrcSet(card.photo)} sizes="(max-width: 768px) 60vw, 30vw" alt="" draggable={false} loading="eager" fetchPriority={slot.z === 3 ? "high" : "auto"} decoding="async" className="h-full w-full bg-surface object-cover" />
           </div>
         </motion.div>
       </motion.div>
