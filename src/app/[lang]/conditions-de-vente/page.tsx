@@ -1,4 +1,6 @@
-import { pageMetadata } from "@/lib/i18n/server";
+import { getLocale, pageMetadata } from "@/lib/i18n/server";
+import { makeT } from "@/lib/i18n";
+import { FrenchPrevails } from "@/components/pages/FrenchPrevails";
 import Link from "@/components/LocaleLink";
 import { PageShell } from "@/components/PageShell";
 import { Fact, InfoPage, InfoSection } from "@/components/pages/InfoPage";
@@ -11,7 +13,8 @@ export const generateMetadata = pageMetadata("Conditions générales de vente �
 
 const methods = PAYMENT_METHOD_IDS.map((k) => PAYMENT_METHODS[k]).join(", ");
 
-export default function Page() {
+export default async function Page() {
+  if ((await getLocale()) === "en") return <English />;
   return (
     <PageShell>
       <InfoPage
@@ -88,6 +91,94 @@ export default function Page() {
         <InfoSection title="11. Réclamations et litiges">
           <p>
             Pour toute réclamation, écris-nous (<Fact value={COMPANY.email} fallback={<Link href="/contact">page Contact</Link>} />). Nous cherchons d&apos;abord une solution amiable. Ces conditions sont soumises au droit ivoirien ; à défaut d&apos;accord, le litige relève des tribunaux compétents d&apos;{COMPANY.city}.
+          </p>
+        </InfoSection>
+      </InfoPage>
+    </PageShell>
+  );
+}
+
+/** The terms in English (the French text above prevails). */
+function English() {
+  const t = makeT("en");
+  const where = filled(COMPANY.address) ? `${COMPANY.address}, ${COMPANY.city}` : COMPANY.city;
+  return (
+    <PageShell>
+      <InfoPage
+        eyebrow="Legal information"
+        title="Terms and conditions of sale."
+        lead={`They apply to every order placed on the ${COMPANY.brand} site: shop t-shirts, 3D studio creations and studio credits.`}
+        current="/conditions-de-vente"
+        updated={LEGAL_UPDATED}
+      >
+        <FrenchPrevails />
+        <InfoSection title="1. The seller">
+          <p>
+            Sales are made with <Fact value={COMPANY.legalName} fallback={COMPANY.brand} />
+            {filled(COMPANY.rccm) && <>, RCCM {COMPANY.rccm}</>}, whose workshop is located at {where}, {COMPANY.country}. To reach us: <Fact value={COMPANY.email} fallback={<Link href="/contact">the Contact page</Link>} />.
+          </p>
+        </InfoSection>
+
+        <InfoSection title="2. The products">
+          <p>We sell t-shirts printed to order in our workshop: the designs in the shop, and the creations you make in the 3D studio.</p>
+          <p>Photos and the 3D view are as faithful as possible, but colours may differ slightly depending on your screen and the fabric. Whether a colour and size are available depends on our stock of blank t-shirts; a sold-out size can&apos;t be ordered.</p>
+        </InfoSection>
+
+        <InfoSection title="3. Prices">
+          <p>Prices are shown in CFA francs (FCFA), all taxes included. Delivery costs are added according to the option chosen:</p>
+          <ul>
+            {DELIVERY_METHODS.map((d) => (
+              <li key={d}>
+                {t(DELIVERY[d].label)} ({t(DELIVERY[d].note)}): {DELIVERY[d].price ? formatFCFA(DELIVERY[d].price) : "free"}
+              </li>
+            ))}
+          </ul>
+          <p>The price applied is the one shown when you order. With online payment, the chosen operator&apos;s fee is added and is paid by you: its amount is shown before you pay.</p>
+        </InfoSection>
+
+        <InfoSection title="4. Ordering">
+          <p>You choose your items, size and delivery option, then enter your details. Your order gets a reference (for example AS-7KP3-QX9M) and a tracking link; it is saved as &ldquo;awaiting payment&rdquo;.</p>
+          <p>The sale is concluded once we have received your payment. We may refuse or cancel an order if payment isn&apos;t received, if the information is clearly false, or if a studio creation doesn&apos;t comply with our <Link href="/conditions-d-utilisation">terms of use</Link>; in that case, any amount received is refunded.</p>
+        </InfoSection>
+
+        <InfoSection title="5. Payment">
+          <p>Payment is made by {PAYMENT_METHOD_IDS.map((k) => t(PAYMENT_METHODS[k])).join(", ")}. After your order, we send you a payment request on the number given. Your order is only printed once the payment has been received.</p>
+        </InfoSection>
+
+        <InfoSection title="6. Studio creations">
+          <ul>
+            <li>We print what you placed in the studio: check your design carefully (spelling, position, colours) before ordering. The 3D view and the print file show the result.</li>
+            <li>An image that&apos;s too small may print blurry; the studio warns you, but the final choice is yours.</li>
+            <li>You must have the right to use the images and texts you upload (see the terms of use).</li>
+            <li>A custom creation is made for you: it can&apos;t be returned or exchanged, except for a defect on our side (section 9).</li>
+          </ul>
+        </InfoSection>
+
+        <InfoSection title="7. Production and delivery">
+          <p>
+            Each piece is printed after payment. The delivery times shown run from dispatch; the details are on the <Link href="/livraison">Delivery</Link> page. With pickup at the workshop, you&apos;re told when your order is ready. A delay gives no right to compensation, but you can cancel an order that hasn&apos;t shipped yet if the announced time is largely exceeded.
+          </p>
+        </InfoSection>
+
+        <InfoSection title="8. Returns and exchanges (shop designs)">
+          <p>You can exchange or return a shop t-shirt within <b>7 days</b> of receiving it, if it hasn&apos;t been worn or washed and is in its original condition. Write to us with your reference; return costs are yours, unless we made a mistake. Refunds go to the payment method used, within 14 days of receiving the return.</p>
+        </InfoSection>
+
+        <InfoSection title="9. Defects and mistakes">
+          <p>A t-shirt that&apos;s damaged, badly printed or different from your order? Write to us within <b>7 days</b> of receiving it, with your reference and a photo. After checking, we reprint it free of charge or refund you, delivery included.</p>
+        </InfoSection>
+
+        <InfoSection title="10. Studio credits">
+          <ul>
+            <li>Credits are for the studio&apos;s paid features: uploading an image, downloading or ordering in HD and Ultra HD. Spinning the t-shirt, choosing colours and downloading the Standard preview are free.</li>
+            <li>A pack you buy is credited to your account once the payment is received.</li>
+            <li>Credits are personal, have no cash value and can&apos;t be refunded or transferred, except for a mistake on our side. A credit used for a download that fails is given back automatically.</li>
+          </ul>
+        </InfoSection>
+
+        <InfoSection title="11. Complaints and disputes">
+          <p>
+            For any complaint, write to us (<Fact value={COMPANY.email} fallback={<Link href="/contact">Contact page</Link>} />). We first look for an amicable solution. These terms are governed by Ivorian law; failing agreement, disputes fall under the competent courts of {COMPANY.city}.
           </p>
         </InfoSection>
       </InfoPage>

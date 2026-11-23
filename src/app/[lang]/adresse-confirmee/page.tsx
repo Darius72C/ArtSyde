@@ -1,4 +1,4 @@
-import { pageMetadata } from "@/lib/i18n/server";
+import { getT, pageMetadata } from "@/lib/i18n/server";
 import Link from "@/components/LocaleLink";
 import { Suspense } from "react";
 import { PageShell } from "@/components/PageShell";
@@ -16,6 +16,7 @@ const sitePath = (raw: string) => (raw.startsWith("/") && !raw.startsWith("//") 
  * or glued to `suite` as `?error=` since the address already has a query.
  */
 async function Result({ searchParams }: Pick<PageProps<"/[lang]/adresse-confirmee">, "searchParams">) {
+  const t = await getT();
   const sp = await searchParams;
   let suite = typeof sp.suite === "string" ? sp.suite : "";
   let error = typeof sp.error === "string" ? sp.error : "";
@@ -28,12 +29,9 @@ async function Result({ searchParams }: Pick<PageProps<"/[lang]/adresse-confirme
 
   if (error) {
     return (
-      <Message eyebrow="Lien expiré" title="Ce lien ne marche plus." muted="Pas de souci.">
-        <p>
-          Il a expiré ou a déjà servi. Connecte-toi avec ton e-mail et ton mot de passe : si ton adresse n&apos;est pas encore confirmée, on
-          t&apos;envoie aussitôt un nouveau lien.
-        </p>
-        <Actions primary={{ href: `/connexion?suite=${encodeURIComponent(next)}`, label: "Se connecter" }} />
+      <Message eyebrow={t("Lien expiré")} title={t("Ce lien ne marche plus.")} muted={t("Pas de souci.")}>
+        <p>{t("Il a expiré ou a déjà servi. Connecte-toi avec ton e-mail et ton mot de passe : si ton adresse n'est pas encore confirmée, on t'envoie aussitôt un nouveau lien.")}</p>
+        <Actions primary={{ href: `/connexion?suite=${encodeURIComponent(next)}`, label: t("Se connecter") }} />
       </Message>
     );
   }
@@ -42,9 +40,9 @@ async function Result({ searchParams }: Pick<PageProps<"/[lang]/adresse-confirme
   if (!me) {
     // Confirmed, but no session in this browser (the link opened elsewhere than where the account was made).
     return (
-      <Message eyebrow="Compte activé" title="Adresse confirmée." muted="Plus qu'à te connecter.">
-        <p>Ton compte ArtSyde est actif. Connecte-toi avec ton e-mail et ton mot de passe pour continuer.</p>
-        <Actions primary={{ href: `/connexion?suite=${encodeURIComponent(next)}`, label: "Se connecter" }} />
+      <Message eyebrow={t("Compte activé")} title={t("Adresse confirmée.")} muted={t("Plus qu'à te connecter.")}>
+        <p>{t("Ton compte ArtSyde est actif. Connecte-toi avec ton e-mail et ton mot de passe pour continuer.")}</p>
+        <Actions primary={{ href: `/connexion?suite=${encodeURIComponent(next)}`, label: t("Se connecter") }} />
       </Message>
     );
   }
@@ -52,12 +50,12 @@ async function Result({ searchParams }: Pick<PageProps<"/[lang]/adresse-confirme
   const credits = await creditBalance(me.customer.id).catch(() => 0);
   const prenom = (me.user.name || "").trim().split(/\s+/)[0];
   return (
-    <Message eyebrow="Compte activé" title="Adresse confirmée." muted={prenom ? `Bienvenue, ${prenom}.` : "Bienvenue."}>
+    <Message eyebrow={t("Compte activé")} title={t("Adresse confirmée.")} muted={prenom ? t("Bienvenue, {name}.", { name: prenom }) : t("Bienvenue.")}>
       <p>
-        Ton compte ArtSyde est actif.
-        {credits > 0 ? ` Tes ${credits} crédits studio t'attendent : crée ton t-shirt en 3D.` : " Tu peux suivre tes commandes depuis ton compte."}
+        {t("Ton compte ArtSyde est actif.")}{" "}
+        {credits > 0 ? t("Tes {n} crédits studio t'attendent : crée ton t-shirt en 3D.", { n: credits }) : t("Tu peux suivre tes commandes depuis ton compte.")}
       </p>
-      <Actions primary={{ href: next, label: "Continuer" }} secondary={next === "/studio" ? { href: "/compte", label: "Mon compte" } : { href: "/studio", label: "Ouvrir le studio" }} />
+      <Actions primary={{ href: next, label: t("Continuer") }} secondary={next === "/studio" ? { href: "/compte", label: t("Mon compte") } : { href: "/studio", label: t("Ouvrir le studio") }} />
     </Message>
   );
 }

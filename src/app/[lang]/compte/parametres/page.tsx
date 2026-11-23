@@ -1,4 +1,5 @@
-import { pageMetadata } from "@/lib/i18n/server";
+import { getLocale, pageMetadata } from "@/lib/i18n/server";
+import { localizeHref } from "@/lib/i18n";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { PageShell } from "@/components/PageShell";
@@ -10,7 +11,7 @@ export const generateMetadata = pageMetadata("Paramètres du compte — ArtSyde"
 
 async function Settings() {
   const me = await getMyCustomer();
-  if (!me) redirect("/connexion?suite=/compte/parametres");
+  if (!me) redirect(localizeHref(await getLocale(), "/connexion?suite=/compte/parametres"));
   const providers = (await db.account.findMany({ where: { userId: me.user.id }, select: { providerId: true } })).map((a) => a.providerId);
   return (
     <AccountSettings

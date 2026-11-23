@@ -1,4 +1,5 @@
-import { pageMetadata } from "@/lib/i18n/server";
+import { getLocale, pageMetadata } from "@/lib/i18n/server";
+import { FrenchPrevails } from "@/components/pages/FrenchPrevails";
 import Link from "@/components/LocaleLink";
 import { PageShell } from "@/components/PageShell";
 import { Fact, InfoPage, InfoSection } from "@/components/pages/InfoPage";
@@ -6,7 +7,8 @@ import { COMPANY, LEGAL_UPDATED } from "@/lib/company";
 
 export const generateMetadata = pageMetadata("Conditions d'utilisation — ArtSyde", "/conditions-d-utilisation");
 
-export default function Page() {
+export default async function Page() {
+  if ((await getLocale()) === "en") return <English />;
   return (
     <PageShell>
       <InfoPage
@@ -92,6 +94,101 @@ export default function Page() {
         <InfoSection title="9. Modifications et droit applicable">
           <p>
             Nous pouvons modifier ces conditions ; la date de mise à jour est indiquée en bas de page, et la version en ligne au moment de ton utilisation s&apos;applique. Elles sont soumises au droit ivoirien ; en cas de litige, et à défaut d&apos;accord amiable, les tribunaux compétents d&apos;{COMPANY.city} sont saisis.
+          </p>
+        </InfoSection>
+      </InfoPage>
+    </PageShell>
+  );
+}
+
+/** The terms of use in English (the French text above prevails). */
+function English() {
+  return (
+    <PageShell>
+      <InfoPage
+        eyebrow="Legal information"
+        title="Terms of use."
+        lead={`The rules for using the ${COMPANY.brand} site, your account and the 3D studio. By using the site, you accept them.`}
+        current="/conditions-d-utilisation"
+        updated={LEGAL_UPDATED}
+      >
+        <FrenchPrevails />
+        <InfoSection title="1. The site">
+          <p>
+            The site is published by <Fact value={COMPANY.legalName} fallback={COMPANY.brand} /> (see the <Link href="/mentions-legales">legal notice</Link>). It lets you discover and order our t-shirts, create your own in the 3D studio and manage your account. Purchases follow our <Link href="/conditions-de-vente">terms of sale</Link>.
+          </p>
+        </InfoSection>
+
+        <InfoSection title="2. Your account">
+          <ul>
+            <li>You can create an account with Google or with your email and a password. It&apos;s free and for one person only.</li>
+            <li>Give accurate information and keep your password to yourself: what is done from your account is your responsibility. Tell us if you think someone else has used it.</li>
+            <li>When you sign up, studio credits are given once per person. Creating several accounts to get more is prohibited.</li>
+            <li>You can close your account at any time by writing to us. We may suspend it in case of abuse or breach of these terms.</li>
+          </ul>
+        </InfoSection>
+
+        <InfoSection title="3. The 3D studio and your creations">
+          <ul>
+            <li>
+              The images and texts you upload <b>remain yours</b>. By ordering, you only allow us to use them to prepare and print your order, and to keep them as long as needed for tracking and any complaints.
+            </li>
+            <li>You guarantee you have the right to use them: no logo, brand, character, photo or work belonging to someone else without their permission.</li>
+            <li>
+              Prohibited: illegal, hateful, violent, discriminatory or sexual content, or content that harms a person&apos;s privacy or image. We may refuse to print a creation that breaks these rules; the order is then cancelled and refunded.
+            </li>
+            <li>If a third party claims rights over a creation you uploaded, you remain responsible for it.</li>
+          </ul>
+        </InfoSection>
+
+        <InfoSection title="4. Downloads and watermark">
+          <ul>
+            <li>The Standard preview is free, small and carries the {COMPANY.brand} watermark. HD and Ultra HD files are obtained with credits.</li>
+            <li>Removing, hiding or getting around the watermark, or copying studio visuals by screenshot or screen recording to use them elsewhere, is prohibited.</li>
+            <li>Every download contains an invisible mark that lets us trace where it came from.</li>
+          </ul>
+        </InfoSection>
+
+        <InfoSection title="5. Studio credits">
+          <p>
+            Credits are tied to your account. How they are used, bought and their limits are described in the <Link href="/conditions-de-vente">terms of sale</Link> (section 10).
+          </p>
+        </InfoSection>
+
+        <InfoSection title="6. Personal data">
+          <p>
+            The data controller is <Fact value={COMPANY.legalName} fallback={COMPANY.brand} />. We process your data in accordance with Ivorian law no. 2013-450 of 19 June 2013 on the protection of personal data.
+          </p>
+          <ul>
+            <li>
+              <b>What we collect</b>: your name, email, phone, delivery address, orders and credit purchases; your account (and, with Google, your name, email and profile picture); the creations sent with an order.
+            </li>
+            <li>
+              <b>Why</b>: to process and deliver your orders, request payment, manage your account and credits, answer your messages, and meet our legal and accounting obligations. We don&apos;t sell your data or use it for advertising.
+            </li>
+            <li>
+              <b>Who has access</b>: our team, and our technical providers for what concerns them (Vercel hosting and audience measurement, Neon database, Cloudflare storage, Brevo emails, GeniusPay payment, Google sign-in if you choose it).
+            </li>
+            <li>
+              <b>How long</b>: as long as your account is open, then for the time required by our legal (especially accounting) obligations for orders.
+            </li>
+            <li>
+              <b>Your rights</b>: you can ask to access, correct or delete your data, and object to processing, by writing to us (<Fact value={COMPANY.email} fallback={<Link href="/contact">Contact page</Link>} />). You can also contact ARTCI, the data protection authority in Côte d&apos;Ivoire.
+            </li>
+          </ul>
+        </InfoSection>
+
+        <InfoSection title="7. Cookies">
+          <p>The site only uses cookies needed for it to work: your sign-in session, and your cart kept in your browser. No advertising cookies and no third-party audience measurement.</p>
+        </InfoSection>
+
+        <InfoSection title="8. Liability">
+          <p>We do our best to keep the site available and error-free, but it may be interrupted for maintenance or in case of an outage. We aren&apos;t responsible for use of the site contrary to these terms, or for the content of sites it links to.</p>
+        </InfoSection>
+
+        <InfoSection title="9. Changes and governing law">
+          <p>
+            We may change these terms; the update date is shown at the bottom of the page, and the version online when you use the site applies. They are governed by Ivorian law; in case of dispute, and failing an amicable agreement, the competent courts of {COMPANY.city} have jurisdiction.
           </p>
         </InfoSection>
       </InfoPage>

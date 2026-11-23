@@ -7,6 +7,7 @@ import { db } from "@/server/db";
 import { getMyCustomer } from "@/server/account";
 import { logActivity, logError } from "@/server/log";
 import { deleteObject, keyFromPublicUrl, r2Config } from "@/server/r2";
+import { getRequestT } from "@/lib/i18n/server";
 
 /*
  * The signed-in customer's settings (/compte/parametres): name and phone, and the password
@@ -21,42 +22,44 @@ const PHONE = /^\+?[\d\s]{8,}$/;
 const codeOf = (e: unknown) => (e as { body?: { code?: string } })?.body?.code;
 
 export async function updateProfile(input: { name: string; phone: string }): Promise<SettingsResult> {
+  const t = await getRequestT();
   const me = await getMyCustomer();
-  if (!me) return { ok: false, message: "Ta session a expiré : reconnecte-toi." };
+  if (!me) return { ok: false, message: t("Ta session a expiré : reconnecte-toi.") };
   const name = String(input?.name ?? "").trim().slice(0, 120);
   const phone = String(input?.phone ?? "").trim().replace(/\s+/g, " ");
-  if (name.length < 2) return { ok: false, field: "name", message: "Indique ton nom." };
-  if (phone && !PHONE.test(phone)) return { ok: false, field: "phone", message: "Numéro invalide." };
+  if (name.length < 2) return { ok: false, field: "name", message: t("Indique ton nom.") };
+  if (phone && !PHONE.test(phone)) return { ok: false, field: "phone", message: t("Numéro invalide.") };
   if (phone) {
     const taken = await db.customer.findFirst({ where: { phone, NOT: { id: me.customer.id } }, select: { id: true } });
-    if (taken) return { ok: false, field: "phone", message: "Ce numéro est déjà utilisé par un autre compte. Écris-nous si c'est le tien." };
+    if (taken) return { ok: false, field: "phone", message: t("Ce numéro est déjà utilisé par un autre compte. Écris-nous si c'est le tien.") };
   }
   try {
     await auth.api.updateUser({ body: { name }, headers: await headers() });
     await db.customer.update({ where: { id: me.customer.id }, data: { name, phone: phone || null } });
   } catch (e) {
     await logError("updateProfile", e);
-    return { ok: false, message: "Tes informations n'ont pas pu être enregistrées. Réessaie." };
+    return { ok: false, message: t("Tes informations n'ont pas pu être enregistrées. Réessaie.") };
   }
   revalidatePath("/compte");
   await logActivity("account.updated", `Profil mis à jour : ${name}`, { phone: Boolean(phone) }, `client:${me.customer.id}`);
-  return { ok: true, message: "Enregistré." };
+  return { ok: true, message: t("Enregistré.") };
 }
 
 export async function changeMyPassword(input: { current: string; next: string }): Promise<SettingsResult> {
-  if (String(input?.next ?? "").length < 8) return { ok: false, field: "next", message: "8 caractères minimum." };
+  const t = await getRequestT();
+  if (String(input?.next ?? "").length < 8) return { ok: false, field: "next", message: t("8 caractères minimum.") };
   try {
     // The other devices are signed out: whoever knew the old password loses access.
     await auth.api.changePassword({ body: { currentPassword: String(input.current ?? ""), newPassword: input.next, revokeOtherSessions: true }, headers: await headers() });
-    return { ok: true, message: "Mot de passe changé. Tes autres appareils ont été déconnectés." };
+    return { ok: true, message: t("Mot de passe changé. Tes autres appareils ont été déconnectés.") };
   } catch (e) {
     const code = codeOf(e);
-    if (code === "INVALID_PASSWORD") return { ok: false, field: "current", message: "Mot de passe actuel incorrect." };
-    if (code === "PASSWORD_TOO_SHORT") return { ok: false, field: "next", message: "8 caractères minimum." };
-    if (code === "PASSWORD_TOO_LONG") return { ok: false, field: "next", message: "Mot de passe trop long." };
-    if (code === "CREDENTIAL_ACCOUNT_NOT_FOUND") return { ok: false, message: "Ton compte n'a pas encore de mot de passe : crée-le d'abord." };
+    if (code === "INVALID_PASSWORD") return { ok: false, field: "current", message: t("Mot de passe actuel incorrect.") };
+    if (code === "PASSWORD_TOO_SHORT") return { ok: false, field: "next", message: t("8 caractères minimum.") };
+    if (code === "PASSWORD_TOO_LONG") return { ok: false, field: "next", message: t("Mot de passe trop long.") };
+    if (code === "CREDENTIAL_ACCOUNT_NOT_FOUND") return { ok: false, message: t("Ton compte n'a pas encore de mot de passe : crée-le d'abord.") };
     await logError("changeMyPassword", e);
-    return { ok: false, message: "Le mot de passe n'a pas pu être changé. Réessaie." };
+    return { ok: false, message: t("Le mot de passe n'a pas pu être changé. Réessaie.") };
   }
 }
 
@@ -70,9 +73,10 @@ const DELETE_WORD = "SUPPRIMER";
  * back to it by linkCustomer, which sees the signup credits already given and doesn't give them twice.
  */
 export async function deleteMyAccount(input: { confirm: string }): Promise<SettingsResult> {
-  if (String(input?.confirm ?? "").trim().toUpperCase() !== DELETE_WORD) return { ok: false, field: "confirm", message: `Écris ${DELETE_WORD} pour confirmer.` };
+  const t = await getRequestT();
+  if (![DELETE_WORD, "DELETE"].includes(String(input?.confirm ?? "").trim().toUpperCase())) return { ok: false, field: "confirm", message: t("Écris {word} pour confirmer.", { word: t(DELETE_WORD) }) };
   const me = await getMyCustomer();
-  if (!me) return { ok: false, message: "Ta session a expiré : reconnecte-toi." };
+  if (!me) return { ok: false, message: t("Ta session a expiré : reconnecte-toi.") };
   const { user, customer } = me;
   try {
     const designs = await db.savedDesign.findMany({ where: { customerId: customer.id }, select: { front: true, back: true } });
@@ -103,25 +107,26 @@ export async function deleteMyAccount(input: { confirm: string }): Promise<Setti
       { userId: user.id, customerId: customer.id, credits: left, designs: designs.length },
       `client:${customer.id}`,
     );
-    return { ok: true, message: "Ton compte a été supprimé." };
+    return { ok: true, message: t("Ton compte a été supprimé.") };
   } catch (e) {
     await logError("deleteMyAccount", e, { userId: user.id });
-    return { ok: false, message: "Ton compte n'a pas pu être supprimé. Réessaie ou écris-nous." };
+    return { ok: false, message: t("Ton compte n'a pas pu être supprimé. Réessaie ou écris-nous.") };
   }
 }
 
 /** For an account opened with Google: adds a password, so it can also sign in with its e-mail. */
 export async function setMyPassword(input: { next: string }): Promise<SettingsResult> {
-  if (String(input?.next ?? "").length < 8) return { ok: false, field: "next", message: "8 caractères minimum." };
+  const t = await getRequestT();
+  if (String(input?.next ?? "").length < 8) return { ok: false, field: "next", message: t("8 caractères minimum.") };
   try {
     await auth.api.setPassword({ body: { newPassword: input.next }, headers: await headers() });
     revalidatePath("/compte/parametres");
-    return { ok: true, message: "Mot de passe créé : tu peux aussi te connecter avec ton e-mail." };
+    return { ok: true, message: t("Mot de passe créé : tu peux aussi te connecter avec ton e-mail.") };
   } catch (e) {
     const code = codeOf(e);
-    if (code === "PASSWORD_ALREADY_SET") return { ok: false, message: "Ton compte a déjà un mot de passe : change-le plutôt." };
-    if (code === "PASSWORD_TOO_SHORT") return { ok: false, field: "next", message: "8 caractères minimum." };
+    if (code === "PASSWORD_ALREADY_SET") return { ok: false, message: t("Ton compte a déjà un mot de passe : change-le plutôt.") };
+    if (code === "PASSWORD_TOO_SHORT") return { ok: false, field: "next", message: t("8 caractères minimum.") };
     await logError("setMyPassword", e);
-    return { ok: false, message: "Le mot de passe n'a pas pu être créé. Réessaie." };
+    return { ok: false, message: t("Le mot de passe n'a pas pu être créé. Réessaie.") };
   }
 }

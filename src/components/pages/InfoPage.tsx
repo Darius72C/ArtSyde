@@ -44,7 +44,7 @@ export async function InfoPage({ eyebrow, title, muted, lead, updated, current, 
         {lead && <p className="lead mt-5 max-w-2xl">{typeof lead === "string" ? t(lead) : lead}</p>}
       </div>
       <div className="max-w-3xl space-y-16 pb-16">{children}</div>
-      {updated && <p className="max-w-3xl text-sm text-muted">{t("Dernière mise à jour : {date}.", { date: updated })}</p>}
+      {updated && <p className="max-w-3xl text-sm text-muted">{t("Dernière mise à jour : {date}.", { date: t(updated) })}</p>}
       <nav aria-label={t("Informations")} className="mt-16 border-t border-line pb-24 pt-10">
         <p className="text-[14px] font-semibold">{t("Voir aussi")}</p>
         <ul className="mt-4 flex flex-wrap gap-x-6 gap-y-3">

@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale, useT } from "./I18nProvider";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { DUR, EASE } from "@/lib/motion";
@@ -30,6 +31,8 @@ function standalone() {
 }
 
 export function Pwa() {
+  const t = useT();
+  const en = useLocale() === "en";
   const [prompt, setPrompt] = useState<InstallPrompt | null>(null);
   const [ios, setIos] = useState(false);
   const [open, setOpen] = useState(false);
@@ -95,7 +98,7 @@ export function Pwa() {
       {open && (prompt || ios) && (
         <motion.div
           role="dialog"
-          aria-label="Installer l'application ArtSyde"
+          aria-label={t("Installer l'application ArtSyde")}
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 24 }}
@@ -105,22 +108,28 @@ export function Pwa() {
           {/* eslint-disable-next-line @next/next/no-img-element -- the app icon, a static file */}
           <img src="/icons/icon-192.png" alt="" width={48} height={48} className="h-12 w-12 shrink-0 rounded-xl" />
           <div className="min-w-0 flex-1">
-            <p className="font-semibold">Installer ArtSyde</p>
+            <p className="font-semibold">{t("Installer ArtSyde")}</p>
             {ios ? (
-              <p className="mt-1 text-sm text-muted">
-                Touche <span className="text-ink">Partager</span> <span aria-hidden>⎋</span> en bas de Safari, puis <span className="text-ink">Sur l&apos;écran d&apos;accueil</span>.
-              </p>
+              en ? (
+                <p className="mt-1 text-sm text-muted">
+                  Tap <span className="text-ink">Share</span> <span aria-hidden>⎋</span> at the bottom of Safari, then <span className="text-ink">Add to Home Screen</span>.
+                </p>
+              ) : (
+                <p className="mt-1 text-sm text-muted">
+                  Touche <span className="text-ink">Partager</span> <span aria-hidden>⎋</span> en bas de Safari, puis <span className="text-ink">Sur l&apos;écran d&apos;accueil</span>.
+                </p>
+              )
             ) : (
-              <p className="mt-1 text-sm text-muted">L&apos;app sur ton écran d&apos;accueil : la boutique et le studio en un geste.</p>
+              <p className="mt-1 text-sm text-muted">{t("L'app sur ton écran d'accueil : la boutique et le studio en un geste.")}</p>
             )}
             <div className="mt-3 flex items-center gap-5 text-sm">
               {!ios && (
                 <button type="button" onClick={install} className="btn !px-5 !py-2">
-                  Installer
+                  {t("Installer")}
                 </button>
               )}
               <button type="button" onClick={later} className="text-muted hover:text-ink">
-                {ios ? "Compris" : "Plus tard"}
+                {ios ? t("Compris") : t("Plus tard")}
               </button>
             </div>
           </div>

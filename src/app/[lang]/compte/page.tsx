@@ -1,4 +1,5 @@
-import { pageMetadata } from "@/lib/i18n/server";
+import { getLocale, pageMetadata } from "@/lib/i18n/server";
+import { intlLocale, localizeHref, makeT } from "@/lib/i18n";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { PageShell } from "@/components/PageShell";
@@ -11,8 +12,11 @@ import { db } from "@/server/db";
 export const generateMetadata = pageMetadata("Mon compte — ArtSyde", undefined, undefined, { robots: { index: false } });
 
 async function Account() {
+  const locale = await getLocale();
+  const t = makeT(locale);
+  const date = (d: Date) => d.toLocaleDateString(intlLocale(locale), { day: "numeric", month: "long", year: "numeric" });
   const me = await getMyCustomer();
-  if (!me) redirect("/connexion?suite=/compte");
+  if (!me) redirect(localizeHref(locale, "/connexion?suite=/compte"));
   const { user, customer } = me;
   // Orders of this customer, and (when the e-mail is verified, e.g. Google) the ones placed with this e-mail before signing up.
   const [orders, credits, designs] = await Promise.all([
@@ -34,8 +38,8 @@ async function Account() {
       orders={orders.map((o) => ({
         reference: o.reference,
         href: orderHref(o.reference, orderKey(o.id)),
-        date: o.createdAt.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }),
-        status: ORDER_STATUS[o.status].label,
+        date: date(o.createdAt),
+        status: t(ORDER_STATUS[o.status].label),
         total: o.totalXof,
         items: o.items.reduce((n, i) => n + i.quantity, 0),
       }))}
@@ -44,7 +48,7 @@ async function Account() {
         name: d.name,
         color: d.teeColor,
         preview: d.previewUrl,
-        date: d.updatedAt.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }),
+        date: date(d.updatedAt),
       }))}
     />
   );
