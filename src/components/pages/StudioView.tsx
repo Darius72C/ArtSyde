@@ -454,7 +454,8 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
     return () => {
       live = false;
     };
-  }, []);
+    // t is stable for the page's language: this still runs once.
+  }, [t]);
 
   // The draft: restored once on arrival, unless /studio?design= opens a saved creation.
   useEffect(() => {

@@ -9,7 +9,7 @@ import { CREDIT_PACKS, CREDIT_PACK_IDS, PAYMENT_METHOD_IDS, type BuyCreditsInput
 import { logActivity, logError } from "@/server/log";
 import { onlinePaymentEnabled } from "@/server/payments/geniuspay";
 import { startCreditPayment } from "@/server/payments/settle";
-import { getRequestLocale } from "@/lib/i18n/server";
+import { getRequestLocale } from "@/lib/i18n/request";
 import { makeT } from "@/lib/i18n";
 
 /*

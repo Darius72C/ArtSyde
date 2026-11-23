@@ -9,7 +9,7 @@ import { logActivity, logWarning, logError } from "@/server/log";
 import { allow } from "@/server/rate-limit";
 import { siteUrl } from "@/server/site";
 import { isLocale, localizeHref, makeT } from "@/lib/i18n";
-import { getRequestT } from "@/lib/i18n/server";
+import { getRequestT } from "@/lib/i18n/request";
 import { paymentFee } from "@/lib/payment-fees";
 import { createPayment, internationalPhone, operatorRouting, failedStatus, geniusConfig, getPayment, paidStatus, sandbox, type GeniusPayment } from "./geniuspay";
 

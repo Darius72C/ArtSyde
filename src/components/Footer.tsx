@@ -1,8 +1,10 @@
+"use client";
+
 import Link from "@/components/LocaleLink";
 import { COMPANY } from "@/lib/company";
 import { STAGGER } from "@/lib/motion";
 import { FadeUp } from "./Reveal";
-import { getT } from "@/lib/i18n/server";
+import { useT } from "./I18nProvider";
 
 const COLS = [
   { t: "Boutique", l: [["Tous les t-shirts", "/#boutique"], ["Nouveautés", "/#nouveautes"], ["Studio 3D", "/studio"], ["Panier", "/panier"]] },
@@ -11,8 +13,8 @@ const COLS = [
   { t: "ArtSyde", l: [["L'atelier", "/atelier"], ["Équipes et associations", "/#equipes"], ["Mentions légales", "/mentions-legales"], ["Conditions de vente", "/conditions-de-vente"], ["Conditions d'utilisation", "/conditions-d-utilisation"]] },
 ];
 
-export async function Footer() {
-  const t = await getT();
+export function Footer() {
+  const t = useT();
   return (
     <footer className="bg-surface text-[12px] text-muted">
       <div className="mx-auto max-w-[1024px] px-5 py-10">

@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { presign, r2Config } from "@/server/r2";
 import { allow, clientIp } from "@/server/rate-limit";
 import { logActivity } from "@/server/log";
-import { getRequestT } from "@/lib/i18n/server";
+import { getRequestT } from "@/lib/i18n/request";
 
 /*
  * The studio's print files: when a custom t-shirt goes into the cart, the browser draws each printed side

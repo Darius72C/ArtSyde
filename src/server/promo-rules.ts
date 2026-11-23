@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/server/db";
 import { formatFCFA } from "@/lib/products";
-import { getRequestT } from "@/lib/i18n/server";
+import { getRequestT } from "@/lib/i18n/request";
 import { CODE_PATTERN, normalizeCode, promoDiscount, promoLabel, type PromoCheck } from "@/lib/promos";
 
 /**

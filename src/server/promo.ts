@@ -3,7 +3,7 @@
 import type { PromoCheck } from "@/lib/promos";
 import { evaluatePromo } from "@/server/promo-rules";
 import { logError } from "@/server/log";
-import { getRequestT } from "@/lib/i18n/server";
+import { getRequestT } from "@/lib/i18n/request";
 
 /**
  * The checkout's "Appliquer": whether the code works on a basket of this amount, and how much it takes off.

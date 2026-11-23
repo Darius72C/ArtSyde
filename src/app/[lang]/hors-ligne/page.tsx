@@ -21,7 +21,7 @@ export default async function Offline() {
         {t("Ton téléphone n'arrive pas à joindre ArtSyde. Vérifie ta connexion (données mobiles ou Wi-Fi), puis réessaie. Ton panier est gardé sur cet appareil.")}
       </p>
       <div className="mt-10">
-        {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- a full reload is the point: it retries the network */}
+        {/* A plain link on purpose: a full reload retries the network. */}
         <a href={home} className="btn">
           {t("Réessayer")}
         </a>

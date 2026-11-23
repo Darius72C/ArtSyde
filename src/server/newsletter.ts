@@ -3,7 +3,7 @@
 import { randomBytes } from "node:crypto";
 import { db } from "@/server/db";
 import { logActivity, logError } from "@/server/log";
-import { getRequestT } from "@/lib/i18n/server";
+import { getRequestT } from "@/lib/i18n/request";
 
 /* The newsletter: signing up from the home page's form, and leaving from the link in each e-mail. */
 

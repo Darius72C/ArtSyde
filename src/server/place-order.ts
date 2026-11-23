@@ -15,7 +15,7 @@ import { onlinePaymentEnabled } from "@/server/payments/geniuspay";
 import { startOrderPayment } from "@/server/payments/settle";
 import { PAYMENT_METHOD_IDS } from "@/lib/credits";
 import { evaluatePromo } from "@/server/promo-rules";
-import { getRequestLocale } from "@/lib/i18n/server";
+import { getRequestLocale } from "@/lib/i18n/request";
 import { makeT } from "@/lib/i18n";
 
 /** A studio piece's print files: only links to our own storage (designs/), one per side at most. */

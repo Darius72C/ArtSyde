@@ -6,7 +6,7 @@ import { getMyCustomer } from "@/server/account";
 import { deleteObject, keyFromPublicUrl, presign, r2Config } from "@/server/r2";
 import { logActivity, logError } from "@/server/log";
 import { DESIGN_SAVE_CREDITS, FREE_DESIGNS } from "@/lib/studio";
-import { getRequestT } from "@/lib/i18n/server";
+import { getRequestT } from "@/lib/i18n/request";
 
 /*
  * The customer's own creations from the studio (SavedDesign): saved to their account, listed in /compte,

@@ -83,7 +83,7 @@ export function OrderView({ order, payment }: { order: PublicOrder | null; payme
               <li key={it.key} className="flex items-center gap-5 border-b border-line py-5">
                 <Thumb item={it} className="aspect-[4/5] w-16" />
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold">{it.name}</p>
+                  <p className="font-semibold">{t(it.name)}</p>
                   <p className="text-xs text-muted">{t("Taille {size}", { size: it.size })} · × {it.qty}</p>
                 </div>
                 <p className="text-sm tabular-nums">{formatFCFA(it.price * it.qty)}</p>

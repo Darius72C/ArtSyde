@@ -5,7 +5,7 @@ import { orderKey } from "@/lib/orders";
 import { PAYMENT_METHOD_IDS } from "@/lib/credits";
 import { logError } from "@/server/log";
 import { settle, startCreditPayment, startOrderPayment, type SettleStatus, type StartResult } from "@/server/payments/settle";
-import { getRequestT } from "@/lib/i18n/server";
+import { getRequestT } from "@/lib/i18n/request";
 
 /*
  * The customer's side of online payment: back from GeniusPay's page (check it now, without waiting for the

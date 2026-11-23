@@ -11,7 +11,6 @@ export const generateMetadata = pageMetadata("Contact — ArtSyde", "/contact", 
 export default async function Page() {
   const locale = await getLocale();
   const t = makeT(locale);
-  const en = locale === "en";
   return (
     <PageShell>
       <InfoPage eyebrow="Aide" title="Contact." muted="On te répond vite." lead="Une question sur une commande, un design ou une commande pour ton équipe ? Le plus rapide : WhatsApp. On répond en général dans la journée, les jours ouvrés." current="/contact">

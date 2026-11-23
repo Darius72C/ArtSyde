@@ -7,7 +7,7 @@ import { db } from "@/server/db";
 import { getMyCustomer } from "@/server/account";
 import { logActivity, logError } from "@/server/log";
 import { deleteObject, keyFromPublicUrl, r2Config } from "@/server/r2";
-import { getRequestT } from "@/lib/i18n/server";
+import { getRequestT } from "@/lib/i18n/request";
 
 /*
  * The signed-in customer's settings (/compte/parametres): name and phone, and the password

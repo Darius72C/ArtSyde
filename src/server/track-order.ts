@@ -4,7 +4,7 @@ import { db } from "@/server/db";
 import { orderHref, orderKey } from "@/lib/orders";
 import { cleanReference } from "@/server/reference";
 import { clientIp, hits, record } from "@/server/rate-limit";
-import { getRequestT } from "@/lib/i18n/server";
+import { getRequestT } from "@/lib/i18n/request";
 
 export type TrackResult = { ok: true; href: string } | { ok: false; message: string };
 

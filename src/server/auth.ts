@@ -12,7 +12,7 @@ import { emailAd, emailImage } from "@/server/email/image";
 import { logActivity, logError } from "@/server/log";
 import { IS_PRODUCTION, SITE_URL } from "@/lib/site";
 import { localeOfPath, localizeHref, type Locale } from "@/lib/i18n";
-import { getRequestLocale } from "@/lib/i18n/server";
+import { getRequestLocale } from "@/lib/i18n/request";
 
 /** The visitor's language for an e-mail sent from /api/auth (French when it can't be told). */
 const emailLocale = (): Promise<Locale> => getRequestLocale().catch(() => "fr" as const);
