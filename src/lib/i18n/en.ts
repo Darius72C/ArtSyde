@@ -897,4 +897,8 @@ export const EN: Record<string, string> = {
   "Tu reçois cet e-mail parce que tu viens de créer un compte ArtSyde.": "You're receiving this email because you just created an ArtSyde account.",
   "La collection ArtSyde": "The ArtSyde collection",
   "Écrire sur WhatsApp": "Message us on WhatsApp",
+
+  // Leftovers
+  "Ajouter": "Add",
+  "Aperçu masqué · reviens sur la page pour continuer": "Preview hidden · come back to the page to continue",
 };

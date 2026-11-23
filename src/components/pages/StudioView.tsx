@@ -117,12 +117,13 @@ function Watermark() {
 }
 
 function Veil({ on, compact = false }: { on: boolean; compact?: boolean }) {
+  const t = useT();
   return (
     <div
       className={`pointer-events-none absolute inset-0 grid place-items-center bg-surface/70 backdrop-blur-2xl transition-opacity duration-300 ${on ? "opacity-100" : "opacity-0"}`}
       aria-hidden
     >
-      {!compact && <p className="eyebrow px-6 text-center">Aperçu masqué · reviens sur la page pour continuer</p>}
+      {!compact && <p className="eyebrow px-6 text-center">{t("Aperçu masqué · reviens sur la page pour continuer")}</p>}
     </div>
   );
 }

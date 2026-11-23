@@ -29,7 +29,7 @@ export function Suggestions({ products }: { products: Product[] }) {
                   onClick={() => cart.add({ productId: p.id, name: p.name, price: p.price, color: p.colors[0], size: defaultSize(p.stock, p.colors[0], p.sizes), art: p.art, bg: p.bg, photo: p.photo })}
                   className="btn absolute bottom-4 left-1/2 -translate-x-1/2 !px-4 !py-1.5 !text-[14px] transition md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
                 >
-                  Ajouter — {defaultSize(p.stock, p.colors[0], p.sizes)}
+                  {t("Ajouter")} — {defaultSize(p.stock, p.colors[0], p.sizes)}
                 </button>
               )}
             </div>
