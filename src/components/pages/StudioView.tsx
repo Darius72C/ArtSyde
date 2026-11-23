@@ -18,13 +18,14 @@ import { ColorPicker } from "../ColorPicker";
 import { fadeUp, RevealLines } from "../Reveal";
 import { DUR, EASE, STAGGER } from "@/lib/motion";
 import { DESIGN_SAVE_CREDITS, FREE_DESIGNS, PRINT_QUALITIES, PRINT_QUALITY, PRINT_WIDTH_CM, STANDARD_PREVIEW_PX, downloadWidth, type PrintQuality } from "@/lib/studio";
-import { TEE_ASPECT, TEE_PATH_01, teePath2D } from "../story/teeOutline";
+import { TEE_ASPECT, TEE_PATH_01 } from "../story/teeOutline";
 import { teeSnapshot, wornSnapshot } from "../story/snapshot";
 import { onBackdrop } from "@/lib/backdrop";
 import { clearDraft, loadDraft, saveDraft } from "@/lib/studioDraft";
 import { track } from "@/lib/metrics";
 import { zipFiles } from "@/lib/zip";
 import { embedTrace, protectImage, stampWatermark } from "@/lib/watermark";
+import { paint, type StudioImage, type StudioSide, type StudioText } from "@/lib/studioPaint";
 
 // "Porté": the design in progress on a shop mannequin, loaded only when chosen.
 const loadWorn = () => import("../MannequinTryOn");
@@ -41,9 +42,9 @@ const W = 1400;
 const H = Math.round(W / TEE_ASPECT);
 const { base: BASE_PRICE, back: BACK_PRICE } = STUDIO_PRICE;
 
-type Img = { id: string; src: string; nw: number; nh: number; x: number; y: number; scale: number; rot: number };
-type Txt = { value: string; font: "serif" | "italic" | "sans"; color: string; x: number; y: number; size: number; rot: number };
-type Side = { images: Img[]; text?: Txt }; // images in stacking order: the last one is on top
+type Img = StudioImage;
+type Txt = StudioText;
+type Side = StudioSide; // images in stacking order: the last one is on top
 type SideId = "front" | "back";
 /** The selected layer: "text", or an image's id. */
 type Layer = string;
@@ -154,42 +155,6 @@ function useCaptureVeil() {
     };
   }, []);
   return veiled;
-}
-
-function fontFamily(f: Txt["font"]) {
-  const v = getComputedStyle(document.documentElement).getPropertyValue(f === "sans" ? "--font-body" : "--font-display").trim();
-  return v || (f === "sans" ? "sans-serif" : "serif");
-}
-
-/** Paints one side's layers on a canvas of any size (live preview, download, print file), cut to the tee. */
-function paint(ctx: CanvasRenderingContext2D, d: Side, w: number, h: number, images: Map<string, HTMLImageElement>) {
-  ctx.clearRect(0, 0, w, h);
-  ctx.save();
-  ctx.clip(teePath2D(w, h));
-  for (const img of d.images) {
-    const el = images.get(img.src);
-    if (!el) continue;
-    const iw = img.scale * w;
-    const ih = (iw * img.nh) / img.nw;
-    ctx.save();
-    ctx.translate(img.x * w, img.y * h);
-    ctx.rotate((img.rot * Math.PI) / 180);
-    ctx.drawImage(el, -iw / 2, -ih / 2, iw, ih);
-    ctx.restore();
-  }
-  if (d.text?.value) {
-    const t = d.text;
-    ctx.save();
-    ctx.translate(t.x * w, t.y * h);
-    ctx.rotate((t.rot * Math.PI) / 180);
-    ctx.font = `${t.font === "italic" ? "italic " : ""}${t.font === "sans" ? 500 : 400} ${t.size * w}px ${fontFamily(t.font)}`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillStyle = t.color;
-    t.value.split("\n").forEach((line, i, all) => ctx.fillText(line, 0, (i - (all.length - 1) / 2) * t.size * w * 1.05));
-    ctx.restore();
-  }
-  ctx.restore();
 }
 
 /** Side length, in cm on the tee, of the square the quality comparison zooms into. */

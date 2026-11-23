@@ -6,6 +6,8 @@ import { Prisma, type OrderStatus } from "@/generated/prisma/client";
 import { TEE_COLORS } from "@/lib/data";
 import { TO_HANDLE, colorName } from "@/lib/admin/labels";
 import { requireAdmin } from "./auth";
+import { asStudioSide } from "@/lib/studioPaint";
+import type { AdminSavedDesign } from "@/components/admin/SavedDesignTile";
 
 /*
  * Every read the admin makes. All of them run at request time (the admin is a live
@@ -244,7 +246,9 @@ export async function getStudio() {
         id: true,
         name: true,
         teeColor: true,
-        previewUrl: true,
+        // The layers themselves (image links and placements, no file data): the admin draws them in 2D and 3D.
+        front: true,
+        back: true,
         updatedAt: true,
         customer: { select: { id: true, name: true, email: true, phone: true } },
         orderItems: { select: { quantity: true } },
@@ -273,10 +277,10 @@ export async function getStudio() {
     designers: [
       ...designs
         .reduce((by, { customer, orderItems, ...d }) => {
-          const card = by.get(customer.id) ?? { ...customer, designs: [] as (typeof d & { colorName: string; ordered: number })[] };
-          card.designs.push({ ...d, colorName: colorName(d.teeColor), ordered: orderItems.reduce((n, i) => n + i.quantity, 0) });
+          const card = by.get(customer.id) ?? { ...customer, designs: [] as AdminSavedDesign[] };
+          card.designs.push({ ...d, front: asStudioSide(d.front), back: asStudioSide(d.back), colorName: colorName(d.teeColor), ordered: orderItems.reduce((n, i) => n + i.quantity, 0) });
           return by.set(customer.id, card);
-        }, new Map<string, (typeof designs)[number]["customer"] & { designs: (Omit<(typeof designs)[number], "customer" | "orderItems"> & { colorName: string; ordered: number })[] }>())
+        }, new Map<string, (typeof designs)[number]["customer"] & { designs: AdminSavedDesign[] }>())
         .values(),
     ],
     designCount,

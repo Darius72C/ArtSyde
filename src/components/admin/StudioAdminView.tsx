@@ -7,6 +7,7 @@ import type { CreditPack } from "@/generated/prisma/client";
 import { CREDIT_PACK, CREDIT_REASON, ORDER_STATUS, dateTime, plural, shortDate } from "@/lib/admin/labels";
 import { getStudio, load } from "@/server/admin/queries";
 import { StudioTee3D } from "./StudioTee3D";
+import { SavedDesignTile } from "./SavedDesignTile";
 import { studioFiles } from "@/lib/studio-files";
 import { DESIGN_SAVE_CREDITS, FREE_DESIGNS } from "@/lib/studio";
 import { DbNotice, Empty, Panel, Share, Stat, TableScroll, table, td, th } from "./ui";
@@ -168,12 +169,7 @@ export async function StudioAdminView() {
                   <ul className="mt-5 grid grid-cols-3 gap-3">
                     {c.designs.map((g) => (
                       <li key={g.id} className="min-w-0">
-                        {g.previewUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element -- a stored data URL
-                          <img src={g.previewUrl} alt={`Aperçu 3D de ${g.name}`} width={220} height={220} className="aspect-square w-full rounded-2xl bg-sand object-contain" />
-                        ) : (
-                          <ProductImage color={g.teeColor} className="aspect-square rounded-2xl" zoom={false} />
-                        )}
+                        <SavedDesignTile design={g} customer={c.name} />
                         <p className="mt-2 truncate text-sm font-semibold">{g.name}</p>
                         <p className="truncate text-xs text-muted">
                           {g.colorName} · {shortDate(g.updatedAt)}
