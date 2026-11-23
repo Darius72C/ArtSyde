@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "../I18nProvider";
 import Link from "@/components/LocaleLink";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
@@ -29,6 +30,7 @@ export function CreditsViewFromUrl({ online = false }: { online?: boolean }) {
 const sectionTitle = "border-b border-line pb-4 text-[24px] font-semibold tracking-[-0.02em]";
 
 export function CreditsView({ initialPack = DEFAULT_PACK, online = false, returning }: { initialPack?: CreditPack; online?: boolean; returning?: { reference: string; failed: boolean } }) {
+  const t = useT();
   const [pack, setPack] = useState<CreditPack>(initialPack);
   const [method, setMethod] = useState<PaymentMethodId>("WAVE");
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -54,7 +56,7 @@ export function CreditsView({ initialPack = DEFAULT_PACK, online = false, return
     if (Object.keys(err).length) return;
     startTransition(async () => {
       const r = await buyCredits({ pack, method, fields }).catch(() => null);
-      if (!r) return setMessage("Connexion perdue. Vérifie ton réseau et réessaie.");
+      if (!r) return setMessage(t("Connexion perdue. Vérifie ton réseau et réessaie."));
       if (!r.ok) {
         setErrors(r.errors);
         setMessage(r.message);
@@ -71,9 +73,9 @@ export function CreditsView({ initialPack = DEFAULT_PACK, online = false, return
   return (
     <div className="mx-auto max-w-[1440px] px-5 md:px-10">
       <div className="pb-10 pt-14 md:pt-20">
-        <RevealLines as="h1" lines={[{ text: "Recharger", muted: "mes crédits." }]} className="display text-5xl md:text-7xl" />
+        <RevealLines as="h1" lines={[{ text: t("Recharger"), muted: t("mes crédits.") }]} className="display text-5xl md:text-7xl" />
         {returning && <div className="mt-10"><CreditReturn reference={returning.reference} failed={returning.failed} /></div>}
-        <p className="lead mt-5 max-w-xl">Les crédits servent à importer une image, sauvegarder un design et télécharger ton visuel en HD. Tourner et colorer ton t-shirt reste gratuit.</p>
+        <p className="lead mt-5 max-w-xl">{t("Les crédits servent à importer une image, sauvegarder un design et télécharger ton visuel en HD. Tourner et colorer ton t-shirt reste gratuit.")}</p>
       </div>
 
       <AnimatePresence mode="wait">
@@ -83,15 +85,15 @@ export function CreditsView({ initialPack = DEFAULT_PACK, online = false, return
               <motion.circle cx="26" cy="26" r="24" fill="none" stroke="currentColor" strokeWidth="2.5" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: DUR.base, ease: EASE.out }} />
               <motion.path d="M15 27l7 7 15-16" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: DUR.fast, delay: 0.45, ease: EASE.out }} />
             </motion.svg>
-            <p className="eyebrow mt-6">Demande enregistrée</p>
-            <h2 ref={doneTitle} tabIndex={-1} className="display mt-2 text-4xl outline-none md:text-5xl">{p.credits} crédits t&apos;attendent.</h2>
+            <p className="eyebrow mt-6">{t("Demande enregistrée")}</p>
+            <h2 ref={doneTitle} tabIndex={-1} className="display mt-2 text-4xl outline-none md:text-5xl">{t("{n} crédits t'attendent.", { n: p.credits })}</h2>
             <p className="mt-4 max-w-lg text-muted">
-              Référence <span className="font-semibold text-ink">{done.reference}</span>. On t&apos;envoie la demande de paiement {PAYMENT_METHODS[method]} de {formatFCFA(toPay)} au {done.phone}. Tes crédits sont ajoutés dès que le paiement est reçu.
+              {t("Référence")} <span className="font-semibold text-ink">{done.reference}</span>. {t("On t'envoie la demande de paiement {method} de {amount} au {phone}. Tes crédits sont ajoutés dès que le paiement est reçu.", { method: t(PAYMENT_METHODS[method]), amount: formatFCFA(toPay), phone: done.phone })}
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-6">
-              <Link href="/studio" className="btn">Retour au studio</Link>
+              <Link href="/studio" className="btn">{t("Retour au studio")}</Link>
               <Link href="/" className="link-line">
-                Accueil <span className="arrow">›</span>
+                {t("Accueil")} <span className="arrow">›</span>
               </Link>
             </div>
           </motion.div>
@@ -99,19 +101,19 @@ export function CreditsView({ initialPack = DEFAULT_PACK, online = false, return
           <motion.form key="form" exit={{ opacity: 0 }} transition={{ duration: DUR.instant, ease: EASE.in }} method="post" onSubmit={submit} noValidate className="grid items-start gap-14 pb-24 lg:grid-cols-[1fr_400px] lg:gap-20">
             <div className="space-y-16">
               <section>
-                <p className={sectionTitle}>Ton pack</p>
-                <div className="mt-6 grid gap-3 sm:grid-cols-3" role="radiogroup" aria-label="Pack de crédits">
+                <p className={sectionTitle}>{t("Ton pack")}</p>
+                <div className="mt-6 grid gap-3 sm:grid-cols-3" role="radiogroup" aria-label={t("Pack de crédits")}>
                   {CREDIT_PACK_IDS.map((k) => {
                     const c = CREDIT_PACKS[k];
                     const on = pack === k;
                     return (
                       <button type="button" role="radio" aria-checked={on} key={k} onClick={() => setPack(k)} className={`relative flex flex-col items-center rounded-2xl border px-5 pb-6 pt-8 text-center transition-colors ${on ? "border-accent shadow-[0_0_0_1px_var(--accent)]" : "border-line hover:border-muted"}`}>
-                        {c.best && <span className="absolute -top-px left-1/2 -translate-x-1/2 rounded-b-xl bg-accent px-3 py-1 text-[12px] font-medium text-white">Le plus choisi</span>}
-                        <span className="text-[17px] font-semibold">{c.name}</span>
+                        {c.best && <span className="absolute -top-px left-1/2 -translate-x-1/2 rounded-b-xl bg-accent px-3 py-1 text-[12px] font-medium text-white">{t("Le plus choisi")}</span>}
+                        <span className="text-[17px] font-semibold">{t(c.name)}</span>
                         <span className="display mt-3 text-[64px] leading-none tabular-nums">{c.credits}</span>
-                        <span className="text-sm text-muted">crédits</span>
+                        <span className="text-sm text-muted">{t("crédits")}</span>
                         <span className="mt-4 text-[17px] font-semibold tabular-nums">{formatFCFA(c.priceXof)}</span>
-                        <span className="mt-1 text-xs text-muted">{c.note}</span>
+                        <span className="mt-1 text-xs text-muted">{t(c.note)}</span>
                       </button>
                     );
                   })}
@@ -119,19 +121,19 @@ export function CreditsView({ initialPack = DEFAULT_PACK, online = false, return
               </section>
 
               <section>
-                <p className={sectionTitle}>Tes coordonnées</p>
+                <p className={sectionTitle}>{t("Tes coordonnées")}</p>
                 <div className="mt-8 grid gap-8 sm:grid-cols-2">
-                  <Field error={errors.name} name="name" label="Nom complet" autoComplete="name" />
-                  <Field error={errors.phone} name="phone" label="Téléphone" type="tel" autoComplete="tel" placeholder="Pour la demande de paiement" />
+                  <Field error={errors.name} name="name" label={t("Nom complet")} autoComplete="name" />
+                  <Field error={errors.phone} name="phone" label={t("Téléphone")} type="tel" autoComplete="tel" placeholder={t("Pour la demande de paiement")} />
                   <div className="sm:col-span-2">
-                    <Field error={errors.email} name="email" label="E-mail (facultatif)" type="email" autoComplete="email" placeholder="Pour recevoir la confirmation" />
+                    <Field error={errors.email} name="email" label={t("E-mail (facultatif)")} type="email" autoComplete="email" placeholder={t("Pour recevoir la confirmation")} />
                   </div>
                 </div>
               </section>
 
               <section>
-                <p className={sectionTitle}>Paiement</p>
-                <div className="mt-6" role="radiogroup" aria-label="Moyen de paiement">
+                <p className={sectionTitle}>{t("Paiement")}</p>
+                <div className="mt-6" role="radiogroup" aria-label={t("Moyen de paiement")}>
                   {PAYMENT_METHOD_IDS.map((k) => {
                     const on = method === k;
                     return (
@@ -140,48 +142,48 @@ export function CreditsView({ initialPack = DEFAULT_PACK, online = false, return
                           {on && <motion.span layoutId="pay-dot" className="h-2.5 w-2.5 rounded-full bg-accent" />}
                         </span>
                         <span className="flex-1">
-                          <span className="block text-[17px] font-semibold">{PAYMENT_METHODS[k]}</span>
-                          <span className="text-sm tabular-nums text-muted">{online ? `Frais ${formatFCFA(paymentFee(p.priceXof, k))}` : k === "CARD" ? "Visa, Mastercard" : "Mobile money"}</span>
+                          <span className="block text-[17px] font-semibold">{t(PAYMENT_METHODS[k])}</span>
+                          <span className="text-sm tabular-nums text-muted">{online ? t("Frais {fee}", { fee: formatFCFA(paymentFee(p.priceXof, k)) }) : k === "CARD" ? "Visa, Mastercard" : "Mobile money"}</span>
                         </span>
                       </button>
                     );
                   })}
                 </div>
                 {online ? (
-                  <p className="mt-6 max-w-lg text-sm text-muted">Tu paies sur la page sécurisée de GeniusPay. Tes crédits arrivent dès que le paiement est confirmé.</p>
+                  <p className="mt-6 max-w-lg text-sm text-muted">{t("Tu paies sur la page sécurisée de GeniusPay. Tes crédits arrivent dès que le paiement est confirmé.")}</p>
                 ) : (
                   <>
-                    <p className="mt-6 text-[21px] font-semibold">Paiement en ligne bientôt disponible.</p>
-                    <p className="mt-2 max-w-lg text-sm text-muted">Ta demande est enregistrée et on t&apos;envoie la demande de paiement sur ton numéro. Tes crédits arrivent dès qu&apos;il est reçu.</p>
+                    <p className="mt-6 text-[21px] font-semibold">{t("Paiement en ligne bientôt disponible.")}</p>
+                    <p className="mt-2 max-w-lg text-sm text-muted">{t("Ta demande est enregistrée et on t'envoie la demande de paiement sur ton numéro. Tes crédits arrivent dès qu'il est reçu.")}</p>
                   </>
                 )}
               </section>
             </div>
 
             <aside className="tile p-8 lg:sticky lg:top-20">
-              <p className="text-[21px] font-semibold">Ton achat</p>
+              <p className="text-[21px] font-semibold">{t("Ton achat")}</p>
               <dl className="mt-6 space-y-3 text-sm">
-                <div className="flex justify-between"><dt className="text-muted">Pack</dt><dd>{p.name}</dd></div>
-                <div className="flex justify-between"><dt className="text-muted">Crédits</dt><dd className="tabular-nums">{p.credits}</dd></div>
-                <div className="flex justify-between"><dt className="text-muted">Paiement</dt><dd>{PAYMENT_METHODS[method]}</dd></div>
-                <div className="flex justify-between"><dt className="text-muted">Prix du pack</dt><dd className="tabular-nums">{formatFCFA(p.priceXof)}</dd></div>
-                {fee > 0 && <div className="flex justify-between"><dt className="text-muted">Frais {PAYMENT_METHODS[method]}</dt><dd className="tabular-nums">{formatFCFA(fee)}</dd></div>}
+                <div className="flex justify-between"><dt className="text-muted">{t("Pack")}</dt><dd>{t(p.name)}</dd></div>
+                <div className="flex justify-between"><dt className="text-muted">{t("Crédits")}</dt><dd className="tabular-nums">{p.credits}</dd></div>
+                <div className="flex justify-between"><dt className="text-muted">{t("Paiement")}</dt><dd>{t(PAYMENT_METHODS[method])}</dd></div>
+                <div className="flex justify-between"><dt className="text-muted">{t("Prix du pack")}</dt><dd className="tabular-nums">{formatFCFA(p.priceXof)}</dd></div>
+                {fee > 0 && <div className="flex justify-between"><dt className="text-muted">{t("Frais {method}", { method: t(PAYMENT_METHODS[method]) })}</dt><dd className="tabular-nums">{formatFCFA(fee)}</dd></div>}
               </dl>
               <div className="mt-6 flex items-baseline justify-between border-t border-line pt-6">
-                <span className="font-semibold">Total</span>
+                <span className="font-semibold">{t("Total")}</span>
                 <motion.span key={toPay} initial={{ opacity: 0.4 }} animate={{ opacity: 1 }} className="display text-3xl tabular-nums">{formatFCFA(toPay)}</motion.span>
               </div>
               <AnimatePresence>
                 {message && (
                   <motion.p role="alert" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: DUR.fast, ease: EASE.out }} className="mt-6 text-sm text-danger">
-                    {message}
+                    {t(message)}
                   </motion.p>
                 )}
               </AnimatePresence>
               <button disabled={pending} className="btn mt-8 w-full">
-                {pending ? <span className="h-4 w-4 animate-spin rounded-full border border-on-ink border-t-transparent" aria-label="Envoi" /> : online ? `Payer ${formatFCFA(toPay)}` : "Valider l'achat"}
+                {pending ? <span className="h-4 w-4 animate-spin rounded-full border border-on-ink border-t-transparent" aria-label={t("Envoi")} /> : online ? t("Payer {amount}", { amount: formatFCFA(toPay) }) : t("Valider l'achat")}
               </button>
-              <Link href="/studio" className="mt-5 block text-center text-sm text-muted underline-offset-4 hover:text-ink hover:underline">Retour au studio</Link>
+              <Link href="/studio" className="mt-5 block text-center text-sm text-muted underline-offset-4 hover:text-ink hover:underline">{t("Retour au studio")}</Link>
             </aside>
           </motion.form>
         )}

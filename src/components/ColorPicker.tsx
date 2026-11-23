@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "./I18nProvider";
 import { useRef, useState, useSyncExternalStore } from "react";
 import { motion } from "motion/react";
 import { SPRING } from "@/lib/motion";
@@ -51,6 +52,7 @@ type Props = {
 
 /** Free colour picker: saturation/brightness gradient + hue rainbow + hex field + presets + eyedropper. */
 export function ColorPicker({ initial, presets, onChange, presetsLabel = "Teintes populaires" }: Props) {
+  const t = useT();
   const [hsv, setHsv] = useState(() => hexToHsv(initial));
   const [text, setText] = useState(initial);
   const hex = hsvToHex(hsv.h, hsv.s, hsv.v);
@@ -89,7 +91,7 @@ export function ColorPicker({ initial, presets, onChange, presetsLabel = "Teinte
       <div
         {...sv}
         role="slider"
-        aria-label="Saturation et luminosité"
+        aria-label={t("Saturation et luminosité")}
         aria-valuenow={Math.round(hsv.s * 100)}
         aria-valuetext={hex}
         tabIndex={0}
@@ -119,7 +121,7 @@ export function ColorPicker({ initial, presets, onChange, presetsLabel = "Teinte
       <div
         {...hue}
         role="slider"
-        aria-label="Teinte"
+        aria-label={t("Teinte")}
         aria-valuemin={0}
         aria-valuemax={360}
         aria-valuenow={Math.round(hsv.h)}
@@ -143,7 +145,7 @@ export function ColorPicker({ initial, presets, onChange, presetsLabel = "Teinte
       <div className="flex items-end gap-4">
         <span className="h-9 w-9 shrink-0 rounded-full ring-1 ring-line" style={{ background: hex }} />
         <label className="flex flex-1 items-center">
-          <span className="sr-only">Code couleur</span>
+          <span className="sr-only">{t("Code couleur")}</span>
           <input
             value={text}
             onChange={(e) => {
@@ -157,7 +159,7 @@ export function ColorPicker({ initial, presets, onChange, presetsLabel = "Teinte
           />
         </label>
         {canPick && (
-          <button onClick={pick} aria-label="Pipette : prendre une couleur à l'écran" className="grid h-9 w-9 shrink-0 place-items-center text-muted transition hover:text-ink">
+          <button onClick={pick} aria-label={t("Pipette : prendre une couleur à l'écran")} className="grid h-9 w-9 shrink-0 place-items-center text-muted transition hover:text-ink">
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M2 22l1-4 11-11 3 3L6 21z" />
               <path d="M14 7l3-3a2.1 2.1 0 0 1 3 3l-3 3" />
@@ -168,7 +170,7 @@ export function ColorPicker({ initial, presets, onChange, presetsLabel = "Teinte
 
       {/* Presets */}
       <div>
-        <p className="eyebrow mb-3">{presetsLabel}</p>
+        <p className="eyebrow mb-3">{t(presetsLabel)}</p>
         <div className="flex flex-wrap gap-3">
           {presets.map((c) => (
             <motion.button
@@ -176,8 +178,8 @@ export function ColorPicker({ initial, presets, onChange, presetsLabel = "Teinte
               whileTap={{ scale: 0.8 }}
               transition={SPRING.pop}
               onClick={() => setHex(c.hex)}
-              title={c.name}
-              aria-label={c.name}
+              title={t(c.name)}
+              aria-label={t(c.name)}
               aria-pressed={hex === c.hex.toLowerCase()}
               className={`h-6 w-6 rounded-full ring-1 ring-offset-[3px] ring-offset-bg transition ${hex === c.hex.toLowerCase() ? "ring-ink" : "ring-line hover:ring-muted"}`}
               style={{ background: c.hex }}

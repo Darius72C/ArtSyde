@@ -6,6 +6,7 @@ import { getMyCustomer } from "@/server/account";
 import { deleteObject, keyFromPublicUrl, presign, r2Config } from "@/server/r2";
 import { logActivity, logError } from "@/server/log";
 import { DESIGN_SAVE_CREDITS, FREE_DESIGNS } from "@/lib/studio";
+import { getRequestT } from "@/lib/i18n/server";
 
 /*
  * The customer's own creations from the studio (SavedDesign): saved to their account, listed in /compte,
@@ -29,13 +30,14 @@ const prefixOf = (customerId: string) => `saved/${customerId}/`;
 
 /** A signed link to send one image of a design (signed-in customers only). */
 export async function presignMyDesignImage(input: { type: string; size: number }): Promise<{ ok: true; uploadUrl: string; publicUrl: string } | { ok: false; message: string }> {
+  const t = await getRequestT();
   const me = await getMyCustomer();
-  if (!me) return { ok: false, message: "Connecte-toi pour sauvegarder tes créations." };
+  if (!me) return { ok: false, message: t("Connecte-toi pour sauvegarder tes créations.") };
   const cfg = r2Config();
-  if (!cfg) return { ok: false, message: "Le stockage des fichiers n'est pas configuré." };
+  if (!cfg) return { ok: false, message: t("Le stockage des fichiers n'est pas configuré.") };
   const ext = TYPES[input?.type];
   const size = Number(input?.size);
-  if (!ext || !Number.isInteger(size) || size <= 0 || size > MAX_IMAGE) return { ok: false, message: "Image refusée (PNG, JPG ou WEBP, 20 Mo max)." };
+  if (!ext || !Number.isInteger(size) || size <= 0 || size > MAX_IMAGE) return { ok: false, message: t("Image refusée (PNG, JPG ou WEBP, 20 Mo max).") };
   const key = `${prefixOf(me.customer.id)}${randomUUID()}.${ext}`;
   const uploadUrl = presign(cfg, "PUT", key, { "content-type": input.type, "content-length": String(size) }, 600);
   return { ok: true, uploadUrl, publicUrl: `${cfg.publicUrl}/${key}` };
@@ -94,13 +96,14 @@ export type SaveResult =
  * asking the customer), in the same transaction that creates it.
  */
 export async function saveMyDesign(input: { id?: string; name: string; teeColor: string; front: unknown; back: unknown; preview?: string; pay?: boolean }): Promise<SaveResult> {
+  const t = await getRequestT();
   const me = await getMyCustomer();
-  if (!me) return { ok: false, message: "Connecte-toi pour sauvegarder tes créations." };
+  if (!me) return { ok: false, message: t("Connecte-toi pour sauvegarder tes créations.") };
   const own = prefixOf(me.customer.id);
   const front = cleanSide(input?.front, own);
   const back = cleanSide(input?.back, own);
-  if (!front || !back) return { ok: false, message: "Une image de la création n'a pas pu être enregistrée. Réessaie." };
-  if (!front.images.length && !front.text && !back.images.length && !back.text) return { ok: false, message: "Ajoute une image ou un texte avant de sauvegarder." };
+  if (!front || !back) return { ok: false, message: t("Une image de la création n'a pas pu être enregistrée. Réessaie.") };
+  if (!front.images.length && !front.text && !back.images.length && !back.text) return { ok: false, message: t("Ajoute une image ou un texte avant de sauvegarder.") };
   const name = str(input?.name, 60).trim() || "Ma création";
   const teeColor = /^#[0-9a-f]{6}$/i.test(input?.teeColor ?? "") ? input.teeColor.toLowerCase() : "#f4f2ec";
   const preview = typeof input?.preview === "string" && input.preview.startsWith("data:image/") && input.preview.length <= MAX_PREVIEW ? input.preview : undefined;
@@ -117,13 +120,13 @@ export async function saveMyDesign(input: { id?: string; name: string; teeColor:
     const customerId = me.customer.id;
     const r = await db.$transaction(async (tx): Promise<SaveResult> => {
       const count = await tx.savedDesign.count({ where: { customerId } });
-      if (count >= MAX_DESIGNS) return { ok: false, message: `${MAX_DESIGNS} créations maximum : supprime-en une dans ton compte.` };
+      if (count >= MAX_DESIGNS) return { ok: false, message: t("{n} créations maximum : supprime-en une dans ton compte.", { n: MAX_DESIGNS }) };
       const cost = count >= FREE_DESIGNS ? DESIGN_SAVE_CREDITS : 0;
       let balance: number | undefined;
       if (cost) {
         balance = (await tx.creditEntry.aggregate({ where: { customerId }, _sum: { amount: true } }))._sum.amount ?? 0;
-        const why = `Tes ${FREE_DESIGNS} créations gratuites sont utilisées : une de plus coûte ${cost} crédit${cost > 1 ? "s" : ""}.`;
-        if (balance < cost) return { ok: false, reason: "not-enough", cost, balance, message: `${why} Recharge tes crédits ou supprime une création dans ton compte.` };
+        const why = t(cost > 1 ? "Tes {free} créations gratuites sont utilisées : une de plus coûte {cost} crédits." : "Tes {free} créations gratuites sont utilisées : une de plus coûte {cost} crédit.", { free: FREE_DESIGNS, cost });
+        if (balance < cost) return { ok: false, reason: "not-enough", cost, balance, message: `${why} ${t("Recharge tes crédits ou supprime une création dans ton compte.")}` };
         if (!input?.pay) return { ok: false, reason: "pay", cost, balance, message: why };
       }
       const row = await tx.savedDesign.create({ data: { ...data, customerId }, select: { id: true } });
@@ -140,7 +143,7 @@ export async function saveMyDesign(input: { id?: string; name: string; teeColor:
     return r;
   } catch (e) {
     await logError("saveMyDesign", e);
-    return { ok: false, message: "La création n'a pas pu être sauvegardée. Réessaie." };
+    return { ok: false, message: t("La création n'a pas pu être sauvegardée. Réessaie.") };
   }
 }
 

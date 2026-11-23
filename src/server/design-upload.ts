@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { presign, r2Config } from "@/server/r2";
 import { allow, clientIp } from "@/server/rate-limit";
 import { logActivity } from "@/server/log";
+import { getRequestT } from "@/lib/i18n/server";
 
 /*
  * The studio's print files: when a custom t-shirt goes into the cart, the browser draws each printed side
@@ -24,19 +25,20 @@ export type DesignUpload = { ok: true; uploadUrl: string; publicUrl: string } | 
 const MAX_SIZE = 80 * 1024 * 1024; // an Ultra HD side is a ~7 600 × 8 400 px PNG
 
 export async function presignDesignFile(input: { side: "front" | "back"; size: number }): Promise<DesignUpload> {
+  const t = await getRequestT();
   const cfg = r2Config();
-  if (!cfg) return { ok: false, message: "Le stockage des fichiers n'est pas configuré." };
+  if (!cfg) return { ok: false, message: t("Le stockage des fichiers n'est pas configuré.") };
   const side = input?.side === "back" ? "back" : input?.side === "front" ? "front" : null;
   const size = Number(input?.size);
-  if (!side || !Number.isInteger(size) || size <= 0 || size > MAX_SIZE) return { ok: false, message: "Fichier d'impression refusé." };
+  if (!side || !Number.isInteger(size) || size <= 0 || size > MAX_SIZE) return { ok: false, message: t("Fichier d'impression refusé.") };
   const ip = await clientIp();
   if (!(await allow(`print-upload:ip:${ip}`, PER_VISITOR.max, PER_VISITOR.windowMs))) {
-    return { ok: false, message: "Trop d'envois en peu de temps. Réessaie dans une heure, ou écris-nous si ça bloque ta commande." };
+    return { ok: false, message: t("Trop d'envois en peu de temps. Réessaie dans une heure, ou écris-nous si ça bloque ta commande.") };
   }
   if (!(await allow("print-upload:site", SITE_PER_DAY.max, SITE_PER_DAY.windowMs))) {
     // Written once a day in the journal, not at every refused file.
     if (await allow("print-upload:cap-noted", 1, SITE_PER_DAY.windowMs)) await logActivity("studio.upload_cap", `Plafond quotidien des fichiers d'impression atteint (${SITE_PER_DAY.max}) : envois bloqués jusqu'à demain`, { ip }, "système");
-    return { ok: false, message: "Les envois sont momentanément suspendus. Réessaie plus tard, ou écris-nous." };
+    return { ok: false, message: t("Les envois sont momentanément suspendus. Réessaie plus tard, ou écris-nous.") };
   }
   const month = new Date().toISOString().slice(0, 7);
   const key = `designs/${month}/${randomUUID()}-${side === "front" ? "devant" : "dos"}.png`;

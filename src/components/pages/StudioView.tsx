@@ -26,6 +26,8 @@ import { track } from "@/lib/metrics";
 import { zipFiles } from "@/lib/zip";
 import { embedTrace, protectImage, stampWatermark } from "@/lib/watermark";
 import { paint, type StudioImage, type StudioSide, type StudioText } from "@/lib/studioPaint";
+import { useLocale, useT } from "../I18nProvider";
+import { intlLocale } from "@/lib/i18n";
 
 // "Porté": the design in progress on a shop mannequin, loaded only when chosen.
 const loadWorn = () => import("../MannequinTryOn");
@@ -50,6 +52,7 @@ type SideId = "front" | "back";
 type Layer = string;
 
 const FONTS = { serif: "Serif", italic: "Italique", sans: "Linéaire" } as const;
+const TAB_LABEL = { couleur: "Couleur", image: "Image", texte: "Texte" } as const;
 const INKS = [
   { name: "Crème", hex: "#efe9df" },
   { name: "Noir", hex: "#1a1a1a" },
@@ -159,13 +162,16 @@ function useCaptureVeil() {
 
 /** Side length, in cm on the tee, of the square the quality comparison zooms into. */
 const COMPARE_CM = 1.5;
-const cmLabel = `${COMPARE_CM.toLocaleString("fr-FR")} cm`;
 
 /**
  * The same 1.5 cm square of the design, painted at each output quality and enlarged to the same size
  * without smoothing: more dots means a sharper print. Centred on the selected layer.
  */
 function QualityCompare({ side, center, images, current, onPick }: { side: Side; center: { x: number; y: number }; images: React.RefObject<Map<string, HTMLImageElement>>; current: PrintQuality; onPick: (q: PrintQuality) => void }) {
+  const tr = useT();
+  const locale = useLocale();
+  const num = (n: number) => n.toLocaleString(intlLocale(locale));
+  const cmLabel = `${num(COMPARE_CM)} cm`;
   const refs = useRef<(HTMLCanvasElement | null)[]>([]);
   useEffect(() => {
     PRINT_QUALITIES.forEach((k, i) => {
@@ -197,10 +203,10 @@ function QualityCompare({ side, center, images, current, onPick }: { side: Side;
                 width={240}
                 height={240}
                 className={`aspect-square w-full rounded-xl border bg-surface [image-rendering:pixelated] ${current === k ? "border-accent shadow-[0_0_0_1px_var(--accent)]" : "border-line"}`}
-                aria-label={`Aperçu en ${q.label}`}
+                aria-label={tr("Aperçu en {quality}", { quality: q.label })}
               />
               <span className="mt-2 block text-sm font-medium">{q.label}</span>
-              <span className="block text-[11px] text-muted">{q.dpi} DPI · {Math.round((q.dpi / 2.54) * COMPARE_CM)} points pour {cmLabel}</span>
+              <span className="block text-[11px] text-muted">{tr("{dpi} DPI · {n} points pour {cm}", { dpi: q.dpi, n: Math.round((q.dpi / 2.54) * COMPARE_CM), cm: cmLabel })}</span>
             </button>
           );
         })}
@@ -212,13 +218,13 @@ function QualityCompare({ side, center, images, current, onPick }: { side: Side;
             <div key={k} className="flex justify-between gap-3">
               <dt className="text-muted">{q.label}</dt>
               <dd className="text-right tabular-nums">
-                {k === "STANDARD" ? `aperçu ${STANDARD_PREVIEW_PX.toLocaleString("fr-FR")} px, filigrane` : `${q.px.toLocaleString("fr-FR")} × ${Math.round(q.px / TEE_ASPECT).toLocaleString("fr-FR")} px · vue 3D ${q.view.toLocaleString("fr-FR")} px`}
+                {k === "STANDARD" ? tr("aperçu {px} px, filigrane", { px: num(STANDARD_PREVIEW_PX) }) : tr("{w} × {h} px · vue 3D {view} px", { w: num(q.px), h: num(Math.round(q.px / TEE_ASPECT)), view: num(q.view) })}
               </dd>
             </div>
           );
         })}
       </dl>
-      <p className="mt-3 text-xs text-muted">Un carré de {cmLabel} de ton design, agrandi. Une image importée trop petite reste floue, quelle que soit la qualité.</p>
+      <p className="mt-3 text-xs text-muted">{tr("Un carré de {cm} de ton design, agrandi. Une image importée trop petite reste floue, quelle que soit la qualité.", { cm: cmLabel })}</p>
     </div>
   );
 }
@@ -259,10 +265,13 @@ function layerAt(d: Side, px: number, py: number, w: number, h: number): Layer |
  * previewed. With no stock set up yet, every colour can be ordered.
  */
 export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap; stockColours?: { name: string; hex: string }[] }) {
+  const t = useT();
+  const locale = useLocale();
+  const num = (n: number) => n.toLocaleString(intlLocale(locale));
   const mounted = useSyncExternalStore(noop, () => true, () => false);
   const canvases = mounted ? getCanvases() : null;
   const images = useRef(new Map<string, HTMLImageElement>());
-  const [design, setDesign] = useState<Record<SideId, Side>>({ front: { images: [], text: DEFAULT_TEXT }, back: { images: [] } });
+  const [design, setDesign] = useState<Record<SideId, Side>>({ front: { images: [], text: { ...DEFAULT_TEXT, value: t(DEFAULT_TEXT.value) } }, back: { images: [] } });
   const [side, setSide] = useState<SideId>("front");
   const [worn, setWorn] = useState(false); // the stage shows the tee alone, or worn by a mannequin
   const [selected, setSelected] = useState<Layer | null>("text");
@@ -274,6 +283,7 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
   const [size, setSize] = useState("M");
   const [qty, setQty] = useState(1);
   const [toast, setToast] = useState<string | null>(null);
+  const [toastCart, setToastCart] = useState(false); // the toast is about the cart: it offers "Voir"
   // Images picked but not added yet (checked before a credit is spent), and the last paid addition that
   // "Annuler" can still take back.
   const [picked, setPicked] = useState<{ files: File[]; urls: string[]; dropped: number } | null>(null);
@@ -322,8 +332,9 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
     Object.assign(canvases[side].style, { width: "100%", height: "100%", display: "block" });
   }, [canvases, side]);
 
-  const flash = (msg: string) => {
+  const flash = (msg: string, cart = false) => {
     setToast(msg);
+    setToastCart(cart);
     setTimeout(() => setToast(null), 2200);
   };
   useEffect(() => {
@@ -356,7 +367,7 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
       setCredits({ ...credits, balance: r.balance ?? 0 });
       setGate("empty");
     }
-    else flash("Les crédits n'ont pas pu être utilisés : réessaie");
+    else flash(t("Les crédits n'ont pas pu être utilisés : réessaie"));
     return null;
   };
 
@@ -414,7 +425,7 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
     (async () => {
       const d = await getMyDesign(id).catch(() => null);
       if (!live) return;
-      if (!d) return flash("Création introuvable : connecte-toi avec le compte qui l'a sauvegardée");
+      if (!d) return flash(t("Création introuvable : connecte-toi avec le compte qui l'a sauvegardée"));
       const srcs = [...new Set([...d.front.images, ...d.back.images].map((i) => i.src))];
       await Promise.all(
         srcs.map(
@@ -438,7 +449,7 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
       pickColor(d.teeColor);
       setSavedAs({ id: d.id, name: d.name });
       setSelected(d.front.images.at(-1)?.id ?? (d.front.text ? "text" : null));
-      flash(lost ? `« ${d.name} » ouverte, mais une image n'a pas pu être chargée` : `« ${d.name} » ouverte`);
+      flash(lost ? t("« {name} » ouverte, mais une image n'a pas pu être chargée", { name: d.name }) : t("« {name} » ouverte", { name: d.name }));
     })();
     return () => {
       live = false;
@@ -533,7 +544,7 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
   const saveDesign = async (name: string) => {
     if (saving) return;
     if (!credits?.signedIn) return setGate("signin");
-    if (!hasContent(design.front) && !hasContent(design.back)) return flash("Ajoute une image ou un texte avant de sauvegarder");
+    if (!hasContent(design.front) && !hasContent(design.back)) return flash(t("Ajoute une image ou un texte avant de sauvegarder"));
     setSaving(true);
     try {
       const sent = new Map<string, string>(); // data URL -> stored URL
@@ -555,7 +566,7 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
       let r = await saveMyDesign(payload);
       // Past the free creations, one more costs credits: asked first, then taken by the server with the save.
       if (!r.ok && r.reason === "pay") {
-        if (!confirm(`${r.message}\n\nSauvegarder « ${name || "Ma création"} » pour ${creditsLabel(r.cost ?? DESIGN_SAVE_CREDITS)} ?`)) return;
+        if (!confirm(`${r.message}\n\n${t("Sauvegarder « {name} » pour {credits} ?", { name: name || t("Ma création"), credits: creditsLabel(r.cost ?? DESIGN_SAVE_CREDITS) })}`)) return;
         r = await saveMyDesign({ ...payload, pay: true });
       }
       if (!r.ok && r.reason === "not-enough") {
@@ -567,12 +578,12 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
       if (r.balance !== undefined && credits?.signedIn) setCredits({ ...credits, balance: r.balance });
       setSavedAs({ id: r.id, name: r.name });
       setNaming(null);
-      const paid = r.spent ? ` · ${creditsLabel(r.spent)} utilisé${r.spent > 1 ? "s" : ""}` : "";
-      flash(savedAs ? `« ${r.name} » mise à jour dans ton compte` : `« ${r.name} » sauvegardée dans ton compte${paid}`);
+      const paid = r.spent ? ` · ${usedLabel(r.spent)}` : "";
+      flash(savedAs ? t("« {name} » mise à jour dans ton compte", { name: r.name }) : `${t("« {name} » sauvegardée dans ton compte", { name: r.name })}${paid}`);
     } catch (err) {
       console.error("Design save failed", err);
       void reportClientError("studio.save", err instanceof Error ? err.message : String(err), { path: location.pathname }).catch(() => {});
-      flash(err instanceof Error && !/fetch|upload/i.test(err.message) ? err.message : "La création n'a pas pu être sauvegardée : vérifie ta connexion et réessaie");
+      flash(err instanceof Error && !/fetch|upload/i.test(err.message) ? err.message : t("La création n'a pas pu être sauvegardée : vérifie ta connexion et réessaie"));
     } finally {
       setSaving(false);
     }
@@ -584,10 +595,10 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
   const onPick = (list: FileList | null) => {
     const files = [...(list ?? [])];
     if (!files.length) return;
-    if (files.some((f) => !/^image\/(png|jpeg|webp)$/.test(f.type))) return flash("Format accepté : PNG, JPG ou WEBP");
-    if (files.some((f) => f.size > 20 * 1024 * 1024)) return flash("Image trop lourde (20 Mo max)");
+    if (files.some((f) => !/^image\/(png|jpeg|webp)$/.test(f.type))) return flash(t("Format accepté : PNG, JPG ou WEBP"));
+    if (files.some((f) => f.size > 20 * 1024 * 1024)) return flash(t("Image trop lourde (20 Mo max)"));
     const room = MAX_IMAGES - design[side].images.length;
-    if (room <= 0) return flash(`${MAX_IMAGES} images maximum par face`);
+    if (room <= 0) return flash(t("{n} images maximum par face", { n: MAX_IMAGES }));
     const take = files.slice(0, room);
     setPicked({ files: take, urls: take.map((f) => URL.createObjectURL(f)), dropped: files.length - take.length });
   };
@@ -601,7 +612,7 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
     const paid = await spend(take.length, "IMAGE_UPLOAD");
     if (!paid) return;
     const target = side;
-    const extra = dropped > 0 ? ` (${MAX_IMAGES} max par face)` : "";
+    const extra = dropped > 0 ? ` ${t("({n} max par face)", { n: MAX_IMAGES })}` : "";
     const ids: string[] = [];
     take.forEach((file) => {
       const reader = new FileReader();
@@ -620,7 +631,7 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
           setSelected(id);
           ids.push(id);
           if (ids.length === take.length) {
-            const text = take.length > 1 ? `${take.length} images ajoutées · ${take.length} crédits${extra}` : `Image ajoutée · 1 crédit${extra}`;
+            const text = take.length > 1 ? `${t("{n} images ajoutées · {n} crédits", { n: take.length })}${extra}` : `${t("Image ajoutée · 1 crédit")}${extra}`;
             // Free images (no credit spent) have nothing to give back: a plain message.
             if (paid.entryId) setUndo({ entryId: paid.entryId, side: target, ids: [...ids], text, left: UNDO_SECONDS });
             else flash(text);
@@ -641,7 +652,7 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
     if (u.side === side) setSelected(topLayer(drop(design[u.side])));
     const back = await refund(u.entryId, "undo");
     const n = u.ids.length;
-    flash(back ? `${n > 1 ? "Images retirées" : "Image retirée"} · ${n > 1 ? `${n} crédits rendus` : "crédit rendu"}` : `${n > 1 ? "Images retirées" : "Image retirée"} · le crédit n'a pas pu être rendu`);
+    flash(`${n > 1 ? t("Images retirées") : t("Image retirée")} · ${back ? (n > 1 ? t("{n} crédits rendus", { n }) : t("crédit rendu")) : t("le crédit n'a pas pu être rendu")}`);
   };
 
   // The "Annuler" countdown.
@@ -715,7 +726,8 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
   const stockManaged = Object.keys(stock).length > 0;
   const teeTracked = Boolean(stock[teeHex.toLowerCase()]);
   const orderable = !stockManaged || available(stock, teeHex, size) > 0;
-  const creditsLabel = (n: number) => `${n} crédit${n > 1 ? "s" : ""}`;
+  const creditsLabel = (n: number) => (n > 1 ? t("{n} crédits", { n }) : t("{n} crédit", { n }));
+  const usedLabel = (n: number) => (n > 1 ? t("{n} crédits utilisés", { n }) : t("{n} crédit utilisé", { n }));
   const setInk = (color: string) =>
     setDesign((d) => ({ ...d, [side]: { ...d[side], text: { ...(d[side].text ?? { ...DEFAULT_TEXT, value: "" }), color } } }));
 
@@ -723,16 +735,16 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
   // Adding to the cart sends the print files to the workshop's storage first: each printed side drawn at the
   // chosen quality, without watermark. The order carries their links; the admin downloads them to print.
   const addToCart = async () => {
-    if (!orderable) return flash(teeTracked ? `Épuisé en ${size} dans cette couleur : choisis une autre taille` : "Cette couleur n'est pas en stock : choisis une teinte en stock pour commander");
+    if (!orderable) return flash(teeTracked ? t("Épuisé en {size} dans cette couleur : choisis une autre taille", { size }) : t("Cette couleur n'est pas en stock : choisis une teinte en stock pour commander"));
     const sides = (["front", "back"] as SideId[]).filter((id) => hasContent(design[id]));
-    if (!sides.length) return flash("Ajoute une image ou un texte avant de commander");
+    if (!sides.length) return flash(t("Ajoute une image ou un texte avant de commander"));
     if (adding) return;
     const paid = await spend(q.credits, "HD_PREVIEW");
     if (!paid) return;
     const files: { side: "front" | "back"; url: string }[] = [];
     try {
       for (const [i, id] of sides.entries()) {
-        setAdding(`Fichier d'impression ${i + 1} sur ${sides.length}…`);
+        setAdding(t("Fichier d'impression {i} sur {n}…", { i: i + 1, n: sides.length }));
         const c = Object.assign(document.createElement("canvas"), { width: q.px, height: Math.round(q.px / TEE_ASPECT) });
         const ctx = c.getContext("2d");
         if (!ctx) throw new Error("canvas too large");
@@ -753,14 +765,14 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
       if (!refused) void reportClientError("studio.upload", err instanceof Error ? err.message : String(err), { path: location.pathname }).catch(() => {});
       setAdding(null);
       void refund(paid.entryId, "failed");
-      return flash(refused ? (err as Error).message : "Le fichier d'impression n'a pas pu être envoyé : vérifie ta connexion et réessaie");
+      return flash(refused ? (err as Error).message : t("Le fichier d'impression n'a pas pu être envoyé : vérifie ta connexion et réessaie"));
     }
     setAdding(null);
     const thumb = snapshot3d();
-    const name = quality === "STANDARD" ? "T-shirt personnalisé" : `T-shirt personnalisé · ${q.label}`;
+    const name = quality === "STANDARD" ? t("T-shirt personnalisé") : `${t("T-shirt personnalisé")} · ${q.label}`;
     track("studio.cart");
     cart.add({ key: cartKey(), productId: null, name, price, color: teeHex, size, qty, preview: thumb, bg: "#e7e0d3", quality, files });
-    flash(q.credits ? `Ajouté au panier · ${creditsLabel(q.credits)} utilisé${q.credits > 1 ? "s" : ""}` : "Ajouté au panier");
+    flash(q.credits ? `${t("Ajouté au panier")} · ${usedLabel(q.credits)}` : t("Ajouté au panier"), true);
   };
 
   // Download: the 3D view of the tee exactly as posed in the studio (angle, colour, design), then the
@@ -812,11 +824,11 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
       }
       save(await zipFiles(files), `artsyde-${tag}.zip`);
       track("studio.download");
-      flash(q.credits ? `Visuel ${q.label} téléchargé · ${creditsLabel(q.credits)} utilisé${q.credits > 1 ? "s" : ""}` : "Visuel téléchargé");
+      flash(q.credits ? `${t("Visuel {quality} téléchargé", { quality: q.label })} · ${usedLabel(q.credits)}` : t("Visuel téléchargé"));
     } catch (err) {
       console.error("Studio export failed", err);
       void refund(paid.entryId, "failed");
-      flash(quality === "STANDARD" ? "Trop lourd pour cet appareil : essaie depuis un ordinateur" : "Trop lourd pour cet appareil : choisis une qualité plus basse");
+      flash(quality === "STANDARD" ? t("Trop lourd pour cet appareil : essaie depuis un ordinateur") : t("Trop lourd pour cet appareil : choisis une qualité plus basse"));
     } finally {
       setExporting(false);
     }
@@ -825,44 +837,44 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
   const slider = (label: string, value: number, min: number, max: number, step: number, on: (v: number) => void, fmt?: (v: number) => string) => (
     <label className="block">
       <span className="flex justify-between text-[11px] tracking-[0.18em] uppercase">
-        <span className="text-muted">{label}</span> <span className="tabular-nums">{fmt ? fmt(value) : value}</span>
+        <span className="text-muted">{t(label)}</span> <span className="tabular-nums">{fmt ? fmt(value) : value}</span>
       </span>
       <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => on(Number(e.target.value))} className="range mt-3" />
     </label>
   );
 
-  const tabBtn = (t: "couleur" | "image" | "texte") => (
+  const tabBtn = (id: "couleur" | "image" | "texte") => (
     <button
-      key={t}
+      key={id}
       role="tab"
-      aria-selected={tab === t}
-      onClick={() => (setTab(t), t !== "couleur" && setSelected(t === "texte" ? "text" : (cur.images.at(-1)?.id ?? null)))}
-      className={`relative pb-2 text-[11px] tracking-[0.2em] uppercase transition-colors ${tab === t ? "" : "text-muted hover:text-ink"}`}
+      aria-selected={tab === id}
+      onClick={() => (setTab(id), id !== "couleur" && setSelected(id === "texte" ? "text" : (cur.images.at(-1)?.id ?? null)))}
+      className={`relative pb-2 text-[11px] tracking-[0.2em] uppercase transition-colors ${tab === id ? "" : "text-muted hover:text-ink"}`}
     >
-      {t}
-      {tab === t && <motion.span layoutId="tool-line" className="absolute inset-x-0 bottom-0 h-px bg-ink" transition={{ duration: DUR.base, ease: EASE.out }} />}
+      {t(TAB_LABEL[id])}
+      {tab === id && <motion.span layoutId="tool-line" className="absolute inset-x-0 bottom-0 h-px bg-ink" transition={{ duration: DUR.base, ease: EASE.out }} />}
     </button>
   );
 
   return (
     <div className="mx-auto max-w-[1440px] px-5 pb-16 pt-10 md:px-10" onContextMenu={(e) => e.preventDefault()} onDragStart={(e) => e.preventDefault()}>
       <div className="mb-8 flex flex-wrap items-end justify-between gap-6">
-        <RevealLines as="h1" lines={[{ text: "Studio 3D.", muted: "Crée le tien." }]} className="display text-5xl md:text-6xl" />
+        <RevealLines as="h1" lines={[{ text: t("Studio 3D."), muted: t("Crée le tien.") }]} className="display text-5xl md:text-6xl" />
         <div className="flex items-center gap-6 text-sm">
           {credits === null ? (
-            <span className="h-px w-16 animate-pulse bg-ink/40" aria-label="Chargement des crédits" />
+            <span className="h-px w-16 animate-pulse bg-ink/40" aria-label={t("Chargement des crédits")} />
           ) : credits.signedIn ? (
             <>
               <motion.span key={tokens} initial={{ opacity: 0.3 }} animate={{ opacity: 1 }} className="tabular-nums">
-                {tokens} crédit{tokens > 1 ? "s" : ""}
+                {creditsLabel(tokens)}
               </motion.span>
               <Link href="/credits" className="link-line">
-                Recharger <span className="arrow">→</span>
+                {t("Recharger")} <span className="arrow">→</span>
               </Link>
             </>
           ) : (
             <Link href="/connexion?suite=/studio" className="link-line">
-              Se connecter · 5 crédits offerts <span className="arrow">→</span>
+              {t("Se connecter · 5 crédits offerts")} <span className="arrow">→</span>
             </Link>
           )}
         </div>
@@ -895,25 +907,25 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
           <div className="absolute left-1/2 top-5 flex -translate-x-1/2 gap-6">
             {(["front", "back"] as const).map((s) => (
               <button key={s} onClick={() => flip(s)} aria-pressed={side === s} className={`relative pb-1.5 text-[11px] tracking-[0.2em] uppercase ${side === s ? "" : "text-muted"}`}>
-                {s === "front" ? "Devant" : "Dos"}
+                {s === "front" ? t("Devant") : t("Dos")}
                 {side === s && <motion.span layoutId="side-line" className="absolute inset-x-0 bottom-0 h-px bg-ink" />}
               </button>
             ))}
           </div>
-          <div className="absolute left-1/2 top-14 flex -translate-x-1/2 rounded-full bg-bg/80 p-0.5 text-[12px]" role="group" aria-label="Affichage">
+          <div className="absolute left-1/2 top-14 flex -translate-x-1/2 rounded-full bg-bg/80 p-0.5 text-[12px]" role="group" aria-label={t("Affichage")}>
             {([false, true] as const).map((w) => (
               <button key={String(w)} type="button" onClick={() => setWorn(w)} onPointerEnter={w ? preloadWorn : undefined} onPointerDown={w ? preloadWorn : undefined} onFocus={w ? preloadWorn : undefined} aria-pressed={worn === w} className={`rounded-full px-3 py-1 transition-colors ${worn === w ? "bg-ink text-on-ink" : "text-muted hover:text-ink"}`}>
-                {w ? "Porté" : "T-shirt"}
+                {w ? t("Porté") : t("T-shirt")}
               </button>
             ))}
           </div>
           <Watermark />
-          <p className="eyebrow pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap">Glisse pour tourner</p>
+          <p className="eyebrow pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap">{t("Glisse pour tourner")}</p>
           <Veil on={veiled} />
           {guide !== null && (
-            <div className="absolute inset-x-4 bottom-4 z-20 rounded-2xl bg-bg/95 p-5 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.35)]" role="dialog" aria-label="Guide du studio">
-              <p className="text-[15px] font-semibold">{GUIDE[guide].title}</p>
-              <p className="mt-1 text-sm text-muted">{GUIDE[guide].body}</p>
+            <div className="absolute inset-x-4 bottom-4 z-20 rounded-2xl bg-bg/95 p-5 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.35)]" role="dialog" aria-label={t("Guide du studio")}>
+              <p className="text-[15px] font-semibold">{t(GUIDE[guide].title)}</p>
+              <p className="mt-1 text-sm text-muted">{t(GUIDE[guide].body)}</p>
               <div className="mt-4 flex items-center justify-between">
                 <span className="flex gap-1.5" aria-hidden>
                   {GUIDE.map((_, i) => (
@@ -921,9 +933,9 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
                   ))}
                 </span>
                 <span className="flex gap-4 text-sm">
-                  <button type="button" onClick={closeGuide} className="text-muted hover:text-ink">Passer</button>
+                  <button type="button" onClick={closeGuide} className="text-muted hover:text-ink">{t("Passer")}</button>
                   <button type="button" onClick={() => (guide < GUIDE.length - 1 ? setGuide(guide + 1) : closeGuide())} className="font-medium text-link">
-                    {guide < GUIDE.length - 1 ? "Suivant" : "C'est parti"}
+                    {guide < GUIDE.length - 1 ? t("Suivant") : t("C'est parti")}
                   </button>
                 </span>
               </div>
@@ -936,8 +948,8 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
         <motion.aside {...panelIn(1)} data-lenis-prevent className="tile order-2 p-6 lg:order-1 lg:max-h-[calc(100svh-200px)] lg:!overflow-y-auto lg:overscroll-contain">
           {restored && (
             <p className="mb-4 flex items-center justify-between gap-3 rounded-xl bg-surface px-3 py-2 text-[13px]">
-              <span>Ton brouillon a été retrouvé.</span>
-              <button type="button" onClick={startOver} className="shrink-0 text-muted underline underline-offset-4 hover:text-ink">Recommencer à zéro</button>
+              <span>{t("Ton brouillon a été retrouvé.")}</span>
+              <button type="button" onClick={startOver} className="shrink-0 text-muted underline underline-offset-4 hover:text-ink">{t("Recommencer à zéro")}</button>
             </p>
           )}
           <div className="flex gap-6 border-b border-line" role="tablist">
@@ -948,22 +960,22 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
             <motion.div key={tab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: DUR.fast, ease: EASE.out }} className="mt-8 space-y-6">
               {tab === "couleur" && (
                 <>
-                  <ColorPicker initial={teeHex} presets={stockColours.length ? stockColours : TEE_COLORS} presetsLabel={stockColours.length ? "En stock à l'atelier" : "Teintes populaires"} onChange={pickColor} />
-                  {stockManaged && !teeTracked && <p className="text-sm text-new">Cette teinte n&apos;est pas en stock : tu peux la voir en 3D, mais pour commander choisis une teinte en stock.</p>}
+                  <ColorPicker initial={teeHex} presets={stockColours.length ? stockColours : TEE_COLORS} presetsLabel={stockColours.length ? t("En stock à l'atelier") : t("Teintes populaires")} onChange={pickColor} />
+                  {stockManaged && !teeTracked && <p className="text-sm text-new">{t("Cette teinte n'est pas en stock : tu peux la voir en 3D, mais pour commander choisis une teinte en stock.")}</p>}
                 </>
               )}
 
               {tab === "image" && (
                 <>
                   <label className="flex cursor-pointer flex-col items-center gap-2 rounded-2xl border border-dashed border-line bg-bg px-6 py-10 text-center transition-colors duration-300 hover:border-accent">
-                    <span className="text-[17px] font-semibold text-link">{cur.images.length ? "Ajouter des images" : "Importer des images"}</span>
-                    <span className="text-xs text-muted">PNG, JPG ou WEBP · 1 crédit par image · {MAX_IMAGES} max sur le {side === "front" ? "devant" : "dos"}</span>
+                    <span className="text-[17px] font-semibold text-link">{cur.images.length ? t("Ajouter des images") : t("Importer des images")}</span>
+                    <span className="text-xs text-muted">{t(side === "front" ? "PNG, JPG ou WEBP · 1 crédit par image · {n} max sur le devant" : "PNG, JPG ou WEBP · 1 crédit par image · {n} max sur le dos", { n: MAX_IMAGES })}</span>
                     <input type="file" multiple accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => (onPick(e.target.files), (e.target.value = ""))} />
                   </label>
                   {cur.images.length > 0 && (
                     <div>
                       <p className="text-sm text-muted">
-                        {cur.images.length} image{cur.images.length > 1 ? "s" : ""} sur le {side === "front" ? "devant" : "dos"} · touche-en une pour la régler
+                        {t(`{n} ${cur.images.length > 1 ? "images" : "image"} sur le ${side === "front" ? "devant" : "dos"} · touche-en une pour la régler`, { n: cur.images.length })}
                       </p>
                       <div className="mt-3 grid grid-cols-4 gap-2">
                         {cur.images.map((img, i) => (
@@ -972,7 +984,7 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
                             type="button"
                             onClick={() => setSelected(img.id)}
                             aria-pressed={selected === img.id}
-                            aria-label={`Image ${i + 1}`}
+                            aria-label={t("Image {n}", { n: i + 1 })}
                             className={`aspect-square overflow-hidden rounded-xl border bg-surface p-1 transition-colors duration-300 ${selected === img.id ? "border-accent shadow-[0_0_0_1px_var(--accent)]" : "border-line hover:border-muted"}`}
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element -- a local data URL */}
@@ -985,7 +997,7 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
                   {selImage && dpi !== null && (
                     <p className="text-sm">
                       <span className={dpi >= 150 ? "text-ok" : "text-danger"}>●</span>{" "}
-                      {dpi >= 150 ? `Qualité d'impression satisfaisante (${dpi} DPI).` : `Image un peu petite (${dpi} DPI) : réduis-la ou choisis une image plus grande.`}
+                      {dpi >= 150 ? t("Qualité d'impression satisfaisante ({dpi} DPI).", { dpi }) : t("Image un peu petite ({dpi} DPI) : réduis-la ou choisis une image plus grande.", { dpi })}
                     </p>
                   )}
                 </>
@@ -994,17 +1006,17 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
               {tab === "texte" && (
                 <>
                   <div>
-                    <p className="mb-2 text-[14px] text-muted">Pour démarrer</p>
+                    <p className="mb-2 text-[14px] text-muted">{t("Pour démarrer")}</p>
                     <div className="flex flex-wrap gap-2">
-                      {TEMPLATES.map((t) => (
-                        <button key={t.label} type="button" onClick={() => applyTemplate(t)} className="rounded-full border border-line px-3 py-1.5 text-[13px] transition-colors hover:border-muted">
-                          {t.label}
+                      {TEMPLATES.map((tpl) => (
+                        <button key={tpl.label} type="button" onClick={() => applyTemplate({ ...tpl, text: { ...tpl.text, value: t(tpl.text.value) } })} className="rounded-full border border-line px-3 py-1.5 text-[13px] transition-colors hover:border-muted">
+                          {t(tpl.label)}
                         </button>
                       ))}
                     </div>
                   </div>
                   <label className="block">
-                    <span className="mb-1.5 block text-[14px] text-muted">Ton texte</span>
+                    <span className="mb-1.5 block text-[14px] text-muted">{t("Ton texte")}</span>
                     <textarea
                       rows={2}
                       maxLength={40}
@@ -1014,7 +1026,7 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
                         setDesign((d) => ({ ...d, [side]: { ...d[side], text: { ...(d[side].text ?? { ...DEFAULT_TEXT, value: "" }), value } } }));
                         setSelected("text");
                       }}
-                      placeholder="Écris ton texte"
+                      placeholder={t("Écris ton texte")}
                       className="field resize-none"
                     />
                   </label>
@@ -1026,35 +1038,35 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
                         className={`rounded-xl border py-2.5 text-[15px] transition-colors duration-300 ${cur.text?.font === f ? "border-accent font-medium shadow-[0_0_0_1px_var(--accent)]" : "border-line hover:border-muted"}`}
                         style={{ fontFamily: f === "sans" ? "var(--font-body)" : "var(--font-display)", fontStyle: f === "italic" ? "italic" : "normal" }}
                       >
-                        {FONTS[f]}
+                        {t(FONTS[f])}
                       </button>
                     ))}
                   </div>
                   <div className="space-y-4 border-t border-line pt-6">
-                    <p className="eyebrow">Couleur du texte</p>
-                    <ColorPicker key={`ink-${side}-${cur.text ? "on" : "off"}`} initial={(cur.text?.color ?? DEFAULT_TEXT.color).toLowerCase()} presets={INKS} presetsLabel="Encres de l'atelier" onChange={setInk} />
+                    <p className="eyebrow">{t("Couleur du texte")}</p>
+                    <ColorPicker key={`ink-${side}-${cur.text ? "on" : "off"}`} initial={(cur.text?.color ?? DEFAULT_TEXT.color).toLowerCase()} presets={INKS} presetsLabel={t("Encres de l'atelier")} onChange={setInk} />
                   </div>
                 </>
               )}
 
               {tab !== "couleur" && layer && (
                 <div className="space-y-6 border-t border-line pt-6">
-                  <p className="eyebrow">Ajuster {selImage ? (cur.images.length > 1 ? `l'image ${selIndex + 1}` : "l'image") : "le texte"}</p>
+                  <p className="eyebrow">{selImage ? (cur.images.length > 1 ? t("Ajuster l'image {n}", { n: selIndex + 1 }) : t("Ajuster l'image")) : t("Ajuster le texte")}</p>
                   {selImage && slider("Largeur", selImage.scale, 0.05, 1, 0.005, (v) => update(selImage.id, { scale: v }), (v) => `${Math.round(v * PRINT_WIDTH_CM)} cm`)}
-                  {selected === "text" && cur.text && slider("Taille", cur.text.size, 0.02, 0.22, 0.001, (v) => update("text", { size: v }), (v) => `${(v * PRINT_WIDTH_CM).toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} cm`)}
+                  {selected === "text" && cur.text && slider("Taille", cur.text.size, 0.02, 0.22, 0.001, (v) => update("text", { size: v }), (v) => `${(v * PRINT_WIDTH_CM).toLocaleString(intlLocale(locale), { minimumFractionDigits: 1, maximumFractionDigits: 1 })} cm`)}
                   {slider("Horizontal", layer.x, 0, 1, 0.01, (v) => update(selected!, { x: v }), (v) => `${Math.round(v * 100)} %`)}
                   {slider("Vertical", layer.y, 0, 1, 0.01, (v) => update(selected!, { y: v }), (v) => `${Math.round(v * 100)} %`)}
                   {slider("Rotation", layer.rot, -180, 180, 1, (v) => update(selected!, { rot: v }), (v) => `${v}°`)}
                   <div className="flex flex-wrap gap-x-6 gap-y-3 pt-2">
-                    <button onClick={() => update(selected!, { x: 0.5 })} className="link-line">Centrer</button>
+                    <button onClick={() => update(selected!, { x: 0.5 })} className="link-line">{t("Centrer")}</button>
                     {selImage && cur.images.length > 1 && (
                       <>
-                        <button onClick={() => restack(selImage.id, 1)} disabled={selIndex === cur.images.length - 1} className="link-line disabled:opacity-40 disabled:no-underline">Devant</button>
-                        <button onClick={() => restack(selImage.id, -1)} disabled={selIndex === 0} className="link-line disabled:opacity-40 disabled:no-underline">Derrière</button>
+                        <button onClick={() => restack(selImage.id, 1)} disabled={selIndex === cur.images.length - 1} className="link-line disabled:opacity-40 disabled:no-underline">{t("Au-dessus")}</button>
+                        <button onClick={() => restack(selImage.id, -1)} disabled={selIndex === 0} className="link-line disabled:opacity-40 disabled:no-underline">{t("Derrière")}</button>
                       </>
                     )}
                     <button onClick={() => removeLayer(selected!)} className="link-line text-danger">
-                      Supprimer
+                      {t("Supprimer")}
                     </button>
                   </div>
                 </div>
@@ -1066,8 +1078,8 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
         {/* Print preview + order */}
         <motion.aside {...panelIn(2)} data-lenis-prevent className="tile order-3 space-y-8 p-6 lg:col-span-2 xl:col-span-1 xl:max-h-[calc(100svh-200px)] xl:!overflow-y-auto xl:overscroll-contain">
           <div>
-            <p className="eyebrow">Zone d&apos;impression · {side === "front" ? "devant" : "dos"}</p>
-            <p className="mt-1 text-xs text-muted">Tout le {side === "front" ? "devant" : "dos"}, manches comprises. Touche une image ou le texte pour le choisir, glisse pour le placer.</p>
+            <p className="eyebrow">{side === "front" ? t("Zone d'impression · devant") : t("Zone d'impression · dos")}</p>
+            <p className="mt-1 text-xs text-muted">{side === "front" ? t("Tout le devant, manches comprises. Touche une image ou le texte pour le choisir, glisse pour le placer.") : t("Tout le dos, manches comprises. Touche une image ou le texte pour le choisir, glisse pour le placer.")}</p>
             <div
               className="relative mx-auto mt-4 w-full max-w-[360px] cursor-move touch-none"
               style={{ aspectRatio: `${W} / ${H}` }}
@@ -1098,27 +1110,27 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
           </div>
 
           <div className="border-t border-line pt-8">
-            <p className="eyebrow">Qualité de sortie</p>
+            <p className="eyebrow">{t("Qualité de sortie")}</p>
             <div className="mt-3 grid grid-cols-3 gap-2">
               {PRINT_QUALITIES.map((k) => (
                 <button key={k} onClick={() => setQuality(k)} aria-pressed={quality === k} className={`rounded-xl border px-2 py-2.5 text-sm transition-colors duration-300 ${quality === k ? "border-accent font-medium shadow-[0_0_0_1px_var(--accent)]" : "border-line hover:border-muted"}`}>
                   {PRINT_QUALITY[k].label}
-                  <span className="block text-[11px] font-normal text-muted">{PRINT_QUALITY[k].credits ? creditsLabel(PRINT_QUALITY[k].credits) : "Aperçu gratuit"}</span>
+                  <span className="block text-[11px] font-normal text-muted">{PRINT_QUALITY[k].credits ? creditsLabel(PRINT_QUALITY[k].credits) : t("Aperçu gratuit")}</span>
                 </button>
               ))}
             </div>
             <p className="mt-3 text-xs text-muted">
               {quality === "STANDARD"
-                ? `Un aperçu de ${STANDARD_PREVIEW_PX.toLocaleString("fr-FR")} px avec filigrane : le t-shirt en 3D de face et de dos, et ton design. Pour un fichier imprimable, choisis HD ou Ultra HD.`
-                : `Le t-shirt en 3D vu de face et de dos (${q.view.toLocaleString("fr-FR")} px), et le fichier d'impression à ${q.dpi} DPI (${q.px.toLocaleString("fr-FR")} × ${Math.round(q.px / TEE_ASPECT).toLocaleString("fr-FR")} px), sans filigrane.`}{" "}
-              {worn ? "En vue Porté, le mannequin choisi est inclus aussi, de face et de dos, sur un fond studio. " : ""}La qualité choisie est aussi celle du fichier d&apos;impression envoyé avec ta commande{q.credits ? ` : ${creditsLabel(q.credits)} à l'ajout au panier` : ""}.
+                ? t("Un aperçu de {px} px avec filigrane : le t-shirt en 3D de face et de dos, et ton design. Pour un fichier imprimable, choisis HD ou Ultra HD.", { px: num(STANDARD_PREVIEW_PX) })
+                : t("Le t-shirt en 3D vu de face et de dos ({view} px), et le fichier d'impression à {dpi} DPI ({w} × {h} px), sans filigrane.", { view: num(q.view), dpi: q.dpi, w: num(q.px), h: num(Math.round(q.px / TEE_ASPECT)) })}{" "}
+              {worn ? `${t("En vue Porté, le mannequin choisi est inclus aussi, de face et de dos, sur un fond studio.")} ` : ""}{t("La qualité choisie est aussi celle du fichier d'impression envoyé avec ta commande")}{q.credits ? t(" : {credits} à l'ajout au panier", { credits: creditsLabel(q.credits) }) : ""}.
             </p>
             <button type="button" onClick={() => setCompare((v) => !v)} aria-expanded={compare} className="link-line mt-3 !text-[15px]">
-              {compare ? "Masquer la comparaison" : "Voir la différence entre les qualités"} <span className="arrow">›</span>
+              {compare ? t("Masquer la comparaison") : t("Voir la différence entre les qualités")} <span className="arrow">›</span>
             </button>
             {compare && mounted && <QualityCompare side={cur} center={layer ? { x: layer.x, y: layer.y } : { x: 0.5, y: 0.32 }} images={images} current={quality} onPick={setQuality} />}
             <button onClick={exportDesign} disabled={exporting} className="btn-outline mt-4 w-full">
-              {exporting ? <span className="h-4 w-4 animate-spin rounded-full border border-accent border-t-transparent" aria-label="Export en cours" /> : `Télécharger le visuel${q.credits ? ` · ${creditsLabel(q.credits)}` : ""}`}
+              {exporting ? <span className="h-4 w-4 animate-spin rounded-full border border-accent border-t-transparent" aria-label={t("Export en cours")} /> : `${t("Télécharger le visuel")}${q.credits ? ` · ${creditsLabel(q.credits)}` : ""}`}
             </button>
             {naming !== null ? (
               <form
@@ -1129,31 +1141,31 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
                 }}
               >
                 <label htmlFor="design-name" className="sr-only">
-                  Nom de la création
+                  {t("Nom de la création")}
                 </label>
-                <input id="design-name" autoFocus value={naming} onChange={(e) => setNaming(e.target.value)} maxLength={60} placeholder="Nom de la création" className="min-w-0 flex-1 rounded-full border border-line bg-transparent px-4 py-2.5 text-sm outline-none focus:border-accent" />
+                <input id="design-name" autoFocus value={naming} onChange={(e) => setNaming(e.target.value)} maxLength={60} placeholder={t("Nom de la création")} className="min-w-0 flex-1 rounded-full border border-line bg-transparent px-4 py-2.5 text-sm outline-none focus:border-accent" />
                 <button type="submit" disabled={saving} className="btn-outline !px-5">
-                  {saving ? <span className="h-4 w-4 animate-spin rounded-full border border-accent border-t-transparent" aria-label="Sauvegarde en cours" /> : "OK"}
+                  {saving ? <span className="h-4 w-4 animate-spin rounded-full border border-accent border-t-transparent" aria-label={t("Sauvegarde en cours")} /> : "OK"}
                 </button>
-                <button type="button" onClick={() => setNaming(null)} className="px-2 text-sm text-muted hover:text-ink" aria-label="Annuler">
+                <button type="button" onClick={() => setNaming(null)} className="px-2 text-sm text-muted hover:text-ink" aria-label={t("Annuler")}>
                   ×
                 </button>
               </form>
             ) : (
               <button type="button" onClick={() => (!credits?.signedIn ? setGate("signin") : savedAs ? void saveDesign(savedAs.name) : setNaming(""))} disabled={saving} className="btn-outline mt-3 w-full">
-                {saving ? <span className="h-4 w-4 animate-spin rounded-full border border-accent border-t-transparent" aria-label="Sauvegarde en cours" /> : savedAs ? `Mettre à jour « ${savedAs.name} »` : "Sauvegarder dans mon compte"}
+                {saving ? <span className="h-4 w-4 animate-spin rounded-full border border-accent border-t-transparent" aria-label={t("Sauvegarde en cours")} /> : savedAs ? t("Mettre à jour « {name} »", { name: savedAs.name }) : t("Sauvegarder dans mon compte")}
               </button>
             )}
             {!savedAs && naming === null && (
               <p className="mt-2 text-center text-xs text-muted">
-                {FREE_DESIGNS} créations gratuites, puis {creditsLabel(DESIGN_SAVE_CREDITS)} par création en plus.
+                {t("{n} créations gratuites, puis {credits} par création en plus.", { n: FREE_DESIGNS, credits: creditsLabel(DESIGN_SAVE_CREDITS) })}
               </p>
             )}
             {savedAs && (
               <p className="mt-2 text-center text-xs text-muted">
-                Retrouve tes créations dans{" "}
+                {t("Retrouve tes créations dans")}{" "}
                 <Link href="/compte#creations" className="text-link hover:underline">
-                  ton compte
+                  {t("ton compte")}
                 </Link>
                 {" · "}
                 <button
@@ -1164,19 +1176,19 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
                   }}
                   className="text-link hover:underline"
                 >
-                  en faire une copie
+                  {t("en faire une copie")}
                 </button>
               </p>
             )}
           </div>
 
           <div className="border-t border-line pt-8">
-            <p className="eyebrow">Taille</p>
+            <p className="eyebrow">{t("Taille")}</p>
             <div className="mt-3 grid grid-cols-5 gap-2">
               {SIZES.map((s) => {
                 const out = stockManaged && available(stock, teeHex, s) <= 0;
                 return (
-                  <button key={s} onClick={() => setSize(s)} aria-pressed={size === s} aria-label={out ? `${s}, épuisé dans cette couleur` : s} className={`rounded-xl border py-2.5 text-sm transition-colors duration-300 ${out ? "text-muted line-through" : ""} ${size === s ? "border-accent font-medium shadow-[0_0_0_1px_var(--accent)]" : "border-line hover:border-muted"}`}>
+                  <button key={s} onClick={() => setSize(s)} aria-pressed={size === s} aria-label={out ? t("{s}, épuisé dans cette couleur", { s }) : s} className={`rounded-xl border py-2.5 text-sm transition-colors duration-300 ${out ? "text-muted line-through" : ""} ${size === s ? "border-accent font-medium shadow-[0_0_0_1px_var(--accent)]" : "border-line hover:border-muted"}`}>
                     {s}
                   </button>
                 );
@@ -1184,15 +1196,15 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
             </div>
             <div className="mt-6 flex items-center justify-between">
               <div className="flex items-center rounded-full border border-line">
-                <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="h-10 w-10 text-lg font-extralight" aria-label="Moins">−</button>
+                <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="h-10 w-10 text-lg font-extralight" aria-label={t("Moins")}>−</button>
                 <span className="w-8 text-center text-sm tabular-nums">{qty}</span>
-                <button onClick={() => setQty((q) => Math.min(20, q + 1))} className="h-10 w-10 text-lg font-extralight" aria-label="Plus">+</button>
+                <button onClick={() => setQty((q) => Math.min(20, q + 1))} className="h-10 w-10 text-lg font-extralight" aria-label={t("Plus")}>+</button>
               </div>
               <motion.p key={price * qty} initial={{ opacity: 0.3 }} animate={{ opacity: 1 }} className="text-[24px] font-semibold tabular-nums">
                 {formatFCFA(price * qty)}
               </motion.p>
             </div>
-            <p className="mt-2 text-right text-xs text-muted">{hasBack ? `Devant et dos (+${formatFCFA(BACK_PRICE)})` : "Impression devant"}</p>
+            <p className="mt-2 text-right text-xs text-muted">{hasBack ? t("Devant et dos (+{price})", { price: formatFCFA(BACK_PRICE) }) : t("Impression devant")}</p>
             <button onClick={addToCart} disabled={!orderable || Boolean(adding)} className="btn mt-6 w-full">
               {adding ? (
                 <>
@@ -1200,11 +1212,11 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
                   {adding}
                 </>
               ) : orderable ? (
-                `Ajouter au panier${q.credits ? ` · ${creditsLabel(q.credits)}` : ""}`
+                `${t("Ajouter au panier")}${q.credits ? ` · ${creditsLabel(q.credits)}` : ""}`
               ) : teeTracked ? (
-                `Épuisé en ${size}`
+                t("Épuisé en {size}", { size })
               ) : (
-                "Couleur pas en stock"
+                t("Couleur pas en stock")
               )}
             </button>
           </div>
@@ -1223,7 +1235,7 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
           >
             <span>{undo.text}</span>
             <button type="button" onClick={undoImages} className="shrink-0 text-[11px] tracking-[0.2em] uppercase underline underline-offset-4">
-              Annuler ({undo.left} s)
+              {t("Annuler ({n} s)", { n: undo.left })}
             </button>
           </motion.div>
         )}
@@ -1243,9 +1255,9 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
               aria-modal
               aria-labelledby="picked-title"
             >
-              <p className="eyebrow">Vérifie avant d&apos;ajouter</p>
+              <p className="eyebrow">{t("Vérifie avant d'ajouter")}</p>
               <h2 id="picked-title" className="display mt-2 text-3xl">
-                {picked.files.length > 1 ? `Ces ${picked.files.length} images ?` : "Cette image ?"}
+                {picked.files.length > 1 ? t("Ces {n} images ?", { n: picked.files.length }) : t("Cette image ?")}
               </h2>
               <div className={`mt-6 grid gap-3 ${picked.files.length > 1 ? "grid-cols-3" : "grid-cols-1"}`}>
                 {picked.urls.map((u, i) => (
@@ -1253,9 +1265,9 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
                   <img key={u} src={u} alt={picked.files[i]?.name ?? ""} className={`w-full rounded-2xl bg-surface object-contain ${picked.files.length > 1 ? "aspect-square" : "max-h-64"}`} />
                 ))}
               </div>
-              {picked.dropped > 0 && <p className="mt-3 text-xs text-muted">{MAX_IMAGES} images maximum par face : {picked.dropped} n&apos;ont pas été retenues.</p>}
+              {picked.dropped > 0 && <p className="mt-3 text-xs text-muted">{t("{n} images maximum par face : {dropped} n'ont pas été retenues.", { n: MAX_IMAGES, dropped: picked.dropped })}</p>}
               <p className="mt-4 text-sm text-muted">
-                {picked.files.length > 1 ? `${picked.files.length} crédits` : "1 crédit"} sur le {side === "front" ? "devant" : "dos"}. Tu pourras encore annuler pendant {UNDO_SECONDS} secondes.
+                {creditsLabel(picked.files.length)} {side === "front" ? t("sur le devant.") : t("sur le dos.")} {t("Tu pourras encore annuler pendant {n} secondes.", { n: UNDO_SECONDS })}
               </p>
               <div className="mt-8 flex flex-col items-center gap-4">
                 <button
@@ -1267,10 +1279,10 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
                     void addImages(p.files, p.dropped);
                   }}
                 >
-                  Ajouter au t-shirt · {picked.files.length > 1 ? `${picked.files.length} crédits` : "1 crédit"}
+                  {t("Ajouter au t-shirt")} · {creditsLabel(picked.files.length)}
                 </button>
                 <button type="button" onClick={closePicked} className="link-line">
-                  Choisir d&apos;autres images
+                  {t("Choisir d'autres images")}
                 </button>
               </div>
             </motion.div>
@@ -1289,9 +1301,9 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
             className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-6 bg-ink px-6 py-4 text-sm text-on-ink"
           >
             {toast}
-            {toast.includes("panier") && (
+            {toastCart && (
               <Link href="/panier" className="text-[11px] tracking-[0.2em] uppercase underline underline-offset-4">
-                Voir
+                {t("Voir")}
               </Link>
             )}
           </motion.div>
@@ -1313,22 +1325,22 @@ export function StudioView({ stock = {}, stockColours = [] }: { stock?: StockMap
             >
               {gate === "signin" ? (
                 <>
-                  <p className="eyebrow">Crédits studio</p>
-                  <h2 className="display mt-2 text-4xl">Connecte-toi pour continuer.</h2>
-                  <p className="mt-4 text-sm text-muted">Tes crédits sont sur ton compte : 5 crédits offerts à l&apos;inscription. Ton design reste ici pendant que tu te connectes dans cet onglet.</p>
+                  <p className="eyebrow">{t("Crédits studio")}</p>
+                  <h2 className="display mt-2 text-4xl">{t("Connecte-toi pour continuer.")}</h2>
+                  <p className="mt-4 text-sm text-muted">{t("Tes crédits sont sur ton compte : 5 crédits offerts à l'inscription. Ton design reste ici pendant que tu te connectes dans cet onglet.")}</p>
                   <div className="mt-8 flex flex-col items-center gap-4">
-                    <Link href="/connexion?suite=/studio" className="btn">Se connecter</Link>
-                    <button onClick={() => setGate(null)} className="link-line">Plus tard</button>
+                    <Link href="/connexion?suite=/studio" className="btn">{t("Se connecter")}</Link>
+                    <button onClick={() => setGate(null)} className="link-line">{t("Plus tard")}</button>
                   </div>
                 </>
               ) : (
                 <>
-                  <p className="eyebrow">Crédits épuisés</p>
-                  <h2 className="display mt-2 text-4xl">Recharge pour continuer.</h2>
-                  <p className="mt-4 text-sm text-muted">Les crédits servent à importer une image, télécharger ou commander en HD.</p>
+                  <p className="eyebrow">{t("Crédits épuisés")}</p>
+                  <h2 className="display mt-2 text-4xl">{t("Recharge pour continuer.")}</h2>
+                  <p className="mt-4 text-sm text-muted">{t("Les crédits servent à importer une image, télécharger ou commander en HD.")}</p>
                   <div className="mt-8 flex flex-col items-center gap-4">
-                    <Link href="/credits" className="btn">Recharger</Link>
-                    <button onClick={() => setGate(null)} className="link-line">Plus tard</button>
+                    <Link href="/credits" className="btn">{t("Recharger")}</Link>
+                    <button onClick={() => setGate(null)} className="link-line">{t("Plus tard")}</button>
                   </div>
                 </>
               )}

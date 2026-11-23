@@ -9,6 +9,8 @@ import { CREDIT_PACKS, CREDIT_PACK_IDS, PAYMENT_METHOD_IDS, type BuyCreditsInput
 import { logActivity, logError } from "@/server/log";
 import { onlinePaymentEnabled } from "@/server/payments/geniuspay";
 import { startCreditPayment } from "@/server/payments/settle";
+import { getRequestLocale } from "@/lib/i18n/server";
+import { makeT } from "@/lib/i18n";
 
 /*
  * Records a credit pack purchase from /credits. Like an order, it waits for payment
@@ -19,10 +21,12 @@ import { startCreditPayment } from "@/server/payments/settle";
 const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 
 export async function buyCredits(input: BuyCreditsInput): Promise<BuyCreditsResult> {
+  const locale = await getRequestLocale();
+  const t = makeT(locale);
   const pack = CREDIT_PACK_IDS.find((p) => p === input?.pack);
-  if (!pack) return { ok: false, errors: {}, message: "Choisis un pack." };
+  if (!pack) return { ok: false, errors: {}, message: t("Choisis un pack.") };
   const method = PAYMENT_METHOD_IDS.find((m) => m === input?.method);
-  if (!method) return { ok: false, errors: {}, message: "Choisis un moyen de paiement." };
+  if (!method) return { ok: false, errors: {}, message: t("Choisis un moyen de paiement.") };
 
   const f = input?.fields ?? {};
   const fields = { name: str(f.name, 120), phone: str(f.phone, 30), email: str(f.email, 160) };
@@ -37,6 +41,7 @@ export async function buyCredits(input: BuyCreditsInput): Promise<BuyCreditsResu
     // The signed-in customer, or a customer already known by this number, gets the purchase on their account.
     const customerId = await customerFor(phone);
     const data = {
+      locale,
       pack,
       credits,
       priceXof,
@@ -66,6 +71,6 @@ export async function buyCredits(input: BuyCreditsInput): Promise<BuyCreditsResu
     throw new Error("Could not pick a free credit purchase reference after 5 attempts.");
   } catch (e) {
     await logError("buyCredits", e);
-    return { ok: false, errors: {}, message: "On n'a pas pu enregistrer ta demande. Réessaie dans un instant." };
+    return { ok: false, errors: {}, message: t("On n'a pas pu enregistrer ta demande. Réessaie dans un instant.") };
   }
 }
