@@ -12,6 +12,7 @@ for (const f of walk("src").filter((f) => /\.(tsx?|mjs)$/.test(f) && !f.includes
   if (!/lib\/i18n|useT\(\)|getT\(\)|getRequestT\(\)|makeT\(|pageMetadata\(/.test(src)) continue; // files on the site's i18n (the emails have their own t())
   for (const m of src.matchAll(/\b(?:t|tr|pageMetadata)\(\s*("(?:[^"\\]|\\.)*")/g)) {
     const k = JSON.parse(m[1]);
+    if (/^[a-z][A-Za-z0-9]*$/.test(k)) continue; // a field name (the e-mails' own t("subject")…), not a text
     if (!keys.has(k)) missing.set(k, f);
   }
 }

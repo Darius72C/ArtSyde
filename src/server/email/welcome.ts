@@ -1,14 +1,17 @@
 import "server-only";
 import { COMPANY } from "@/lib/company";
-import { DEFAULT_WELCOME, WELCOME_KEY, fill, mergeWelcome, type WelcomeTexts } from "@/lib/email-texts";
+import { DEFAULT_WELCOME, WELCOME_EN, WELCOME_KEY, fill, mergeWelcome, type WelcomeTexts } from "@/lib/email-texts";
+import { localizeHref, makeT, type Locale } from "@/lib/i18n";
 import { getSetting } from "@/server/settings";
 import type { AdBanner } from "@/lib/ad";
 import { C, FONT, adHref, button, esc, layout, siteUrl } from "./layout";
 import type { Email } from "./send";
 
 /** The welcome e-mail's words as set in Admin > E-mails (the defaults where a field is empty). */
-export async function welcomeTexts(): Promise<WelcomeTexts> {
-  return mergeWelcome(await getSetting<Partial<WelcomeTexts>>(WELCOME_KEY));
+export async function welcomeTexts(locale: Locale = "fr"): Promise<WelcomeTexts> {
+  const fr = mergeWelcome(await getSetting<Partial<WelcomeTexts>>(WELCOME_KEY));
+  // English: its own words, with the photo chosen in the admin.
+  return locale === "en" ? { ...WELCOME_EN, image: fr.image } : fr;
 }
 
 /**
@@ -17,8 +20,11 @@ export async function welcomeTexts(): Promise<WelcomeTexts> {
  * `texts`: its words (welcomeTexts()); the defaults when not given.
  * `ad`: the banner set for e-mails (emailAd()), or none.
  */
-export function welcomeEmail({ name, email, credits, image, texts = DEFAULT_WELCOME, ad }: { name: string; email: string; credits: number; image?: string; texts?: WelcomeTexts; ad?: AdBanner }): Email {
-  const site = siteUrl();
+export function welcomeEmail({ name, email, credits, image, texts = DEFAULT_WELCOME, ad, locale = "fr" }: { name: string; email: string; credits: number; image?: string; texts?: WelcomeTexts; ad?: AdBanner; locale?: Locale }): Email {
+  const base = siteUrl();
+  const tr = makeT(locale);
+  const page = (path: string) => `${base}${localizeHref(locale, path)}`;
+  const reason = tr("Tu reçois cet e-mail parce que tu viens de créer un compte ArtSyde.");
   const prenom = (name || email.split("@")[0]).trim().split(/\s+/)[0];
   const t = (k: keyof WelcomeTexts) => fill(texts[k], { prenom, credits });
   // Escaped for HTML; a line break typed in the admin stays a line break.
@@ -32,7 +38,7 @@ export function welcomeEmail({ name, email, credits, image, texts = DEFAULT_WELC
 <p style="margin:0;font-size:17px;line-height:26px;color:${C.nightMuted};">${h("intro")}</p>
 ${
   photo
-    ? `<a href="${site}/#boutique" style="display:block;margin-top:32px;"><img src="${esc(photo)}" width="512" alt="La collection ArtSyde" style="display:block;width:100%;max-width:512px;height:auto;border:0;border-radius:20px;"></a>`
+    ? `<a href="${page("/#boutique")}" style="display:block;margin-top:32px;"><img src="${esc(photo)}" width="512" alt="${esc(tr("La collection ArtSyde"))}" style="display:block;width:100%;max-width:512px;height:auto;border:0;border-radius:20px;"></a>`
     : ""
 }`;
 
@@ -53,8 +59,8 @@ ${
 </table>
 
 <div style="height:28px;line-height:28px;">&nbsp;</div>
-${button(`${site}/studio`, `${h("button")} &nbsp;→`)}
-<p style="margin:16px 0 0;text-align:center;font-family:${FONT};font-size:15px;line-height:22px;"><a href="${site}/#boutique" style="color:${C.link};text-decoration:none;">${h("link")} ›</a></p>
+${button(page("/studio"), `${h("button")} &nbsp;→`)}
+<p style="margin:16px 0 0;text-align:center;font-family:${FONT};font-size:15px;line-height:22px;"><a href="${page("/#boutique")}" style="color:${C.link};text-decoration:none;">${h("link")} ›</a></p>
 
 <div style="height:40px;line-height:40px;border-bottom:1px solid ${C.line};">&nbsp;</div>
 <div style="height:36px;line-height:36px;">&nbsp;</div>
@@ -74,7 +80,7 @@ ${step(3, h("step3Title"), h("step3Text"), true)}
 <tr><td style="background:${C.page};border-radius:22px;padding:26px 28px;font-family:${FONT};">
   <p style="margin:0 0 4px;font-size:17px;line-height:24px;font-weight:700;color:${C.ink};">${h("helpTitle")}</p>
   <p style="margin:0 0 ${COMPANY.whatsapp ? 18 : 0}px;font-size:15px;line-height:22px;color:${C.muted};">${h("helpText")}</p>
-  ${COMPANY.whatsapp ? button(COMPANY.whatsapp, "Écrire sur WhatsApp", "whatsapp") : ""}
+  ${COMPANY.whatsapp ? button(COMPANY.whatsapp, esc(tr("Écrire sur WhatsApp")), "whatsapp") : ""}
 </td></tr>
 </table>`;
 
@@ -85,8 +91,8 @@ ${step(3, h("step3Title"), h("step3Text"), true)}
     "",
     `${t("giftBadge")} : ${credits} ${t("giftTitle")}. ${t("giftText")}`,
     "",
-    `${t("button")} : ${site}/studio`,
-    `${t("link")} : ${site}/#boutique`,
+    `${t("button")} : ${page("/studio")}`,
+    `${t("link")} : ${page("/#boutique")}`,
     "",
     t("stepsTitle"),
     `1. ${t("step1Title")} : ${t("step1Text")}`,
@@ -97,13 +103,13 @@ ${step(3, h("step3Title"), h("step3Text"), true)}
     ...(ad ? ["", ...[[ad.title, ad.text].filter(Boolean).join(" — "), adHref(ad) ?? ""].filter(Boolean)] : []),
     "",
     `ArtSyde · ${COMPANY.city}, ${COMPANY.country}`,
-    "Tu reçois cet e-mail parce que tu viens de créer un compte ArtSyde.",
+    reason,
   ].join("\n");
 
   return {
     to: { email, name: name || undefined },
     subject,
-    html: layout({ title: subject, preheader: t("preheader"), hero, body, reason: "Tu reçois cet e-mail parce que tu viens de créer un compte ArtSyde.", ad }),
+    html: layout({ title: subject, preheader: t("preheader"), hero, body, reason, ad, locale }),
     text,
     tags: ["welcome"],
   };

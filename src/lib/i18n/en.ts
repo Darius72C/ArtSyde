@@ -890,4 +890,11 @@ export const EN: Record<string, string> = {
   // Legal dates
   "5 novembre 2026": "5 November 2026",
   "Conditions d'utilisation.": "Terms of use.",
+
+  // Emails
+  "Imprimé à {city}": "Printed in {city}",
+  "Se désabonner": "Unsubscribe",
+  "Tu reçois cet e-mail parce que tu viens de créer un compte ArtSyde.": "You're receiving this email because you just created an ArtSyde account.",
+  "La collection ArtSyde": "The ArtSyde collection",
+  "Écrire sur WhatsApp": "Message us on WhatsApp",
 };

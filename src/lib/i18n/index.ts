@@ -13,6 +13,8 @@ export const DEFAULT_LOCALE: Locale = "fr";
 
 export const isLocale = (v: unknown): v is Locale => v === "fr" || v === "en";
 
+export { LANG_COOKIE } from "./cookie";
+
 export type Vars = Record<string, string | number>;
 
 const fill = (s: string, vars?: Vars) => (vars ? s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m)) : s);

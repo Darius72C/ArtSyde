@@ -1,6 +1,7 @@
 import "server-only";
 import { COMPANY } from "@/lib/company";
 import type { AdBanner } from "@/lib/ad";
+import { localizeHref, makeT, type Locale } from "@/lib/i18n";
 
 /*
  * The shared frame of ArtSyde's e-mails. E-mail clients (Gmail, Outlook, Apple Mail, phones) ignore most
@@ -65,11 +66,13 @@ function adBlock(ad: AdBanner) {
  * inboxes show after the subject; `reason`: why the person receives it (bottom of the e-mail); `ad`: the banner
  * set for e-mails (emailAd()), under the card, or none; `unsubscribe`: the newsletters' "Se désabonner" link.
  */
-export function layout({ title, preheader, hero, body, reason, ad, unsubscribe }: { title: string; preheader: string; hero: string; body: string; reason: string; ad?: AdBanner; unsubscribe?: string }) {
+export function layout({ title, preheader, hero, body, reason, ad, unsubscribe, locale = "fr" }: { title: string; preheader: string; hero: string; body: string; reason: string; ad?: AdBanner; unsubscribe?: string; locale?: Locale }) {
   const site = siteUrl();
+  const t = makeT(locale);
+  const page = (path: string) => `${site}${localizeHref(locale, path)}`;
   const footLink = (href: string, label: string) => `<a href="${href}" style="color:${C.muted};text-decoration:underline;">${label}</a>`;
   return `<!doctype html>
-<html lang="fr">
+<html lang="${locale}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -96,8 +99,8 @@ export function layout({ title, preheader, hero, body, reason, ad, unsubscribe }
     <!-- Top bar -->
     <tr><td class="px" style="background:${C.night};border-radius:28px 28px 0 0;padding:28px 44px 0;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-        <td><a href="${site}" style="font-family:${FONT};font-size:20px;font-weight:700;letter-spacing:-0.5px;color:${C.onNight};text-decoration:none;"><img src="${site}/icons/logo-header.png" width="90" height="50" alt="ArtSyde" style="display:block;width:90px;height:50px;border:0;"></a></td>
-        <td align="right" style="font-family:${FONT};font-size:12px;letter-spacing:0.4px;color:${C.nightMuted};">Imprimé à ${COMPANY.city}</td>
+        <td><a href="${page("/")}" style="font-family:${FONT};font-size:20px;font-weight:700;letter-spacing:-0.5px;color:${C.onNight};text-decoration:none;"><img src="${site}/icons/logo-header.png" width="90" height="50" alt="ArtSyde" style="display:block;width:90px;height:50px;border:0;"></a></td>
+        <td align="right" style="font-family:${FONT};font-size:12px;letter-spacing:0.4px;color:${C.nightMuted};">${esc(t("Imprimé à {city}", { city: COMPANY.city }))}</td>
       </tr></table>
     </td></tr>
 
@@ -114,11 +117,11 @@ ${ad?.image ? adBlock(ad) : ""}
 
     <!-- Footer -->
     <tr><td class="px" style="padding:32px 44px 8px;font-family:${FONT};font-size:12px;line-height:19px;color:${C.muted};text-align:center;">
-      <a href="${site}" style="font-size:15px;font-weight:700;letter-spacing:-0.3px;color:${C.ink};text-decoration:none;">ArtSyde</a><br>
-      Ton t-shirt. Ton style. · ${COMPANY.city}, ${COMPANY.country}<br><br>
-      ${footLink(`${site}/#boutique`, "Boutique")} &nbsp;·&nbsp; ${footLink(`${site}/studio`, "Studio 3D")} &nbsp;·&nbsp; ${footLink(`${site}/compte`, "Mon compte")}${COMPANY.whatsapp ? ` &nbsp;·&nbsp; ${footLink(COMPANY.whatsapp, "WhatsApp")}` : ""}<br><br>
+      <a href="${page("/")}" style="font-size:15px;font-weight:700;letter-spacing:-0.3px;color:${C.ink};text-decoration:none;">ArtSyde</a><br>
+      ${esc(t("Ton t-shirt."))} ${esc(t("Ton style."))} · ${COMPANY.city}, ${COMPANY.country}<br><br>
+      ${footLink(page("/#boutique"), esc(t("Boutique")))} &nbsp;·&nbsp; ${footLink(page("/studio"), esc(t("Studio 3D")))} &nbsp;·&nbsp; ${footLink(page("/compte"), esc(t("Mon compte")))}${COMPANY.whatsapp ? ` &nbsp;·&nbsp; ${footLink(COMPANY.whatsapp, "WhatsApp")}` : ""}<br><br>
       ${esc(reason)}<br>
-      ${unsubscribe ? `${footLink(esc(unsubscribe), "Se désabonner")} &nbsp;·&nbsp; ` : ""}${footLink(`${site}/conditions-d-utilisation`, "Conditions d'utilisation")}
+      ${unsubscribe ? `${footLink(esc(unsubscribe), esc(t("Se désabonner")))} &nbsp;·&nbsp; ` : ""}${footLink(page("/conditions-d-utilisation"), esc(t("Conditions d'utilisation")))}
     </td></tr>
 
   </table>

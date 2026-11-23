@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ADMIN_COOKIE, ADMIN_SIGN_IN, verifyAdminToken } from "@/server/admin/token";
+import { LANG_COOKIE } from "@/lib/i18n/cookie";
 
 /*
  * 1. /admin: no valid admin cookie → the sign-in page, with the page asked for kept in `?de=`. Every admin
@@ -27,13 +28,20 @@ export async function proxy(request: NextRequest) {
   }
 
   const english = pathname === "/en" || pathname.startsWith("/en/");
+  const locale = english ? "en" : "fr";
   const headers = new Headers(request.headers);
-  headers.set("x-locale", english ? "en" : "fr");
-  if (english) return NextResponse.next({ request: { headers } });
-
-  const url = request.nextUrl.clone();
-  url.pathname = `/fr${pathname === "/" ? "" : pathname}`;
-  return NextResponse.rewrite(url, { request: { headers } });
+  headers.set("x-locale", locale);
+  let res: NextResponse;
+  if (english) res = NextResponse.next({ request: { headers } });
+  else {
+    const url = request.nextUrl.clone();
+    url.pathname = `/fr${pathname === "/" ? "" : pathname}`;
+    res = NextResponse.rewrite(url, { request: { headers } });
+  }
+  // The visitor's language, for what happens outside the pages (sign-in e-mails sent from /api/auth). Set only
+  // when it changes, so ordinary page views carry no Set-Cookie.
+  if (request.cookies.get(LANG_COOKIE)?.value !== locale) res.cookies.set(LANG_COOKIE, locale, { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax" });
+  return res;
 }
 
 export const config = {

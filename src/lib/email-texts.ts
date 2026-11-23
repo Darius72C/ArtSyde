@@ -52,6 +52,33 @@ export const DEFAULT_WELCOME: WelcomeTexts = {
   image: "",
 };
 
+/**
+ * The welcome e-mail for accounts made on the English site (/en). Not editable in the admin (the admin edits the
+ * French one); only its photo follows the one chosen there.
+ */
+export const WELCOME_EN: WelcomeTexts = {
+  subject: "Welcome to ArtSyde, {prenom}",
+  preheader: "Your account is ready: {credits} studio credits are waiting for you to create your first t-shirt.",
+  eyebrow: "Your account is ready",
+  title: "Welcome, {prenom}.",
+  intro: "Pick a t-shirt from the collection, or create your own in 3D: we print it in our workshop, just for you.",
+  giftBadge: "Welcome gift",
+  giftTitle: "free studio credits",
+  giftText: "To upload your images and download your design in HD.",
+  button: "Create my t-shirt",
+  link: "Or explore the collection",
+  stepsTitle: "Your t-shirt in three steps.",
+  step1Title: "Pick your colour",
+  step1Text: "The real oversized t-shirt, in 3D, in the colour you want.",
+  step2Title: "Place your design",
+  step2Text: "Your image or text, across the whole front and back.",
+  step3Title: "Order",
+  step3Text: "Printed in our workshop, delivered to you or ready for pickup.",
+  helpTitle: "A question?",
+  helpText: "A size, a design, a team order: write to us, we reply fast.",
+  image: "",
+};
+
 /** The fields as the admin form shows them, in order, with their label and size. */
 export const WELCOME_FIELDS: { key: keyof WelcomeTexts; label: string; long?: boolean; max: number }[] = [
   { key: "subject", label: "Objet", max: 120 },

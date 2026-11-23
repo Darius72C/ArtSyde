@@ -11,6 +11,11 @@ import { welcomeEmail, welcomeTexts } from "@/server/email/welcome";
 import { emailAd, emailImage } from "@/server/email/image";
 import { logActivity, logError } from "@/server/log";
 import { IS_PRODUCTION, SITE_URL } from "@/lib/site";
+import { localeOfPath, localizeHref, type Locale } from "@/lib/i18n";
+import { getRequestLocale } from "@/lib/i18n/server";
+
+/** The visitor's language for an e-mail sent from /api/auth (French when it can't be told). */
+const emailLocale = (): Promise<Locale> => getRequestLocale().catch(() => "fr" as const);
 
 /** Studio credits given once to every new account. */
 export const SIGNUP_CREDITS = 5;
@@ -69,8 +74,10 @@ async function welcome(user: { id: string; name: string; email: string }) {
   }
   // Coming back with an e-mail that already had its signup credits: no welcome gift to announce.
   if (!bonus) return;
+  // In the language of the site the account was made on (read now, while the request is still there).
+  const locale = await emailLocale();
   // The welcome e-mail, sent after the response so sign-up isn't slowed down (skipped until Brevo is set up).
-  const send = async () => sendEmail(welcomeEmail({ name: user.name, email: user.email, credits: SIGNUP_CREDITS, image: await emailImage(), texts: await welcomeTexts(), ad: await emailAd() }));
+  const send = async () => sendEmail(welcomeEmail({ name: user.name, email: user.email, credits: SIGNUP_CREDITS, image: await emailImage(), texts: await welcomeTexts(locale), ad: await emailAd(), locale }));
   try {
     after(send);
   } catch {
@@ -101,7 +108,9 @@ function throughConfirmedPage(url: string) {
   try {
     const u = new URL(url);
     const back = u.searchParams.get("callbackURL") || "/compte";
-    if (!back.startsWith("/adresse-confirmee")) u.searchParams.set("callbackURL", `/adresse-confirmee?suite=${encodeURIComponent(back.startsWith("/") && !back.startsWith("//") ? back : "/compte")}`);
+    // In the language of the page the customer came from (/en/... on the English site).
+    const locale = localeOfPath(back);
+    if (!/^(\/en)?\/adresse-confirmee/.test(back)) u.searchParams.set("callbackURL", `${localizeHref(locale, "/adresse-confirmee")}?suite=${encodeURIComponent(back.startsWith("/") && !back.startsWith("//") ? back : localizeHref(locale, "/compte"))}`);
     return u.toString();
   } catch {
     return url;
@@ -128,8 +137,11 @@ export const auth = betterAuth({
     expiresIn: VERIFY_HOURS * 60 * 60,
     sendVerificationEmail: async ({ user, url }) => {
       const link = throughConfirmedPage(url);
+      // The page the link returns to tells the language (/en/... on the English site), else the visitor's.
+      const back = new URL(link).searchParams.get("callbackURL") ?? "";
+      const locale: Locale = back.startsWith("/en/") ? "en" : await emailLocale();
       // Not awaited by the request (Better Auth's advice: the answer takes the same time whether the address exists).
-      const send = () => sendEmail(verifyEmail({ name: user.name, email: user.email, url: link }));
+      const send = () => sendEmail(verifyEmail({ name: user.name, email: user.email, url: link, locale }));
       try {
         after(send);
       } catch {
