@@ -1,7 +1,7 @@
 "use client";
 
 import { track } from "@/lib/metrics";
-import Link from "next/link";
+import Link from "@/components/LocaleLink";
 import { useRef, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { cart } from "@/lib/cart";
@@ -11,6 +11,7 @@ import { formatFCFA, productHref, type Product } from "@/lib/products";
 import { ProductImage } from "../ProductImage";
 import { RevealLines, Tilt } from "../Reveal";
 import { DUR, EASE, SPRING, STAGGER, VIEWPORT } from "@/lib/motion";
+import { useT } from "../I18nProvider";
 
 const TABS = [
   { id: "all", label: "Tout" },
@@ -20,6 +21,7 @@ const TABS = [
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 function Card({ p, i, onAdd }: { p: Product; i: number; onAdd: (p: Product, color: string, from: Element | null) => void }) {
+  const t = useT();
   const [color, setColor] = useState(p.colors[0]);
   const art = useRef<HTMLDivElement>(null);
   return (
@@ -34,8 +36,8 @@ function Card({ p, i, onAdd }: { p: Product; i: number; onAdd: (p: Product, colo
     >
       <Tilt className="tile flex h-full flex-col p-5 md:p-6" max={6}>
       <div className="flex h-5 items-center justify-between">
-        {p.tag ? <span className="eyebrow !text-[12px]">{p.tag === "Promo" ? "Offre" : p.tag}</span> : <span />}
-        <Link href={`${productHref(p)}?vue=porte`} className="text-[12px] text-muted underline-offset-4 hover:text-ink hover:underline">Voir porté</Link>
+        {p.tag ? <span className="eyebrow !text-[12px]">{t(p.tag === "Promo" ? "Offre" : p.tag)}</span> : <span />}
+        <Link href={`${productHref(p)}?vue=porte`} className="text-[12px] text-muted underline-offset-4 hover:text-ink hover:underline">{t("Voir porté")}</Link>
       </div>
       {/* Colour swap: the old tee fades out while the new one settles in. */}
       <div ref={art} className="relative my-4 aspect-square" style={{ transform: "translateZ(30px)" }}>
@@ -59,7 +61,7 @@ function Card({ p, i, onAdd }: { p: Product; i: number; onAdd: (p: Product, colo
           <button
             key={c}
             onClick={() => setColor(c)}
-            aria-label={`Couleur ${c}`}
+            aria-label={t("Couleur {c}", { c })}
             aria-pressed={c === color}
             className={`h-4 w-4 rounded-full ring-1 ring-offset-2 ring-offset-surface transition duration-300 hover:scale-125 active:scale-90 ${c === color ? "scale-110 ring-ink" : "ring-ink/25 hover:ring-muted"}`}
             style={{ background: c }}
@@ -74,11 +76,11 @@ function Card({ p, i, onAdd }: { p: Product; i: number; onAdd: (p: Product, colo
       </p>
       {p.sizes.some((s) => available(p.stock, color, s) > 0) ? (
         <button onClick={() => onAdd(p, color, art.current)} className="btn mx-auto mt-4 !px-5 !py-2 !text-[14px]">
-          Ajouter au panier
+          {t("Ajouter au panier")}
         </button>
       ) : (
         <button disabled className="btn mx-auto mt-4 !px-5 !py-2 !text-[14px]">
-          Épuisé dans cette couleur
+          {t("Épuisé dans cette couleur")}
         </button>
       )}
       </Tilt>
@@ -88,6 +90,7 @@ function Card({ p, i, onAdd }: { p: Product; i: number; onAdd: (p: Product, colo
 
 /** `products` come from the database (src/server/catalog.ts), read by the home page. */
 export function Shop({ products }: { products: Product[] }) {
+  const t = useT();
   const [tab, setTab] = useState<Tab>("all");
   const [toast, setToast] = useState<string | null>(null);
   const timer = useRef<number | undefined>(undefined);
@@ -105,13 +108,13 @@ export function Shop({ products }: { products: Product[] }) {
   return (
     <section id="boutique" className="mx-auto max-w-[1180px] px-5 py-20 md:py-28">
       <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-end">
-        <RevealLines lines={[{ text: "Tous les t-shirts.", muted: "Choisis le tien." }]} className="display max-w-2xl text-[clamp(2rem,4.5vw,3.25rem)]" />
+        <RevealLines lines={[{ text: t("Tous les t-shirts."), muted: t("Choisis le tien.") }]} className="display max-w-2xl text-[clamp(2rem,4.5vw,3.25rem)]" />
         <LayoutGroup>
           <div className="flex rounded-full bg-surface p-1" role="tablist">
-            {TABS.map((t) => (
-              <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)} className="relative rounded-full px-4 py-1.5 text-[14px]">
-                {tab === t.id && <motion.span layoutId="seg" className="absolute inset-0 rounded-full bg-bg shadow-[0_1px_4px_rgba(0,0,0,0.12)]" transition={SPRING.snappy} />}
-                <span className={`relative ${tab === t.id ? "font-medium" : "text-muted"}`}>{t.label}</span>
+            {TABS.map((x) => (
+              <button key={x.id} role="tab" aria-selected={tab === x.id} onClick={() => setTab(x.id)} className="relative rounded-full px-4 py-1.5 text-[14px]">
+                {tab === x.id && <motion.span layoutId="seg" className="absolute inset-0 rounded-full bg-bg shadow-[0_1px_4px_rgba(0,0,0,0.12)]" transition={SPRING.snappy} />}
+                <span className={`relative ${tab === x.id ? "font-medium" : "text-muted"}`}>{t(x.label)}</span>
               </button>
             ))}
           </div>
@@ -137,10 +140,10 @@ export function Shop({ products }: { products: Product[] }) {
           >
             <span className="grid h-6 w-6 place-items-center rounded-full bg-ok text-[13px] text-white">✓</span>
             <span>
-              <b className="font-semibold">{toast}</b> ajouté au panier
+              <b className="font-semibold">{toast}</b> {t("ajouté au panier")}
             </span>
             <Link href="/panier" className="link-line !text-[15px]">
-              Voir <span className="arrow">›</span>
+              {t("Voir")} <span className="arrow">›</span>
             </Link>
           </motion.div>
         )}

@@ -1,5 +1,5 @@
 import { optimizedSrc, optimizedSrcSet } from "@/lib/imageUrl";
-import Link from "next/link";
+import Link from "@/components/LocaleLink";
 import { external, type AdBanner } from "@/lib/ad";
 
 /**

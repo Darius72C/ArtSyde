@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/LocaleLink";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { checkCreditPayment, payCreditsNow } from "@/server/payment-actions";
 

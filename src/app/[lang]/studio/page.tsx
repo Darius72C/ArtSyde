@@ -1,0 +1,21 @@
+import { pageMetadata } from "@/lib/i18n/server";
+import { PageShell } from "@/components/PageShell";
+import { StudioView } from "@/components/pages/StudioView";
+import { getStock, getStockColours } from "@/server/stock";
+import { StockWatch } from "@/components/StockWatch";
+import { AdSlot } from "@/components/AdSlot";
+
+export const generateMetadata = pageMetadata("Studio 3D — ArtSyde", "/studio");
+
+// Full-screen tool: header but no footer.
+export default async function Page() {
+  // Blank t-shirts in stock: the studio orders only those (cached, refreshed when the stock changes).
+  const [stock, stockColours] = await Promise.all([getStock(), getStockColours()]);
+  return (
+    <PageShell footer={false}>
+      <StudioView stock={stock} stockColours={stockColours} />
+      <AdSlot placement="studio" />
+      <StockWatch />
+    </PageShell>
+  );
+}

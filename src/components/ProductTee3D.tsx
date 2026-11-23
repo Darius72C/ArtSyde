@@ -10,6 +10,7 @@ import { TEE_HEIGHT, TEE_WIDTH, canvasTexture, colorTrue, printMaterial, tintShe
 import { TEE_ASPECT, teePath2D } from "./story/teeOutline";
 import { SoftShadow } from "./story/SoftShadow";
 import { loadPrint, loadedPrint } from "@/lib/printImages";
+import { useT } from "./I18nProvider";
 
 /*
  * A product's t-shirt in 3D: the fabric in the chosen colour, with the front and back prints set in
@@ -94,6 +95,7 @@ function Tee({ color, print, side, drag }: { color: string; print: Print3D; side
  * can always drag to turn it; a new `side` resets the drag.
  */
 export default function ProductTee3D({ color, print, side = "front", className = "" }: { color: string; print: Print3D; side?: PrintSide; className?: string }) {
+  const t = useT();
   const drag = useRef<Drag>({ rot: 0, active: false });
   const last = useRef(0);
   useEffect(() => {
@@ -116,7 +118,7 @@ export default function ProductTee3D({ color, print, side = "front", className =
       onPointerUp={() => (drag.current.active = false)}
       onPointerCancel={() => (drag.current.active = false)}
       role="img"
-      aria-label="T-shirt en 3D. Fais glisser pour le tourner."
+      aria-label={t("T-shirt en 3D. Fais glisser pour le tourner.")}
     >
       <Safe3D>
       <Canvas dpr={[1, 1.5]} camera={{ position: [0, 0, 6.2], fov: 35 }} gl={{ antialias: true, alpha: true }} onCreated={({ gl }) => colorTrue(gl)}>

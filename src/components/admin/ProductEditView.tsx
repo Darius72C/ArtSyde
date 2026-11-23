@@ -12,7 +12,7 @@ import { Print3DEditor } from "./Print3DEditor";
 import { ProductForm, type EditableProduct } from "./ProductForm";
 import { DbNotice, Empty, MoreLink, PageTitle } from "./ui";
 
-const NEW: EditableProduct = { id: "", name: "", priceXof: 0, oldPriceXof: null, tag: null, colors: [], sizes: ["S", "M", "L", "XL", "XXL"], active: true };
+const NEW: EditableProduct = { id: "", name: "", description: "", descriptionEn: "", priceXof: 0, oldPriceXof: null, tag: null, colors: [], sizes: ["S", "M", "L", "XL", "XXL"], active: true };
 
 export async function ProductEditView({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { id } = await params;
@@ -40,7 +40,7 @@ export async function ProductEditView({ params, searchParams }: { params: Promis
     );
 
   const configured = r2Config() !== null;
-  const product: EditableProduct = p ? { id: p.id, name: p.name, priceXof: p.priceXof, oldPriceXof: p.oldPriceXof, tag: p.tag, colors: p.colors, sizes: p.sizes, active: p.active } : NEW;
+  const product: EditableProduct = p ? { id: p.id, name: p.name, description: p.description, descriptionEn: p.descriptionEn, priceXof: p.priceXof, oldPriceXof: p.oldPriceXof, tag: p.tag, colors: p.colors, sizes: p.sizes, active: p.active } : NEW;
 
   return (
     <>

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/LocaleLink";
 import { useRef } from "react";
 import { motion, useMotionValue, useReducedMotion, useScroll, useSpring, useTransform, type MotionValue } from "motion/react";
 import type { Product } from "@/lib/products";
@@ -8,6 +8,7 @@ import type { HeroCardView } from "@/server/hero";
 import { RevealLines } from "../Reveal";
 import { optimizedSrc, optimizedSrcSet } from "@/lib/imageUrl";
 import { DUR, EASE, SPRING, STAGGER } from "@/lib/motion";
+import { useT } from "../I18nProvider";
 
 /*
  * The hero's cards (up to three): ad visuals, not product listings: an image each, no name, price or link
@@ -86,6 +87,7 @@ function HeroCard({ card, slot, spread, px, py, still }: { card: Card; slot: (ty
 
 /** `cards` are the ones set in the admin; `products` (the catalogue) fill the empty places with their newest photos. */
 export function Hero({ products = [], cards: set = [] }: { products?: Product[]; cards?: HeroCardView[] }) {
+  const t = useT();
   const root = useRef<HTMLElement>(null);
   const reduce = Boolean(useReducedMotion());
   const cards = pickCards(set, products);
@@ -117,23 +119,23 @@ export function Hero({ products = [], cards: set = [] }: { products?: Product[];
       }}
     >
       <motion.p className="eyebrow" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DUR.slow, ease: EASE.out }}>
-        Nouvelle collection
+        {t("Nouvelle collection")}
       </motion.p>
       <RevealLines
         as="h1"
         delay={0.1}
-        lines={["Ton t-shirt.", { muted: "Ton style." }]}
+        lines={[t("Ton t-shirt."), { muted: t("Ton style.") }]}
         className="display mx-auto mt-3 max-w-4xl text-[clamp(3rem,9vw,6rem)]"
       />
       <motion.p className="lead mx-auto mt-5 max-w-xl" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DUR.reveal, ease: EASE.out, delay: 0.1 + STAGGER.item }}>
-        Imprimé dans notre atelier. Choisis un modèle, ou crée le tien en 3D en deux minutes.
+        {t("Imprimé dans notre atelier. Choisis un modèle, ou crée le tien en 3D en deux minutes.")}
       </motion.p>
       <motion.div className="mt-8 flex flex-wrap items-center justify-center gap-6" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DUR.reveal, ease: EASE.out, delay: 0.1 + STAGGER.item * 2 }}>
         <Link href="/#boutique" className="btn">
-          Acheter
+          {t("Acheter")}
         </Link>
         <Link href="/studio" className="link-line">
-          Créer le mien <span className="arrow">›</span>
+          {t("Créer le mien")} <span className="arrow">›</span>
         </Link>
       </motion.div>
 

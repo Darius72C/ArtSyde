@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/LocaleLink";
 import { useRef } from "react";
 import { motion } from "motion/react";
 import { cart } from "@/lib/cart";
@@ -11,6 +11,7 @@ import { formatFCFA, productHref, type Product } from "@/lib/products";
 import { ProductImage } from "../ProductImage";
 import { RevealLines, Tilt } from "../Reveal";
 import { DUR, EASE, STAGGER, VIEWPORT } from "@/lib/motion";
+import { useT } from "../I18nProvider";
 
 /**
  * New arrivals. Desktop: the section pins and vertical scrolling drives the rail sideways.
@@ -18,6 +19,7 @@ import { DUR, EASE, STAGGER, VIEWPORT } from "@/lib/motion";
  */
 /** `products` come from the database (src/server/catalog.ts), read by the home page. */
 export function NewArrivals({ products }: { products: Product[] }) {
+  const t = useT();
   const root = useRef<HTMLElement>(null);
   const rail = useRef<HTMLDivElement>(null);
   const items = products.filter((p) => p.tag === "Nouveau" || p.tag === "Best-seller");
@@ -44,7 +46,7 @@ export function NewArrivals({ products }: { products: Product[] }) {
   return (
     <section ref={root} id="nouveautes" className="flex flex-col justify-center overflow-hidden py-20 md:min-h-svh md:pb-10 md:pt-20">
       <div className="mx-auto flex w-full max-w-[1180px] items-end justify-between gap-6 px-5">
-        <RevealLines lines={[{ text: "Les nouveautés.", muted: "Fraîchement imprimées." }]} className="display max-w-2xl text-[clamp(2rem,4.5vw,3.25rem)]" />
+        <RevealLines lines={[{ text: t("Les nouveautés."), muted: t("Fraîchement imprimées.") }]} className="display max-w-2xl text-[clamp(2rem,4.5vw,3.25rem)]" />
         <div className="hidden h-[3px] w-40 overflow-hidden rounded-full bg-surface md:block" aria-hidden>
           <span className="na-progress block h-full origin-left scale-x-0 rounded-full bg-ink" />
         </div>
@@ -60,11 +62,11 @@ export function NewArrivals({ products }: { products: Product[] }) {
             className="na-card group w-[78vw] shrink-0 sm:w-[340px] md:w-[400px]"
           >
             <Tilt className="tile flex h-full flex-col p-7">
-              <p className="eyebrow">{p.tag === "Nouveau" ? "Nouveau" : "Le plus vendu"}</p>
+              <p className="eyebrow">{p.tag === "Nouveau" ? t("Nouveau") : t("Le plus vendu")}</p>
               <h3 className="display mt-1 text-[28px]">
                 <Link href={productHref(p)} className="underline-offset-4 hover:underline">{p.name}</Link>
               </h3>
-              <p className="mt-1 text-muted">À partir de {formatFCFA(p.price)}</p>
+              <p className="mt-1 text-muted">{t("À partir de {price}", { price: formatFCFA(p.price) })}</p>
               <Link href={productHref(p)} tabIndex={-1} aria-hidden className="na-art my-6 block md:my-4" style={{ transform: "translateZ(40px)" }}>
                 <ProductImage color={p.colors[0]} art={p.art} photo={p.photo} alt={p.name} bg="transparent" className="mx-auto aspect-square w-full rounded-[22px] md:w-auto md:h-[min(320px,34svh)]" />
               </Link>
@@ -82,11 +84,11 @@ export function NewArrivals({ products }: { products: Product[] }) {
                     }}
                     className="btn !px-4 !py-1.5 !text-[14px]"
                   >
-                    Acheter
+                    {t("Acheter")}
                   </button>
                 ) : (
                   <Link href={productHref(p)} className="link-line !text-[15px]">
-                    Voir les couleurs <span className="arrow">›</span>
+                    {t("Voir les couleurs")} <span className="arrow">›</span>
                   </Link>
                 )}
               </div>
@@ -94,8 +96,8 @@ export function NewArrivals({ products }: { products: Product[] }) {
           </motion.article>
         ))}
         <Link href="/#boutique" className="tile group flex w-[60vw] shrink-0 flex-col items-center justify-center gap-2 p-7 text-center sm:w-[260px]">
-          <span className="display text-[24px] transition-transform duration-500 group-hover:-translate-y-1">Tout voir</span>
-          <span className="link-line">La boutique <span className="arrow">›</span></span>
+          <span className="display text-[24px] transition-transform duration-500 group-hover:-translate-y-1">{t("Tout voir")}</span>
+          <span className="link-line">{t("La boutique")} <span className="arrow">›</span></span>
         </Link>
       </div>
     </section>

@@ -109,7 +109,8 @@ async function cropToSubject(blob: Blob, aspect: number): Promise<Blob> {
  * The image shared from the "Porté" view: the mannequin front and back on the studio backdrop, the product's
  * photo, its name, price and sizes, and a QR code with the link to the product.
  */
-export async function wornShareCard(o: { front: Blob; back: Blob; photo?: string; title: string; price: string; sizes: string; link: string }): Promise<Blob> {
+export async function wornShareCard(o: { front: Blob; back: Blob; photo?: string; title: string; price: string; sizes: string; link: string; labels?: { front: string; back: string; scan: string } }): Promise<Blob> {
+  const labels = o.labels ?? { front: "Devant", back: "Dos", scan: "Scanne pour le commander" };
   const W = 1080, H = 1290, M = 40, G = 20;
   const c = Object.assign(document.createElement("canvas"), { width: W, height: H });
   const ctx = c.getContext("2d");
@@ -126,7 +127,7 @@ export async function wornShareCard(o: { front: Blob; back: Blob; photo?: string
 
   // Front and back, side by side.
   const pw = (W - 2 * M - G) / 2, ph = Math.round(pw * 1.25);
-  ([[front, "Devant"], [back, "Dos"]] as const).forEach(([img, label], i) => {
+  ([[front, labels.front], [back, labels.back]] as const).forEach(([img, label], i) => {
     const x = M + i * (pw + G);
     cover(ctx, img, x, M, pw, ph, 28);
     ctx.font = `600 26px ${font}`;
@@ -157,7 +158,7 @@ export async function wornShareCard(o: { front: Blob; back: Blob; photo?: string
   ctx.fillStyle = "#6e6e73";
   ctx.font = `500 28px ${font}`;
   ctx.fillText(o.sizes, tx, y + 194, qx - tx - 24);
-  ctx.fillText("Scanne pour le commander", tx, y + bh - 16, qx - tx - 24);
+  ctx.fillText(labels.scan, tx, y + bh - 16, qx - tx - 24);
   const qr = qrcode(0, "M");
   qr.addData(o.link);
   qr.make();

@@ -11,6 +11,7 @@ import { canvasTexture, colorTrue } from "./story/teeModel";
 import { PRINT_H, PRINT_W, drawPrint, usePrintImages } from "./ProductTee3D";
 import { teeState } from "./story/teeState";
 import { wornSnapshot } from "./story/snapshot";
+import { useT } from "./I18nProvider";
 import { CHEST } from "@/lib/sizing"; // body chest by size; the models are made in L
 
 /*
@@ -218,6 +219,7 @@ function CameraRig({ view }: { view: React.RefObject<View> }) {
  */
 /** `onZoomChange`: told when the view gets zoomed or back to whole (e.g. to change a hint around it). */
 export default function MannequinTryOn({ color, print = NO_PRINT, size, studio, className = "", onZoomChange }: { color: string; print?: Print3D; size: string; studio?: StudioCanvases; className?: string; onZoomChange?: (zoomed: boolean) => void }) {
+  const t = useT();
   const [id, setId] = useState<Mannequin>("homme-baggy");
   const current = MANNEQUINS.find((m) => m.id === id)!;
   const drag = useRef<Drag>({ rot: 0.35, active: false });
@@ -337,7 +339,7 @@ export default function MannequinTryOn({ color, print = NO_PRINT, size, studio, 
         }}
         onDoubleClick={() => zoomTo(view.current.target > 1.05 ? 1 : 2.2)}
         role="img"
-        aria-label={`T-shirt porté par ${current.gender === "duo" ? "deux mannequins, homme et femme" : `un mannequin ${current.gender}, look ${current.look.toLowerCase()}`}, taille ${size}. Fais glisser pour le tourner, pince pour zoomer ; zoomé, deux doigts pour te déplacer.`}
+        aria-label={t("T-shirt porté par {who}, taille {size}. Fais glisser pour le tourner, pince pour zoomer ; zoomé, deux doigts pour te déplacer.", { who: current.gender === "duo" ? t("deux mannequins, homme et femme") : t(current.gender === "homme" ? "un mannequin homme, look {look}" : "un mannequin femme, look {look}", { look: t(current.look).toLowerCase() }), size })}
       >
         <Safe3D>
           <Canvas dpr={[1, 1.5]} camera={{ position: [0, CAM_Y, CAM_Z], fov: 30 }} gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true }} onCreated={({ gl }) => colorTrue(gl)}>
@@ -366,7 +368,7 @@ export default function MannequinTryOn({ color, print = NO_PRINT, size, studio, 
             type="button"
             onClick={() => zoomTo(view.current.target * k)}
             disabled={sign === "−" && !zoomed}
-            aria-label={label}
+            aria-label={t(label)}
             className="grid size-9 place-items-center rounded-full bg-bg/85 text-lg leading-none text-ink shadow-[0_1px_4px_rgba(0,0,0,0.12)] transition-opacity disabled:opacity-35"
           >
             {sign}
@@ -375,10 +377,10 @@ export default function MannequinTryOn({ color, print = NO_PRINT, size, studio, 
       </div>
       {/* The picker: Homme / Femme / Duo, then that choice's looks. At the bottom, above the hint; hidden while zoomed. */}
       <div className={`absolute inset-x-4 bottom-14 grid justify-items-center gap-2 transition-opacity duration-300 ${zoomed ? "pointer-events-none opacity-0" : ""}`} aria-hidden={zoomed || undefined}>
-        <div className="flex gap-1 rounded-full bg-bg/80 p-0.5 text-[12px]" role="group" aria-label="Mannequin">
+        <div className="flex gap-1 rounded-full bg-bg/80 p-0.5 text-[12px]" role="group" aria-label={t("Mannequin")}>
           {(["homme", "femme", "duo"] as const).map((g) => (
             <button key={g} type="button" onClick={() => current.gender !== g && setId(MANNEQUINS.find((m) => m.gender === g)!.id)} aria-pressed={current.gender === g} className={`rounded-full px-3 py-1 transition-colors ${current.gender === g ? "bg-ink text-on-ink" : "text-muted hover:text-ink"}`}>
-              {g === "homme" ? "Homme" : g === "femme" ? "Femme" : "Duo"}
+              {g === "homme" ? t("Homme") : g === "femme" ? t("Femme") : t("Duo")}
             </button>
           ))}
         </div>
@@ -391,7 +393,7 @@ export default function MannequinTryOn({ color, print = NO_PRINT, size, studio, 
               aria-pressed={id === m.id}
               className={`whitespace-nowrap border-b pb-0.5 text-[11px] tracking-[0.18em] uppercase transition-colors ${id === m.id ? "border-ink" : "border-transparent text-muted hover:text-ink"}`}
             >
-              {m.look}
+              {t(m.look)}
             </button>
           ))}
         </div>

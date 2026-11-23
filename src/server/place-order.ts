@@ -15,6 +15,8 @@ import { onlinePaymentEnabled } from "@/server/payments/geniuspay";
 import { startOrderPayment } from "@/server/payments/settle";
 import { PAYMENT_METHOD_IDS } from "@/lib/credits";
 import { evaluatePromo } from "@/server/promo-rules";
+import { getRequestLocale } from "@/lib/i18n/server";
+import { makeT } from "@/lib/i18n";
 
 /** A studio piece's print files: only links to our own storage (designs/), one per side at most. */
 function printFiles(files: unknown, quality: PrintQuality): Prisma.CustomDesignCreateWithoutOrderItemInput[] {
@@ -49,14 +51,17 @@ const MAX_QTY = 20;
 const MAX_PREVIEW = 200_000; // the studio's 220×220 PNG thumbnail, as a data URL
 const STUDIO_PRICES: number[] = [STUDIO_PRICE.base, STUDIO_PRICE.base + STUDIO_PRICE.back];
 
-const CART_CHANGED = "Ton panier a changé entre-temps. Repasse par le panier, puis valide à nouveau.";
+const CART_CHANGED_FR = "Ton panier a changé entre-temps. Repasse par le panier, puis valide à nouveau.";
 const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 
 export async function placeOrder(input: CheckoutInput): Promise<PlaceOrderResult> {
+  const locale = await getRequestLocale();
+  const t = makeT(locale);
+  const CART_CHANGED = t(CART_CHANGED_FR);
   const f = input?.fields ?? {};
   const fields = { name: str(f.name, 120), phone: str(f.phone, 30), email: str(f.email, 160), city: str(f.city, 120), address: str(f.address, 300), notes: str(f.notes, 500) };
   const delivery = DELIVERY_METHODS.find((d) => d === input?.delivery);
-  if (!delivery) return { ok: false, errors: {}, message: "Choisis un mode de livraison." };
+  if (!delivery) return { ok: false, errors: {}, message: t("Choisis un mode de livraison.") };
   const errors = checkFields(fields, delivery);
   if (Object.keys(errors).length) return { ok: false, errors };
 
@@ -70,7 +75,7 @@ export async function placeOrder(input: CheckoutInput): Promise<PlaceOrderResult
     catalogue = ids.length ? await db.product.findMany({ where: { id: { in: ids }, active: true }, select: { id: true, priceXof: true, colors: true, sizes: true } }) : [];
   } catch (e) {
     await logError("placeOrder: catalogue read", e);
-    return { ok: false, errors: {}, message: "On n'a pas pu enregistrer ta commande. Réessaie dans un instant." };
+    return { ok: false, errors: {}, message: t("On n'a pas pu enregistrer ta commande. Réessaie dans un instant.") };
   }
 
   // Recompute every line from the catalogue.
@@ -115,12 +120,12 @@ export async function placeOrder(input: CheckoutInput): Promise<PlaceOrderResult
         return {
           ok: false,
           errors: {},
-          message: left > 0 ? `Il ne reste que ${left} t-shirt${left > 1 ? "s" : ""} en ${w.size} dans une des couleurs choisies. Ajuste la quantité dans ton panier.` : `Un t-shirt de ton panier est épuisé en ${w.size} dans sa couleur. Choisis une autre taille ou une autre couleur dans ton panier.`,
+          message: left > 0 ? t(left > 1 ? "Il ne reste que {n} t-shirts en {size} dans une des couleurs choisies. Ajuste la quantité dans ton panier." : "Il ne reste que {n} t-shirt en {size} dans une des couleurs choisies. Ajuste la quantité dans ton panier.", { n: left, size: w.size }) : t("Un t-shirt de ton panier est épuisé en {size} dans sa couleur. Choisis une autre taille ou une autre couleur dans ton panier.", { size: w.size }),
         };
     }
   } catch (e) {
     await logError("placeOrder: stock check", e);
-    return { ok: false, errors: {}, message: "On n'a pas pu enregistrer ta commande. Réessaie dans un instant." };
+    return { ok: false, errors: {}, message: t("On n'a pas pu enregistrer ta commande. Réessaie dans un instant.") };
   }
 
   const subtotalXof = items.reduce((s, i) => s + i.unitPriceXof * i.quantity, 0);
@@ -131,11 +136,11 @@ export async function placeOrder(input: CheckoutInput): Promise<PlaceOrderResult
   if (typeof input.promo === "string" && input.promo.trim()) {
     try {
       const r = await evaluatePromo(input.promo, subtotalXof, fields.phone.replace(/\s+/g, " "));
-      if (!r.ok) return { ok: false, errors: {}, message: `Code promo : ${r.message}`, promoError: r.message };
+      if (!r.ok) return { ok: false, errors: {}, message: t("Code promo : {message}", { message: r.message }), promoError: r.message };
       promo = { code: r.code, discount: r.discount };
     } catch (e) {
       await logError("placeOrder: promo check", e);
-      return { ok: false, errors: {}, message: "On n'a pas pu vérifier ton code promo. Réessaie dans un instant." };
+      return { ok: false, errors: {}, message: t("On n'a pas pu vérifier ton code promo. Réessaie dans un instant.") };
     }
   }
   const discountXof = promo?.discount ?? 0;
@@ -145,6 +150,7 @@ export async function placeOrder(input: CheckoutInput): Promise<PlaceOrderResult
     const customerId = await customerFor(fields.phone.replace(/\s+/g, " "));
     const data = {
       customerId,
+      locale,
       status: "PENDING_PAYMENT",
       paymentStatus: "UNPAID",
       customerName: fields.name,
@@ -183,6 +189,6 @@ export async function placeOrder(input: CheckoutInput): Promise<PlaceOrderResult
     throw new Error("Could not pick a free order reference after 5 attempts.");
   } catch (e) {
     await logError("placeOrder", e);
-    return { ok: false, errors: {}, message: "On n'a pas pu enregistrer ta commande. Réessaie dans un instant." };
+    return { ok: false, errors: {}, message: t("On n'a pas pu enregistrer ta commande. Réessaie dans un instant.") };
   }
 }

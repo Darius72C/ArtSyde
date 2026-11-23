@@ -1,11 +1,12 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/LocaleLink";
 import { AnimatePresence, motion } from "motion/react";
 import { cart, cartSubtotal, SIZES, useCart, type CartItem } from "@/lib/cart";
 import { available } from "@/lib/stock";
 import { formatFCFA, type Product } from "@/lib/products";
 import { TEE_COLORS } from "@/lib/data";
+import { useT } from "../I18nProvider";
 
 const colorName = (hex: string) => TEE_COLORS.find((c) => c.hex.toLowerCase() === hex.toLowerCase())?.name ?? "Couleur libre";
 import { ProductImage } from "../ProductImage";
@@ -40,19 +41,21 @@ function BinIcon() {
 }
 
 function Qty({ item }: { item: CartItem }) {
+  const t = useT();
   return (
     <div className="flex items-center rounded-full border border-line">
-      <button onClick={() => cart.setQty(item.key, item.qty - 1)} aria-label="Retirer un" className="h-9 w-9 text-lg font-extralight transition hover:bg-sand">−</button>
+      <button onClick={() => cart.setQty(item.key, item.qty - 1)} aria-label={t("Retirer un")} className="h-9 w-9 text-lg font-extralight transition hover:bg-sand">−</button>
       <motion.span key={item.qty} initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="w-8 text-center text-sm tabular-nums">
         {item.qty}
       </motion.span>
-      <button onClick={() => cart.setQty(item.key, item.qty + 1)} aria-label="Ajouter un" className="h-9 w-9 text-lg font-extralight transition hover:bg-sand">+</button>
+      <button onClick={() => cart.setQty(item.key, item.qty + 1)} aria-label={t("Ajouter un")} className="h-9 w-9 text-lg font-extralight transition hover:bg-sand">+</button>
     </div>
   );
 }
 
 /** `products` (for the suggestions) come from the database, read by the /panier page. */
 export function CartView({ products }: { products: Product[] }) {
+  const t = useT();
   const items = useCart();
   const subtotal = cartSubtotal(items);
   const count = items.reduce((n, i) => n + i.qty, 0);
@@ -61,18 +64,18 @@ export function CartView({ products }: { products: Product[] }) {
   return (
     <div className="mx-auto max-w-[1440px] px-5 md:px-10">
       <div className="pb-10 pt-14 md:pb-14 md:pt-20">
-        <p className="eyebrow mb-5">{count} article{count > 1 ? "s" : ""}</p>
-        <RevealLines as="h1" lines={["Ton panier."]} className="display text-5xl md:text-7xl" />
+        <p className="eyebrow mb-5">{count > 1 ? t("{n} articles", { n: count }) : t("{n} article", { n: count })}</p>
+        <RevealLines as="h1" lines={[t("Ton panier.")]} className="display text-5xl md:text-7xl" />
       </div>
 
       <AnimatePresence mode="wait">
         {items.length === 0 ? (
           <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="tile px-8 py-16 text-center md:py-20">
-            <p className="display text-4xl">Ton panier est vide.</p>
-            <p className="mx-auto mt-4 max-w-md text-muted">Fais un tour dans la boutique, ou crée une pièce unique dans le studio 3D.</p>
+            <p className="display text-4xl">{t("Ton panier est vide.")}</p>
+            <p className="mx-auto mt-4 max-w-md text-muted">{t("Fais un tour dans la boutique, ou crée une pièce unique dans le studio 3D.")}</p>
             <div className="mt-10 flex flex-wrap items-center justify-center gap-8">
-              <Link href="/#boutique" className="btn">La boutique</Link>
-              <Link href="/studio" className="link-line">Le studio 3D <span className="arrow">›</span></Link>
+              <Link href="/#boutique" className="btn">{t("La boutique")}</Link>
+              <Link href="/studio" className="link-line">{t("Le studio 3D")} <span className="arrow">›</span></Link>
             </div>
           </motion.div>
         ) : (
@@ -95,14 +98,14 @@ export function CartView({ products }: { products: Product[] }) {
                           <h3 className="text-[19px] font-semibold">{it.name}</h3>
                           <p className="mt-1 flex items-center gap-2 text-sm text-muted">
                             <span className="h-3 w-3 rounded-full ring-1 ring-line" style={{ background: it.color }} />
-                            {it.productId === null ? `Création personnalisée · ${colorName(it.color)}` : colorName(it.color)}
+                            {it.productId === null ? `${t("Création personnalisée")} · ${t(colorName(it.color))}` : t(colorName(it.color))}
                           </p>
                         </div>
                         <p className="text-sm tabular-nums">{formatFCFA(it.price * it.qty)}</p>
                       </div>
                       <div className="mt-auto flex flex-wrap items-center gap-5 pt-4">
                         <label className="flex items-center gap-2 text-sm">
-                          <span className="text-muted">Taille</span>
+                          <span className="text-muted">{t("Taille")}</span>
                           <select value={it.size} onChange={(e) => cart.setSize(it.key, e.target.value)} className="rounded-lg border border-line bg-bg px-2 py-1 text-sm outline-none focus:border-accent">
                             {SIZES.map((s) => {
                               // Catalogue t-shirts: a size sold out in this colour can't be picked.
@@ -110,7 +113,7 @@ export function CartView({ products }: { products: Product[] }) {
                               const out = s !== it.size && available(stock, it.color, s) <= 0;
                               return (
                                 <option key={s} value={s} disabled={out}>
-                                  {out ? `${s} (épuisé)` : s}
+                                  {out ? t("{s} (épuisé)", { s }) : s}
                                 </option>
                               );
                             })}
@@ -126,7 +129,7 @@ export function CartView({ products }: { products: Product[] }) {
                           className="bin-link ml-auto inline-flex items-center gap-1.5 text-[15px] text-link hover:underline"
                         >
                           <BinIcon />
-                          Retirer
+                          {t("Retirer")}
                         </button>
                       </div>
                     </div>
@@ -136,17 +139,17 @@ export function CartView({ products }: { products: Product[] }) {
             </ul>
 
             <motion.aside layout className="tile p-8 lg:sticky lg:top-20">
-              <p className="text-[21px] font-semibold">Récapitulatif</p>
+              <p className="text-[21px] font-semibold">{t("Récapitulatif")}</p>
               <dl className="mt-6 space-y-3 text-sm">
-                <div className="flex justify-between"><dt className="text-muted">Sous-total</dt><dd className="tabular-nums">{formatFCFA(subtotal)}</dd></div>
-                <div className="flex justify-between"><dt className="text-muted">Livraison</dt><dd>Étape suivante</dd></div>
+                <div className="flex justify-between"><dt className="text-muted">{t("Sous-total")}</dt><dd className="tabular-nums">{formatFCFA(subtotal)}</dd></div>
+                <div className="flex justify-between"><dt className="text-muted">{t("Livraison")}</dt><dd>{t("Étape suivante")}</dd></div>
               </dl>
               <div className="mt-6 flex items-baseline justify-between border-t border-line pt-6">
-                <span className="font-semibold">Total</span>
+                <span className="font-semibold">{t("Total")}</span>
                 <motion.span key={subtotal} initial={{ opacity: 0.4 }} animate={{ opacity: 1 }} className="display text-3xl tabular-nums">{formatFCFA(subtotal)}</motion.span>
               </div>
-              <Link href="/commande" className="btn mt-8 w-full">Passer commande</Link>
-              <Link href="/#boutique" className="mt-5 block text-center text-sm text-muted underline-offset-4 hover:text-ink hover:underline">Continuer mes achats</Link>
+              <Link href="/commande" className="btn mt-8 w-full">{t("Passer commande")}</Link>
+              <Link href="/#boutique" className="mt-5 block text-center text-sm text-muted underline-offset-4 hover:text-ink hover:underline">{t("Continuer mes achats")}</Link>
             </motion.aside>
           </motion.div>
         )}

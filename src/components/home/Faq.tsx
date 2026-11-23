@@ -4,6 +4,7 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { RevealLines } from "../Reveal";
 import { DUR, EASE, SPRING, STAGGER, VIEWPORT } from "@/lib/motion";
+import { useT } from "../I18nProvider";
 
 const FAQ = [
   { q: "Quelles tailles proposez-vous ?", a: "Du S au XXL pour la plupart des modèles. Un guide des tailles est disponible sur chaque fiche produit." },
@@ -14,11 +15,12 @@ const FAQ = [
 ];
 
 export function Faq() {
+  const t = useT();
   const [open, setOpen] = useState<number | null>(null);
   return (
     <section id="aide" className="bg-surface py-20 md:py-28">
       <div className="mx-auto max-w-[820px] px-5">
-        <RevealLines lines={["Questions fréquentes."]} className="display text-center text-[clamp(2rem,4.5vw,3.25rem)]" />
+        <RevealLines lines={[t("Questions fréquentes.")]} className="display text-center text-[clamp(2rem,4.5vw,3.25rem)]" />
         <ul className="mt-10 divide-y divide-line border-y border-line">
           {FAQ.map((f, i) => {
             const isOpen = open === i;
@@ -31,7 +33,7 @@ export function Faq() {
                 transition={{ duration: DUR.slow, ease: EASE.out, delay: i * STAGGER.item }}
               >
                 <button onClick={() => setOpen(isOpen ? null : i)} aria-expanded={isOpen} className="group flex w-full items-center justify-between gap-6 py-6 text-left">
-                  <span className="text-[19px] font-semibold transition-transform duration-500 group-hover:translate-x-1.5 md:text-[21px]">{f.q}</span>
+                  <span className="text-[19px] font-semibold transition-transform duration-500 group-hover:translate-x-1.5 md:text-[21px]">{t(f.q)}</span>
                   <motion.span animate={{ rotate: isOpen ? 45 : 0 }} transition={SPRING.ui} className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-xl transition-colors duration-300 ${isOpen ? "bg-accent text-white" : "bg-bg text-muted group-hover:text-ink"}`}>
                     +
                   </motion.span>
@@ -40,7 +42,7 @@ export function Faq() {
                   {isOpen && (
                     <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: DUR.base, ease: EASE.out }} className="overflow-hidden">
                       <motion.p initial={{ y: -12 }} animate={{ y: 0 }} exit={{ y: -12 }} transition={{ duration: DUR.base, ease: EASE.out }} className="max-w-2xl pb-6 text-[17px] text-muted">
-                        {f.a}
+                        {t(f.a)}
                       </motion.p>
                     </motion.div>
                   )}

@@ -1,4 +1,7 @@
+"use client";
+
 import { COMPANY } from "@/lib/company";
+import { useT } from "./I18nProvider";
 
 /** WhatsApp's logo. */
 export function WhatsAppMark({ className = "h-6 w-6" }: { className?: string }) {
@@ -14,17 +17,18 @@ export function WhatsAppMark({ className = "h-6 w-6" }: { className?: string }) 
  * Not shown when no link is set.
  */
 export function WhatsAppButton() {
+  const t = useT();
   if (!COMPANY.whatsapp) return null;
   return (
     <a
       href={COMPANY.whatsapp}
       target="_blank"
       rel="noopener noreferrer"
-      aria-label="Nous écrire sur WhatsApp"
+      aria-label={t("Nous écrire sur WhatsApp")}
       className="group fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-5 z-40 flex items-center gap-2 rounded-full bg-[#25D366] p-3.5 text-white shadow-[0_10px_30px_-8px_rgba(0,0,0,0.45)] transition-transform duration-300 hover:scale-105 active:scale-95"
     >
       <WhatsAppMark />
-      <span className="hidden max-w-0 overflow-hidden whitespace-nowrap text-[15px] font-medium transition-[max-width] duration-500 group-hover:max-w-40 md:inline">Écris-nous</span>
+      <span className="hidden max-w-0 overflow-hidden whitespace-nowrap text-[15px] font-medium transition-[max-width] duration-500 group-hover:max-w-40 md:inline">{t("Écris-nous")}</span>
     </a>
   );
 }

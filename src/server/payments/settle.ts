@@ -8,6 +8,8 @@ import { STOCK_TAG } from "@/server/stock";
 import { logActivity, logWarning, logError } from "@/server/log";
 import { allow } from "@/server/rate-limit";
 import { siteUrl } from "@/server/site";
+import { isLocale, localizeHref, makeT } from "@/lib/i18n";
+import { getRequestT } from "@/lib/i18n/server";
 import { paymentFee } from "@/lib/payment-fees";
 import { createPayment, internationalPhone, operatorRouting, failedStatus, geniusConfig, getPayment, paidStatus, sandbox, type GeniusPayment } from "./geniuspay";
 
@@ -115,17 +117,20 @@ export type StartResult = { ok: true; url: string } | { ok: false; message: stri
 /** Starts paying an order online: GeniusPay's page to send the customer to. */
 export async function startOrderPayment(orderId: string, method?: string): Promise<StartResult> {
   const cfg = geniusConfig();
-  if (!cfg) return { ok: false, message: "Le paiement en ligne n'est pas encore disponible." };
-  const o = await db.order.findUnique({ where: { id: orderId }, select: { id: true, reference: true, totalXof: true, paymentMethod: true, customerName: true, customerPhone: true, customerEmail: true, status: true, paymentStatus: true } });
-  if (!o || o.status !== "PENDING_PAYMENT" || o.paymentStatus === "PAID") return { ok: false, message: "Cette commande n'attend plus de paiement." };
-  const back = `${siteUrl()}${orderHref(o.reference, orderKey(o.id))}`;
+  if (!cfg) return { ok: false, message: (await getRequestT())("Le paiement en ligne n'est pas encore disponible.") };
+  const o = await db.order.findUnique({ where: { id: orderId }, select: { id: true, reference: true, locale: true, totalXof: true, paymentMethod: true, customerName: true, customerPhone: true, customerEmail: true, status: true, paymentStatus: true } });
+  if (!o || o.status !== "PENDING_PAYMENT" || o.paymentStatus === "PAID") return { ok: false, message: (await getRequestT())("Cette commande n'attend plus de paiement.") };
+  // Back to the order's page in the language it was placed in.
+  const locale = isLocale(o.locale) ? o.locale : "fr";
+  const t = makeT(locale);
+  const back = `${siteUrl()}${localizeHref(locale, orderHref(o.reference, orderKey(o.id)))}`;
   // The customer pays the operator's fee on top of the order (src/lib/payment-fees.ts).
   const fee = paymentFee(o.totalXof, method ?? o.paymentMethod);
   try {
     const pay = await open({
       amount: o.totalXof + fee,
       currency: "XOF",
-      description: `Commande ${o.reference} — ArtSyde`,
+      description: t("Commande {reference} — ArtSyde", { reference: o.reference }),
       customer: { name: o.customerName, phone: internationalPhone(o.customerPhone), country: "CI", ...(o.customerEmail ? { email: o.customerEmail } : {}) },
       ...operatorRouting(method ?? o.paymentMethod),
       success_url: `${back}&paiement=retour`,
@@ -138,23 +143,25 @@ export async function startOrderPayment(orderId: string, method?: string): Promi
     return { ok: true, url: pay.url };
   } catch (e) {
     await logError("geniuspay.create", e, { order: o.reference });
-    return { ok: false, message: "Ce moyen de paiement ne répond pas. Ta commande est enregistrée : réessaie dans un instant depuis son suivi, ou choisis-en un autre." };
+    return { ok: false, message: t("Ce moyen de paiement ne répond pas. Ta commande est enregistrée : réessaie dans un instant depuis son suivi, ou choisis-en un autre.") };
   }
 }
 
 /** Starts paying a credit purchase online. */
 export async function startCreditPayment(purchaseId: string, method?: string): Promise<StartResult> {
   const cfg = geniusConfig();
-  if (!cfg) return { ok: false, message: "Le paiement en ligne n'est pas encore disponible." };
+  if (!cfg) return { ok: false, message: (await getRequestT())("Le paiement en ligne n'est pas encore disponible.") };
   const p = await db.creditPurchase.findUnique({ where: { id: purchaseId } });
-  if (!p || p.paymentStatus === "PAID") return { ok: false, message: "Cet achat est déjà payé." };
-  const back = `${siteUrl()}/credits?achat=${encodeURIComponent(p.reference)}`;
+  if (!p || p.paymentStatus === "PAID") return { ok: false, message: (await getRequestT())("Cet achat est déjà payé.") };
+  const locale = isLocale(p.locale) ? p.locale : "fr";
+  const t = makeT(locale);
+  const back = `${siteUrl()}${localizeHref(locale, "/credits")}?achat=${encodeURIComponent(p.reference)}`;
   const fee = paymentFee(p.priceXof, method ?? p.paymentMethod);
   try {
     const pay = await open({
       amount: p.priceXof + fee,
       currency: "XOF",
-      description: `Crédits studio ArtSyde : pack ${CREDIT_PACKS[p.pack].name} (${p.credits} crédits)`,
+      description: t("Crédits studio ArtSyde : pack {pack} ({n} crédits)", { pack: t(CREDIT_PACKS[p.pack].name), n: p.credits }),
       customer: { name: p.customerName, phone: internationalPhone(p.customerPhone), country: "CI", ...(p.customerEmail ? { email: p.customerEmail } : {}) },
       ...operatorRouting(method ?? p.paymentMethod),
       success_url: `${back}&paiement=retour`,
@@ -167,7 +174,7 @@ export async function startCreditPayment(purchaseId: string, method?: string): P
     return { ok: true, url: pay.url };
   } catch (e) {
     await logError("geniuspay.create", e, { purchase: p.reference });
-    return { ok: false, message: "Ce moyen de paiement ne répond pas. Ton achat est enregistré : réessaie dans un instant, ou choisis-en un autre." };
+    return { ok: false, message: t("Ce moyen de paiement ne répond pas. Ton achat est enregistré : réessaie dans un instant, ou choisis-en un autre.") };
   }
 }
 

@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/LocaleLink";
 import { adviseSize, type Build } from "@/lib/sizing";
+import { useT } from "./I18nProvider";
 
 const KEY = "artsyde:taille"; // the visitor's answers, kept on this device only
 
 /** « Quelle taille pour moi ? » : height and weight give a size among the product's, applied in one tap. */
 export function SizeHelper({ sizes, onPick, current }: { sizes: string[]; onPick: (size: string) => void; current: string }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [build, setBuild] = useState<Build>("homme");
   const [height, setHeight] = useState("");
@@ -41,7 +43,7 @@ export function SizeHelper({ sizes, onPick, current }: { sizes: string[]; onPick
   if (!open)
     return (
       <button type="button" onClick={openHelper} className="mt-3 text-sm text-muted underline underline-offset-4 hover:text-ink">
-        Quelle taille pour moi ?
+        {t("Quelle taille pour moi ?")}
       </button>
     );
 
@@ -49,23 +51,23 @@ export function SizeHelper({ sizes, onPick, current }: { sizes: string[]; onPick
   return (
     <div className="mt-3 rounded-2xl border border-line p-4 text-sm">
       <div className="flex items-center justify-between">
-        <p className="font-medium">Quelle taille pour moi ?</p>
-        <button type="button" onClick={() => setOpen(false)} aria-label="Fermer" className="text-muted hover:text-ink">✕</button>
+        <p className="font-medium">{t("Quelle taille pour moi ?")}</p>
+        <button type="button" onClick={() => setOpen(false)} aria-label={t("Fermer")} className="text-muted hover:text-ink">✕</button>
       </div>
-      <div className="mt-3 flex gap-1 rounded-full bg-surface p-0.5 text-[13px]" role="group" aria-label="Morphologie">
+      <div className="mt-3 flex gap-1 rounded-full bg-surface p-0.5 text-[13px]" role="group" aria-label={t("Morphologie")}>
         {(["homme", "femme"] as const).map((b) => (
           <button key={b} type="button" onClick={() => setBuild(b)} aria-pressed={build === b} className={`flex-1 rounded-full px-3 py-1 ${build === b ? "bg-ink text-on-ink" : "text-muted"}`}>
-            {b === "homme" ? "Homme" : "Femme"}
+            {b === "homme" ? t("Homme") : t("Femme")}
           </button>
         ))}
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2">
         <label>
-          <span className="text-muted">Taille (cm)</span>
+          <span className="text-muted">{t("Taille (cm)")}</span>
           <input inputMode="numeric" value={height} onChange={(e) => setHeight(e.target.value.replace(/\D/g, "").slice(0, 3))} placeholder="175" className={field} />
         </label>
         <label>
-          <span className="text-muted">Poids (kg)</span>
+          <span className="text-muted">{t("Poids (kg)")}</span>
           <input inputMode="numeric" value={weight} onChange={(e) => setWeight(e.target.value.replace(/\D/g, "").slice(0, 3))} placeholder="70" className={field} />
         </label>
       </div>
@@ -73,17 +75,17 @@ export function SizeHelper({ sizes, onPick, current }: { sizes: string[]; onPick
         {advice && (
           <div className="mt-4">
             <p>
-              On te conseille le <b>{advice.size}</b>
-              {advice.exact ? "" : " (la plus proche disponible)"}. Le t-shirt est coupé oversize : il tombe déjà large.
-              {advice.larger && <> Pour un effet encore plus ample, prends le {advice.larger}.</>}
+              {t("On te conseille le")} <b>{advice.size}</b>
+              {advice.exact ? "" : ` ${t("(la plus proche disponible)")}`}. {t("Le t-shirt est coupé oversize : il tombe déjà large.")}
+              {advice.larger && <> {t("Pour un effet encore plus ample, prends le {size}.", { size: advice.larger })}</>}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <button type="button" onClick={() => onPick(advice.size)} disabled={current === advice.size} className="btn !px-4 !py-2 text-sm disabled:opacity-60">
-                {current === advice.size ? `${advice.size} choisi ✓` : `Choisir le ${advice.size}`}
+                {current === advice.size ? t("{size} choisi ✓", { size: advice.size }) : t("Choisir le {size}", { size: advice.size })}
               </button>
               {advice.larger && (
                 <button type="button" onClick={() => onPick(advice.larger!)} disabled={current === advice.larger} className="btn-outline !px-4 !py-2 text-sm disabled:opacity-60">
-                  {current === advice.larger ? `${advice.larger} choisi ✓` : `Plus ample : ${advice.larger}`}
+                  {current === advice.larger ? t("{size} choisi ✓", { size: advice.larger }) : t("Plus ample : {size}", { size: advice.larger })}
                 </button>
               )}
             </div>
@@ -91,7 +93,7 @@ export function SizeHelper({ sizes, onPick, current }: { sizes: string[]; onPick
         )}
       </div>
       <p className="mt-3 text-xs text-muted">
-        Conseil indicatif. Toutes les mesures : <Link href="/guide-des-tailles" className="underline underline-offset-4">guide des tailles</Link>.
+        {t("Conseil indicatif. Toutes les mesures :")} <Link href="/guide-des-tailles" className="underline underline-offset-4">{t("guide des tailles")}</Link>.
       </p>
     </div>
   );

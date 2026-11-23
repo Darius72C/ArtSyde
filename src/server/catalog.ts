@@ -32,6 +32,7 @@ async function readCatalog(): Promise<Product[]> {
     flats: p.flatMockups,
     print3d: parsePrint3D(p.print3d),
     description: p.description,
+    descriptionEn: p.descriptionEn,
   }));
 }
 

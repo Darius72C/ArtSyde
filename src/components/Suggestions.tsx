@@ -1,6 +1,7 @@
 "use client";
 
-import Link from "next/link";
+import { useT } from "./I18nProvider";
+import Link from "@/components/LocaleLink";
 import { cart } from "@/lib/cart";
 import { available, defaultSize } from "@/lib/stock";
 import { formatFCFA, productHref, type Product } from "@/lib/products";
@@ -10,10 +11,11 @@ import { FadeUp, RevealLines } from "./Reveal";
 
 /** "Tu vas aimer.": up to four products, each opening its page, with a quick add in size M. Used by the cart and the product page. */
 export function Suggestions({ products }: { products: Product[] }) {
+  const t = useT();
   if (products.length === 0) return null;
   return (
     <section className="py-24">
-      <RevealLines lines={[{ text: "Tu vas aimer.", muted: "Pour compléter." }]} className="display text-4xl md:text-5xl" />
+      <RevealLines lines={[{ text: t("Tu vas aimer."), muted: t("Pour compléter.") }]} className="display text-4xl md:text-5xl" />
       <div className="mt-12 grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-4 md:gap-x-6">
         {products.slice(0, 4).map((p, i) => (
           <FadeUp key={p.id} delay={i * STAGGER.item} className="group">

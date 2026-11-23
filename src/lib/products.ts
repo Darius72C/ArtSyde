@@ -20,6 +20,8 @@ export type Product = {
   flats: string[]; // flat mockups (the "Mockup" tab), in the admin's order
   print3d: Print3D; // the print on the 3D t-shirt (the "3D" tab)
   description: string;
+  /** The description in English, empty when not written (src/lib/products-i18n.ts falls back to French). */
+  descriptionEn?: string;
   /** Blank t-shirts left for this product's colours (src/lib/stock.ts). Colours missing here are not tracked. */
   stock?: StockMap;
 };

@@ -49,6 +49,8 @@ export async function saveProduct(_prev: ProductFormState, form: FormData): Prom
   const colors = [...new Set(form.getAll("colors").map((v) => String(v).trim().toLowerCase()))].filter((v) => HEX.test(v)).slice(0, MAX_COLORS);
   const sizes = Object.values(Size).filter((s) => form.getAll("sizes").includes(s));
   const active = form.get("active") === "on";
+  const description = String(form.get("description") ?? "").trim().slice(0, 2000);
+  const descriptionEn = String(form.get("descriptionEn") ?? "").trim().slice(0, 2000);
 
   const errors: ProductFormState["errors"] = {};
   if (name.length < 2) errors.name = "Donne un nom au modèle.";
@@ -58,7 +60,7 @@ export async function saveProduct(_prev: ProductFormState, form: FormData): Prom
   if (!sizes.length) errors.sizes = "Choisis au moins une taille.";
   if (Object.keys(errors).length) return { errors };
 
-  const data = { name, priceXof, oldPriceXof, tag, colors, sizes, active };
+  const data = { name, description, descriptionEn, priceXof, oldPriceXof, tag, colors, sizes, active };
   let created: string | null = null;
   try {
     if (id) {

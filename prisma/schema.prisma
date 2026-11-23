@@ -18,6 +18,8 @@ model Product {
   slug        String      @unique
   name        String
   description String      @default("")
+  // The description in English (the /en site); empty: the French one shows.
+  descriptionEn String    @default("")
   priceXof    Int
   oldPriceXof Int? // prix barré pendant une promo
   tag         ProductTag?
@@ -204,6 +206,8 @@ model CreditPurchase {
   id            String        @id @default(cuid())
   // Référence courte lisible, ex. "CR-2611-0007", donnée au client.
   reference     String        @unique
+  // Langue du site au moment de l'achat ("fr" ou "en") : retour de paiement et e-mails dans cette langue.
+  locale        String        @default("fr")
   pack          CreditPack
   credits       Int
   priceXof      Int
@@ -283,6 +287,8 @@ model Order {
   // Référence courte lisible, ex. "AS-2611-0042", donnée au client.
   reference String      @unique
   status    OrderStatus @default(PENDING_PAYMENT)
+  // Langue du site au moment de la commande ("fr" ou "en") : e-mails et retour de paiement dans cette langue.
+  locale    String      @default("fr")
 
   // Client inscrit, s'il y en a un. Les champs ci-dessous gardent ce qui a été saisi à la commande.
   customerId    String?

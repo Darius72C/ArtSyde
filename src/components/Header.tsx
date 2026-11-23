@@ -1,6 +1,7 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/LocaleLink";
+import NextLink from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { AnimatePresence, motion, useAnimationControls } from "motion/react";
@@ -8,13 +9,16 @@ import { useCartCount } from "@/lib/cart";
 import { authClient } from "@/lib/auth-client";
 import { CART_BUMP } from "@/lib/flyToCart";
 import { DUR, EASE, SPRING } from "@/lib/motion";
+import { localizeHref, switchLocaleHref } from "@/lib/i18n";
+import { useLocale, useT } from "./I18nProvider";
 
 /** The account icon: the account page when signed in (with the first letter of the name), else the sign-in page. */
 function AccountLink() {
+  const t = useT();
   const { data } = authClient.useSession();
   const user = data?.user;
   return (
-    <Link href={user ? "/compte" : "/connexion"} aria-label={user ? `Mon compte, ${user.name}` : "Se connecter"} className="nav-link hidden md:inline">
+    <Link href={user ? "/compte" : "/connexion"} aria-label={user ? t("Mon compte, {name}", { name: user.name }) : t("Se connecter")} className="nav-link hidden md:inline">
       {user ? (
         <span className="grid h-[22px] w-[22px] place-items-center rounded-full bg-ink text-[11px] font-semibold uppercase text-on-ink">{(user.name || user.email).slice(0, 1)}</span>
       ) : (
@@ -79,7 +83,20 @@ function useDarkUnderNav() {
   return dark;
 }
 
+/** FR / EN: the same page in the other language. */
+function LanguageSwitch({ path, className = "" }: { path: string | null; className?: string }) {
+  const locale = useLocale();
+  const other = locale === "en" ? "fr" : "en";
+  return (
+    <NextLink href={switchLocaleHref(path ?? "/", other)} hrefLang={other} lang={other} aria-label={other === "en" ? "English version" : "Version française"} className={`nav-link text-[12px] font-semibold tracking-wide ${className}`}>
+      {other.toUpperCase()}
+    </NextLink>
+  );
+}
+
 function Bar({ path }: { path: string | null }) {
+  const t = useT();
+  const locale = useLocale();
   const user = authClient.useSession().data?.user; // the phone menu's "Compte": the account when signed in
   const count = useCartCount();
   const [open, setOpen] = useState(false);
@@ -98,22 +115,23 @@ function Bar({ path }: { path: string | null }) {
       className="nav-tone sticky top-0 z-50 border-b border-line/60 bg-[var(--nav)] text-ink backdrop-blur-xl backdrop-saturate-150 transition-[background-color,border-color,color] duration-500"
     >
       <nav className="mx-auto flex h-12 max-w-[1024px] items-center justify-between px-5">
-        <Link href="/" className="block" aria-label="ArtSyde, accueil">
+        <Link href="/" className="block" aria-label={t("ArtSyde, accueil")}>
           {/* The logo as a mask: it takes the header's text colour, white on dark, black on light. */}
           <span aria-hidden className="block h-[40px] bg-current" style={{ width: LOGO_WIDTH, WebkitMask: LOGO_MASK, mask: LOGO_MASK }} />
         </Link>
         <ul className="hidden items-center gap-9 md:flex">
           {LINKS.map((l) => (
             <li key={l.href}>
-              <Link href={l.href} aria-current={path === l.href ? "page" : undefined} className="nav-link nav-underline">
-                {l.label}
+              <Link href={l.href} aria-current={path === localizeHref(locale, l.href) ? "page" : undefined} className="nav-link nav-underline">
+                {t(l.label)}
               </Link>
             </li>
           ))}
         </ul>
         <div className="flex items-center gap-5">
+          <LanguageSwitch path={path} />
           <AccountLink />
-          <Link href="/panier" id="cart-link" aria-label={`Panier, ${count} article${count > 1 ? "s" : ""}`} className="nav-link relative">
+          <Link href="/panier" id="cart-link" aria-label={count > 1 ? t("Panier, {n} articles", { n: count }) : t("Panier, {n} article", { n: count })} className="nav-link relative">
             <motion.span animate={bag} className="block">
               <BagIcon />
             </motion.span>
@@ -132,7 +150,7 @@ function Bar({ path }: { path: string | null }) {
               )}
             </AnimatePresence>
           </Link>
-          <button onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label="Menu" className="relative h-6 w-6 md:hidden">
+          <button onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label={t("Menu")} className="relative h-6 w-6 md:hidden">
             <motion.span className="absolute left-1 right-1 top-[9px] h-px bg-ink" animate={open ? { rotate: 45, y: 3 } : { rotate: 0, y: 0 }} transition={SPRING.ui} />
             <motion.span className="absolute left-1 right-1 top-[15px] h-px bg-ink" animate={open ? { rotate: -45, y: -3 } : { rotate: 0, y: 0 }} transition={SPRING.ui} />
           </button>
@@ -152,7 +170,7 @@ function Bar({ path }: { path: string | null }) {
               {[...LINKS, { href: user ? "/compte" : "/connexion", label: "Compte" }, { href: "/panier", label: "Panier" }].map((l, i) => (
                 <motion.li key={l.href} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 + i * 0.03, duration: DUR.fast, ease: EASE.out }}>
                   <Link href={l.href} onClick={() => setOpen(false)} className="display block py-2 text-[28px]">
-                    {l.label}
+                    {t(l.label)}
                   </Link>
                 </motion.li>
               ))}

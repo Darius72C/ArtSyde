@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "./I18nProvider";
 import { Component, useSyncExternalStore, type ReactNode } from "react";
 import { reportClientError } from "@/server/client-log";
 
@@ -51,7 +52,9 @@ class Catch3D extends Component<{ fallback: ReactNode; children: ReactNode }, { 
 }
 
 /** A quiet note in place of the 3D view, filling the space the scene had. */
-export function No3D({ text = "L'aperçu 3D n'est pas disponible sur cet appareil." }: { text?: string }) {
+export function No3D({ text }: { text?: string }) {
+  const t = useT();
+  text ??= t("L'aperçu 3D n'est pas disponible sur cet appareil.");
   return (
     <div className="flex h-full min-h-40 w-full items-center justify-center p-6 text-center text-sm text-muted" role="note">
       {text}

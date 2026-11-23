@@ -4,6 +4,7 @@ import { db } from "@/server/db";
 import { orderHref, orderKey } from "@/lib/orders";
 import { cleanReference } from "@/server/reference";
 import { clientIp, hits, record } from "@/server/rate-limit";
+import { getRequestT } from "@/lib/i18n/server";
 
 export type TrackResult = { ok: true; href: string } | { ok: false; message: string };
 
@@ -27,20 +28,21 @@ function nationalDigits(v: string) {
  * reveals nothing; and failed tries are limited, so references can't be tried one after the other.
  */
 export async function findOrder(reference: string, phone: string): Promise<TrackResult> {
+  const t = await getRequestT();
   const ref = cleanReference(reference, "AS");
   const tel = nationalDigits(phone);
-  if (!ref) return { ok: false, message: "La référence ressemble à AS-7KP3-QX9M (dans l'e-mail ou le message de ta commande) : vérifie-la." };
-  if (tel.length < 8) return { ok: false, message: "Entre le numéro donné à la commande." };
+  if (!ref) return { ok: false, message: t("La référence ressemble à AS-7KP3-QX9M (dans l'e-mail ou le message de ta commande) : vérifie-la.") };
+  if (tel.length < 8) return { ok: false, message: t("Entre le numéro donné à la commande.") };
 
   const bucket = `track-miss:ip:${await clientIp()}`;
   if ((await hits(bucket, MISSES.windowMs)) >= MISSES.max) {
-    return { ok: false, message: "Trop d'essais. Réessaie dans une heure, ou écris-nous avec ta référence." };
+    return { ok: false, message: t("Trop d'essais. Réessaie dans une heure, ou écris-nous avec ta référence.") };
   }
   const o = await db.order.findUnique({ where: { reference: ref }, select: { id: true, reference: true, customerPhone: true } }).catch(() => null);
   // The same answer whether the reference or the phone is wrong.
   if (!o || nationalDigits(o.customerPhone) !== tel) {
     await record(bucket);
-    return { ok: false, message: "Aucune commande avec cette référence et ce numéro." };
+    return { ok: false, message: t("Aucune commande avec cette référence et ce numéro.") };
   }
   return { ok: true, href: orderHref(o.reference, orderKey(o.id)) };
 }

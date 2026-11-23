@@ -2,6 +2,15 @@ import type { MetadataRoute } from "next";
 import { getCatalog } from "@/server/catalog";
 import { productHref } from "@/lib/products";
 import { SITE_URL } from "@/lib/site";
+import { localizeHref } from "@/lib/i18n";
+
+/** Each page in French (its plain URL) and in English (/en…), each listing the other as its translation. */
+const both = (path: string) => {
+  const fr = `${SITE_URL}${path}`;
+  const en = `${SITE_URL}${localizeHref("en", path || "/")}`;
+  const alternates = { languages: { fr, en, "x-default": fr } };
+  return [{ url: fr, alternates }, { url: en, alternates }];
+};
 
 const PAGES: { path: string; priority: number; changeFrequency: "daily" | "weekly" | "monthly" | "yearly" }[] = [
   { path: "", priority: 1, changeFrequency: "daily" },
@@ -19,12 +28,9 @@ const PAGES: { path: string; priority: number; changeFrequency: "daily" | "weekl
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const products = await getCatalog();
   return [
-    ...PAGES.map((p) => ({ url: `${SITE_URL}${p.path}`, changeFrequency: p.changeFrequency, priority: p.priority })),
-    ...products.map((p) => ({
-      url: `${SITE_URL}${productHref(p)}`,
-      changeFrequency: "weekly" as const,
-      priority: 0.8,
-      images: p.photo ? [p.photo] : undefined,
-    })),
+    ...PAGES.flatMap((p) => both(p.path).map((u) => ({ ...u, changeFrequency: p.changeFrequency, priority: p.priority }))),
+    ...products.flatMap((p) =>
+      both(productHref(p)).map((u) => ({ ...u, changeFrequency: "weekly" as const, priority: 0.8, images: p.photo ? [p.photo] : undefined })),
+    ),
   ];
 }

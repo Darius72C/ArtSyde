@@ -5,6 +5,7 @@ import { orderKey } from "@/lib/orders";
 import { PAYMENT_METHOD_IDS } from "@/lib/credits";
 import { logError } from "@/server/log";
 import { settle, startCreditPayment, startOrderPayment, type SettleStatus, type StartResult } from "@/server/payments/settle";
+import { getRequestT } from "@/lib/i18n/server";
 
 /*
  * The customer's side of online payment: back from GeniusPay's page (check it now, without waiting for the
@@ -30,8 +31,9 @@ export async function checkOrderPayment(reference: string, key: string): Promise
 
 /** "Payer maintenant": a new GeniusPay page for an order still waiting for its payment. */
 export async function payOrderNow(reference: string, key: string, method?: string): Promise<StartResult> {
+  const t = await getRequestT();
   const o = await orderFor(reference, key);
-  if (!o) return { ok: false, message: "Commande introuvable." };
+  if (!o) return { ok: false, message: t("Commande introuvable.") };
   return startOrderPayment(o.id, PAYMENT_METHOD_IDS.find((m) => m === method));
 }
 
@@ -51,7 +53,8 @@ export async function checkCreditPayment(reference: string): Promise<SettleStatu
 
 /** Paying again for a credit purchase whose payment failed. */
 export async function payCreditsNow(reference: string, method?: string): Promise<StartResult> {
+  const t = await getRequestT();
   const p = await db.creditPurchase.findUnique({ where: { reference: String(reference ?? "") }, select: { id: true } });
-  if (!p) return { ok: false, message: "Achat introuvable." };
+  if (!p) return { ok: false, message: t("Achat introuvable.") };
   return startCreditPayment(p.id, PAYMENT_METHOD_IDS.find((m) => m === method));
 }

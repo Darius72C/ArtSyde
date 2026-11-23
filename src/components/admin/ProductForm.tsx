@@ -11,7 +11,7 @@ import { DUR, EASE, SPRING } from "@/lib/motion";
 import { saveProduct, type ProductFormState } from "@/server/admin/products";
 import { uploadMedia } from "./uploadMedia";
 
-export type EditableProduct = { id: string; name: string; priceXof: number; oldPriceXof: number | null; tag: string | null; colors: string[]; sizes: string[]; active: boolean };
+export type EditableProduct = { id: string; name: string; description: string; descriptionEn: string; priceXof: number; oldPriceXof: number | null; tag: string | null; colors: string[]; sizes: string[]; active: boolean };
 
 const TAGS = [
   { value: "", label: "Aucune" },
@@ -182,6 +182,18 @@ function ProductFormBody({ product, uploads = false, onSubmitted }: FormProps & 
       <div className="grid gap-8 sm:grid-cols-2">
         <Field name="price" label="Prix (FCFA)" inputMode="numeric" defaultValue={product.priceXof || ""} error={e.price} />
         <Field name="oldPrice" label="Prix barré (FCFA, facultatif)" inputMode="numeric" defaultValue={product.oldPriceXof ?? ""} error={e.oldPrice} />
+      </div>
+
+      {/* The product page's description: French for the site, English for /en (empty: the French one shows there too). */}
+      <div className="grid gap-8 sm:grid-cols-2">
+        <label className="block">
+          <span className="mb-1.5 block text-[14px] text-muted">Description (français, facultatif)</span>
+          <textarea name="description" defaultValue={product.description} maxLength={2000} rows={4} className="field" />
+        </label>
+        <label className="block">
+          <span className="mb-1.5 block text-[14px] text-muted">Description en anglais (site /en, facultatif)</span>
+          <textarea name="descriptionEn" defaultValue={product.descriptionEn} maxLength={2000} rows={4} className="field" placeholder="Vide : la description française s'affiche" />
+        </label>
       </div>
 
       <label className="block">
